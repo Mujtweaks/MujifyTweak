@@ -27,7 +27,8 @@ dist-ssr
 src-tauri/target
 src-tauri/gen/schemas
 
-# Local secrets — AI API keys live here, never committed
+# Local secrets — AI API keys + updater signing key, never committed
 .env
 .env.*
 *.key
+*.key.pub

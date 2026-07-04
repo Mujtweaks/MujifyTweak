@@ -17,11 +17,60 @@
 mod modules;
 
 use serde::Serialize;
+use tauri::{
+    menu::{Menu, MenuItem},
+    tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
+    Emitter, Manager, WindowEvent,
+};
 
 use modules::{
     benchmark, change_log, game_detector, hardware_profiler, network_monitor, profile_store,
     rollback_engine, system_monitor, tweak_catalog, tweaks_engine,
 };
+
+fn show_main(app: &tauri::AppHandle) {
+    if let Some(w) = app.get_webview_window("main") {
+        let _ = w.show();
+        let _ = w.unminimize();
+        let _ = w.set_focus();
+    }
+}
+
+/// Tray icon with Open / Quick Optimize / Exit. Left-click opens the window.
+fn build_tray(app: &tauri::AppHandle) -> tauri::Result<()> {
+    let open = MenuItem::with_id(app, "open", "Open Mujify Tweaks", true, None::<&str>)?;
+    let quick = MenuItem::with_id(app, "quick_optimize", "Quick Optimize", true, None::<&str>)?;
+    let quit = MenuItem::with_id(app, "quit", "Exit", true, None::<&str>)?;
+    let menu = Menu::with_items(app, &[&open, &quick, &quit])?;
+
+    let mut builder = TrayIconBuilder::new()
+        .menu(&menu)
+        .tooltip("Mujify Tweaks")
+        .on_menu_event(|app, event| match event.id.as_ref() {
+            "open" => show_main(app),
+            "quick_optimize" => {
+                show_main(app);
+                let _ = app.emit("navigate", "tweaks");
+            }
+            "quit" => app.exit(0),
+            _ => {}
+        })
+        .on_tray_icon_event(|tray, event| {
+            if let TrayIconEvent::Click {
+                button: MouseButton::Left,
+                button_state: MouseButtonState::Up,
+                ..
+            } = event
+            {
+                show_main(tray.app_handle());
+            }
+        });
+    if let Some(icon) = app.default_window_icon() {
+        builder = builder.icon(icon.clone());
+    }
+    builder.build(app)?;
+    Ok(())
+}
 
 /// Checkpoint 1 — IPC proof-of-life. The System Guard card renders this verbatim.
 #[derive(Serialize)]
@@ -50,12 +99,21 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_notification::init())
+        .plugin(tauri_plugin_updater::Builder::new().build())
         .setup(|app| {
             let handle = app.handle().clone();
             system_monitor::start(handle.clone());
             network_monitor::start(handle.clone());
-            game_detector::start(handle);
+            game_detector::start(handle.clone());
+            build_tray(&handle)?;
             Ok(())
+        })
+        // Close (X) minimizes to the tray instead of quitting; tray → Exit quits.
+        .on_window_event(|window, event| {
+            if let WindowEvent::CloseRequested { api, .. } = event {
+                api.prevent_close();
+                let _ = window.hide();
+            }
         })
         .invoke_handler(tauri::generate_handler![
             ping,

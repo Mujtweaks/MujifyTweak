@@ -18,8 +18,8 @@ import DriverManager from "./pages/DriverManager";
 import StartupManager from "./pages/StartupManager";
 import Settings from "./pages/Settings";
 import { connectBackend, fetchHardware } from "./lib/backend";
-import { initEventBridge } from "./lib/events";
-import type { PageId } from "./lib/nav";
+import { initEventBridge, listenNavigate } from "./lib/events";
+import { NAV_ITEMS, type PageId } from "./lib/nav";
 
 export default function App() {
   const [page, setPage] = useState<PageId>("home");
@@ -28,6 +28,13 @@ export default function App() {
     void connectBackend();
     void fetchHardware();
     void initEventBridge();
+    // Tray deep-links (e.g. Quick Optimize) navigate the UI.
+    const valid = new Set<string>([...NAV_ITEMS.map((n) => n.id), "changelog", "report"]);
+    let unlisten: (() => void) | undefined;
+    listenNavigate((p) => {
+      if (valid.has(p)) setPage(p as PageId);
+    }).then((u) => (unlisten = u));
+    return () => unlisten?.();
   }, []);
 
   const renderPage = () => {

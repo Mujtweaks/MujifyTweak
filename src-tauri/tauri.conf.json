@@ -28,6 +28,14 @@
       "csp": null
     }
   },
+  "plugins": {
+    "updater": {
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDVEMzQxNkUyMzNGMjRDNTIKUldSU1RQSXo0aFkwWFhSUGl4WWFpVkJVOHlGTklocXV3Z2EzZUFVL2MrZU9hdDBCNDlCN0oxeEMK",
+      "endpoints": [
+        "https://github.com/MUJIFY_OWNER/mujify-tweaks/releases/latest/download/latest.json"
+      ]
+    }
+  },
   "bundle": {
     "active": true,
     "targets": ["nsis"],

@@ -50,3 +50,11 @@ export async function initEventBridge(): Promise<void> {
     useTweakStore.getState().pushActivity(e.payload),
   );
 }
+
+/** Tray "Quick Optimize" (and future deep-links) navigate the UI. */
+export async function listenNavigate(
+  onNavigate: (page: string) => void,
+): Promise<() => void> {
+  if (!isTauri) return () => {};
+  return listen<string>("navigate", (e) => onNavigate(e.payload));
+}

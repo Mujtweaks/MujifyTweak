@@ -1,0 +1,76 @@
+name: Release
+
+# Builds, signs, and publishes the Windows installer + updater manifest.
+# Triggers on a version tag (recommended) or manual dispatch.
+#
+# Required repo secrets (Settings → Secrets and variables → Actions):
+#   TAURI_SIGNING_PRIVATE_KEY           full contents of mujify-updater.key
+#   TAURI_SIGNING_PRIVATE_KEY_PASSWORD  the key password
+#
+# NOTE: the updater endpoint in tauri.conf.json points at
+# github.com/MUJIFY_OWNER/... — replace MUJIFY_OWNER with the real owner, and
+# because the repo is PRIVATE, host the released assets somewhere publicly
+# reachable (a public releases repo or GitHub Pages) or the auto-updater's
+# unauthenticated fetch will 404. Building/signing below works regardless.
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+jobs:
+  release:
+    runs-on: windows-latest
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-pc-windows-msvc
+
+      - name: Cache cargo
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      - name: Setup .NET (for the temperature sidecar)
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "8.0.x"
+
+      - name: Build self-contained LibreHardwareMonitor sidecar
+        shell: pwsh
+        run: |
+          dotnet publish sidecar-src/LHMWrapper -c Release -r win-x64 `
+            --self-contained true -p:PublishSingleFile=true `
+            -p:IncludeNativeLibrariesForSelfExtract=true
+          Copy-Item sidecar-src/LHMWrapper/bin/Release/net8.0/win-x64/publish/LHMWrapper.exe `
+            src-tauri/binaries/LHMWrapper-x86_64-pc-windows-msvc.exe -Force
+
+      - name: Install frontend deps
+        run: npm ci
+
+      - name: Build + sign + publish
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        with:
+          tagName: ${{ github.ref_name }}
+          releaseName: "Mujify Tweaks ${{ github.ref_name }}"
+          releaseBody: "See the assets below to download and install."
+          releaseDraft: false
+          prerelease: false
+          # Emits latest.json (the updater manifest) alongside the NSIS installer.
+          includeUpdaterJson: true
