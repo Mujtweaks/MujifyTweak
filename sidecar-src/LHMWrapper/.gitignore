@@ -1,0 +1,4 @@
+# C# build artifacts — the published sidecar is bundled in src-tauri/binaries/,
+# these intermediates are not committed.
+bin/
+obj/

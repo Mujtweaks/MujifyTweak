@@ -78,6 +78,8 @@ pub fn start(app: AppHandle) {
 
             if active != last_active {
                 let _ = app.emit("game_changed", &active);
+                // Start/stop real FPS capture (PresentMon) for the new game.
+                super::frame_time_monitor::on_active_game_change(&app, &active);
                 last_active = active;
             }
 

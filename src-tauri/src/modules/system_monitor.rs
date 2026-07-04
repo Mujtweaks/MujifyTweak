@@ -15,9 +15,11 @@ use std::sync::Mutex;
 use std::thread;
 use std::time::Duration;
 
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use sysinfo::System;
 use tauri::{AppHandle, Emitter};
+use tauri_plugin_shell::process::CommandEvent;
+use tauri_plugin_shell::ShellExt;
 use wmi::WMIConnection;
 
 use super::wmi_util::{connect, query, variant_to_f64, Row};
@@ -26,9 +28,44 @@ use super::wmi_util::{connect, query, variant_to_f64, Row};
 /// read current stats without re-sampling. Updated every tick by the monitor.
 static LATEST: Mutex<Option<SystemStats>> = Mutex::new(None);
 
+/// Latest CPU/GPU temps from the LibreHardwareMonitor sidecar. (None until it
+/// produces a reading; CPU temp needs the elevated shipped app — honest null in
+/// unelevated dev.)
+static LATEST_TEMPS: Mutex<(Option<f32>, Option<f32>)> = Mutex::new((None, None));
+
 /// Most recent live sample, if the monitor has produced one yet.
 pub fn latest() -> Option<SystemStats> {
     LATEST.lock().unwrap().clone()
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct TempLine {
+    cpu_temp_c: Option<f32>,
+    gpu_temp_c: Option<f32>,
+}
+
+/// Spawn the bundled LibreHardwareMonitor sidecar and keep LATEST_TEMPS updated.
+/// Missing sidecar (some dev setups) simply leaves temps null — never a crash.
+fn start_temp_sidecar(app: AppHandle) {
+    let sidecar = match app.shell().sidecar("LHMWrapper") {
+        Ok(cmd) => cmd,
+        Err(_) => return,
+    };
+    let (mut rx, _child) = match sidecar.spawn() {
+        Ok(pair) => pair,
+        Err(_) => return,
+    };
+    tauri::async_runtime::spawn(async move {
+        while let Some(event) = rx.recv().await {
+            if let CommandEvent::Stdout(bytes) = event {
+                let line = String::from_utf8_lossy(&bytes);
+                if let Ok(t) = serde_json::from_str::<TempLine>(line.trim()) {
+                    *LATEST_TEMPS.lock().unwrap() = (t.cpu_temp_c, t.gpu_temp_c);
+                }
+            }
+        }
+    });
 }
 
 #[derive(Serialize, Clone, Default)]
@@ -247,6 +284,9 @@ pub fn start(app: AppHandle) {
         return;
     }
 
+    // Real CPU/GPU temps via the LibreHardwareMonitor sidecar.
+    start_temp_sidecar(app.clone());
+
     thread::spawn(move || {
         // One WMI connection, created on this thread, reused for its life.
         // (wmi 0.18 keeps COM initialized on the owning thread.)
@@ -283,9 +323,8 @@ pub fn start(app: AppHandle) {
                 None => (None, None, None, None, None),
             };
 
-            // Temps require the LHM sidecar (not built yet) — honest null.
-            let cpu_temp: Option<f32> = None;
-            let gpu_temp: Option<f32> = None;
+            // Real temps from the LHM sidecar (null until it reports / needs admin).
+            let (cpu_temp, gpu_temp) = *LATEST_TEMPS.lock().unwrap();
 
             let (health, system_score) =
                 compute_health(cpu, gpu, ram_pct, disk_act, cpu_temp, gpu_temp);

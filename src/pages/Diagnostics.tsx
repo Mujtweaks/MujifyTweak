@@ -205,8 +205,12 @@ export default function Diagnostics() {
         <SummaryCard
           icon={Thermometer}
           label="Temperature"
-          value={stats?.cpuTempC != null ? `${Math.round(stats.cpuTempC)}°C` : "Sensor pending"}
-          sub={stats?.cpuTempC != null ? "Within safe limits." : "Temps need the LHM sidecar (.NET)."}
+          value={stats?.cpuTempC != null ? `${Math.round(stats.cpuTempC)}°C` : "—"}
+          sub={
+            stats?.cpuTempC != null
+              ? "Within safe limits."
+              : "CPU temp reads live in the installed (admin) app."
+          }
         />
         <SummaryCard
           icon={CheckCircle2}
@@ -227,8 +231,8 @@ export default function Diagnostics() {
           <MonitorRow icon={Monitor} label="GPU Usage" value={stats?.gpuUsagePercent != null ? `${Math.round(stats.gpuUsagePercent)}%` : "--"} percent={stats?.gpuUsagePercent ?? null} color="#2fd466" />
           <MonitorRow icon={MemoryStick} label="VRAM Usage" value={stats?.gpuVramUsedMb != null ? `${(stats.gpuVramUsedMb / 1024).toFixed(1)}GB` : "--"} percent={stats?.gpuVramUsedMb != null ? Math.min(100, (stats.gpuVramUsedMb / 1024 / 16) * 100) : null} color="#3e8bff" />
           <MonitorRow icon={MemoryStick} label="RAM Usage" value={stats ? `${Math.round(stats.ramUsagePercent)}%` : "--"} percent={stats?.ramUsagePercent ?? null} />
-          <MonitorRow icon={Thermometer} label="CPU Temp" value={stats?.cpuTempC != null ? `${Math.round(stats.cpuTempC)}°C` : "—"} percent={stats?.cpuTempC != null ? stats.cpuTempC : null} />
-          <MonitorRow icon={Thermometer} label="GPU Temp" value={stats?.gpuTempC != null ? `${Math.round(stats.gpuTempC)}°C` : "—"} percent={stats?.gpuTempC != null ? stats.gpuTempC : null} color="#2fd466" />
+          <MonitorRow icon={Thermometer} label="CPU Temp" value={stats?.cpuTempC != null ? `${Math.round(stats.cpuTempC)}°C` : "admin"} percent={stats?.cpuTempC != null ? stats.cpuTempC : null} />
+          <MonitorRow icon={Thermometer} label="GPU Temp" value={stats?.gpuTempC != null ? `${Math.round(stats.gpuTempC)}°C` : "admin"} percent={stats?.gpuTempC != null ? stats.gpuTempC : null} color="#2fd466" />
           <MonitorRow icon={HardDrive} label="Storage Activity" value={stats?.diskActivityPercent != null ? `${Math.round(stats.diskActivityPercent)}%` : "--"} percent={stats?.diskActivityPercent ?? null} color="#3e8bff" />
         </div>
 

@@ -15,6 +15,7 @@ use std::time::Duration;
 use serde::{Deserialize, Serialize};
 use tauri::AppHandle;
 
+use super::frame_time_monitor;
 use super::system_monitor;
 
 #[derive(Serialize, Deserialize, Clone, Default)]
@@ -63,6 +64,8 @@ async fn collect(count: u32, interval: Duration) -> Averages {
     let mut gpu_n = 0u32;
     let mut ram = 0.0f32;
     let mut score = 0.0f32;
+    let mut fps_sum = 0.0f32;
+    let mut fps_n = 0u32;
     let mut got = 0u32;
 
     for _ in 0..count {
@@ -76,6 +79,11 @@ async fn collect(count: u32, interval: Duration) -> Averages {
             score += s.system_score as f32;
             got += 1;
         }
+        // Real FPS if a game is being captured by PresentMon; absent otherwise.
+        if let Some(f) = frame_time_monitor::latest_frame() {
+            fps_sum += f.avg_fps;
+            fps_n += 1;
+        }
         tokio::time::sleep(interval).await;
     }
 
@@ -86,7 +94,8 @@ async fn collect(count: u32, interval: Duration) -> Averages {
         gpu_usage: if gpu_n > 0 { Some(gpu_sum / gpu_n as f32) } else { None },
         ram_usage: ram / n,
         system_score: score / n,
-        avg_fps: None, // PresentMon not bundled yet — honest null
+        // Measured only when a game was actually presenting during the window.
+        avg_fps: if fps_n > 0 { Some(fps_sum / fps_n as f32) } else { None },
     }
 }
 
@@ -99,14 +108,18 @@ fn pct(before: f32, after: f32) -> Option<f32> {
 }
 
 fn build_metrics(b: &Averages, p: &Averages) -> Vec<MetricDelta> {
+    let fps_measured = b.avg_fps.is_some() && p.avg_fps.is_some();
     vec![
         MetricDelta {
             label: "Avg FPS".into(),
             before: b.avg_fps,
             after: p.avg_fps,
-            delta_pct: None,
+            delta_pct: match (b.avg_fps, p.avg_fps) {
+                (Some(x), Some(y)) => pct(x, y),
+                _ => None,
+            },
             better: "higher".into(),
-            measured: false, // until PresentMon
+            measured: fps_measured,
         },
         MetricDelta {
             label: "CPU Load".into(),
@@ -149,21 +162,35 @@ fn build_metrics(b: &Averages, p: &Averages) -> Vec<MetricDelta> {
 /// Honest verdict. Without FPS we can only speak to system-load/score movement,
 /// and we say exactly that — never "meaningful FPS gain" from load numbers.
 fn verdict(metrics: &[MetricDelta], fps_measured: bool) -> String {
-    if !fps_measured {
-        let score = metrics
+    if fps_measured {
+        let fps = metrics
             .iter()
-            .find(|m| m.label == "System Score")
+            .find(|m| m.label == "Avg FPS")
             .and_then(|m| m.delta_pct)
             .unwrap_or(0.0);
-        return if score > 3.0 {
-            "System headroom improved. Bundle PresentMon to measure real in-game FPS.".into()
-        } else if score < -3.0 {
-            "System load rose after changes — consider Revert All.".into()
+        return if fps > 5.0 {
+            format!("Meaningful improvement — average FPS rose {:.0}%. Tweaks confirmed effective.", fps)
+        } else if fps > 2.0 {
+            format!("Marginal improvement — average FPS rose {:.0}%.", fps)
+        } else if fps < -2.0 {
+            format!("Performance dropped {:.0}% — recommend Revert All.", fps.abs())
         } else {
-            "No significant system-load change measured. FPS not yet measurable (PresentMon pending).".into()
+            "No significant FPS change measured.".into()
         };
     }
-    "Report complete.".into()
+    // No game was presenting → we only measured system load, and say exactly that.
+    let score = metrics
+        .iter()
+        .find(|m| m.label == "System Score")
+        .and_then(|m| m.delta_pct)
+        .unwrap_or(0.0);
+    if score > 3.0 {
+        "System headroom improved. Launch a game and re-run to measure real in-game FPS.".into()
+    } else if score < -3.0 {
+        "System load rose after changes — consider Revert All.".into()
+    } else {
+        "No significant system-load change measured. Launch a game to measure FPS.".into()
+    }
 }
 
 /// Run one baseline OR post capture. `phase` is "baseline" | "post".
@@ -193,7 +220,8 @@ pub async fn run_benchmark(
         if let Some(report) = guard.as_mut() {
             report.post = avg.clone();
             report.metrics = build_metrics(&report.baseline, &report.post);
-            report.fps_measured = false;
+            report.fps_measured =
+                report.baseline.avg_fps.is_some() && report.post.avg_fps.is_some();
             report.verdict = verdict(&report.metrics, report.fps_measured);
             report.created_at = chrono::Utc::now().timestamp_millis();
         }
@@ -205,4 +233,45 @@ pub async fn run_benchmark(
 #[tauri::command]
 pub fn get_latest_report() -> Option<BenchmarkReport> {
     LATEST_REPORT.lock().unwrap().clone()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn avg(cpu: f32, fps: Option<f32>) -> Averages {
+        Averages {
+            samples: 20,
+            cpu_usage: cpu,
+            gpu_usage: Some(50.0),
+            ram_usage: 60.0,
+            system_score: 90.0,
+            avg_fps: fps,
+        }
+    }
+
+    #[test]
+    fn fps_delta_is_measured_only_when_both_sides_have_fps() {
+        // Both sides have FPS → the Avg FPS row is measured with a real delta.
+        let m = build_metrics(&avg(50.0, Some(100.0)), &avg(45.0, Some(120.0)));
+        let fps_row = m.iter().find(|r| r.label == "Avg FPS").unwrap();
+        assert!(fps_row.measured);
+        assert!((fps_row.delta_pct.unwrap() - 20.0).abs() < 0.1); // +20%
+    }
+
+    #[test]
+    fn fps_row_honestly_unmeasured_without_a_game() {
+        // No FPS captured (no game presenting) → row stays unmeasured, no fake %.
+        let m = build_metrics(&avg(50.0, None), &avg(45.0, None));
+        let fps_row = m.iter().find(|r| r.label == "Avg FPS").unwrap();
+        assert!(!fps_row.measured);
+        assert!(fps_row.delta_pct.is_none());
+    }
+
+    #[test]
+    fn verdict_speaks_to_fps_when_measured() {
+        let m = build_metrics(&avg(50.0, Some(100.0)), &avg(45.0, Some(115.0)));
+        let v = verdict(&m, true);
+        assert!(v.to_lowercase().contains("fps"));
+    }
 }
