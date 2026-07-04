@@ -11,6 +11,7 @@
 //! Everything else (CPU%, per-core, RAM, GPU%, VRAM, disk) is live Windows data.
 
 use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Mutex;
 use std::thread;
 use std::time::Duration;
 
@@ -20,6 +21,15 @@ use tauri::{AppHandle, Emitter};
 use wmi::WMIConnection;
 
 use super::wmi_util::{connect, query, variant_to_f64, Row};
+
+/// Latest sample, shared process-wide so the benchmark loop and any command can
+/// read current stats without re-sampling. Updated every tick by the monitor.
+static LATEST: Mutex<Option<SystemStats>> = Mutex::new(None);
+
+/// Most recent live sample, if the monitor has produced one yet.
+pub fn latest() -> Option<SystemStats> {
+    LATEST.lock().unwrap().clone()
+}
 
 #[derive(Serialize, Clone, Default)]
 #[serde(rename_all = "camelCase")]
@@ -301,6 +311,7 @@ pub fn start(app: AppHandle) {
                 health,
             };
 
+            *LATEST.lock().unwrap() = Some(stats.clone());
             let _ = app.emit("system_stats", &stats);
             thread::sleep(Duration::from_secs(1));
         }

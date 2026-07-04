@@ -1,20 +1,27 @@
 // Mujify Tweaks — Rust core.
 //
-// Implemented checkpoints: 1 (ping IPC), 2 (HardwareProfiler), 3 (SystemMonitor),
-// 4–5 (GameDetector + AntiCheatGuard detection), 7 (NetworkMonitor),
-// 8 scan-half (tweak catalog + read-only scanner), 11 storage-half (ProfileStore).
+// Implemented: Checkpoint 1 (ping), 2 (HardwareProfiler), 3 (SystemMonitor),
+// 4–5 (GameDetector + AntiCheatGuard), 7 (NetworkMonitor), 8 (tweak catalog +
+// read-only scanner), 8b/9 (TweaksEngine apply + ChangeLog), 10 (RollbackEngine),
+// 11 (ProfileStore), 13–15 (Baseline/Post/Delta benchmark).
 //
-// Safety invariant: no code path here applies a tweak to the machine. The
-// scanner reads only; the apply/rollback engines (Checkpoints 8b–10) arrive
-// later and every state-changing op will route TweaksEngine → AntiCheatGuard →
-// ChangeLog. AntiCheatGuard::ALWAYS_BLOCKED is enforced regardless of caller.
+// Safety invariants:
+//  - Every state-changing op routes TweaksEngine → AntiCheatGuard → ChangeLog,
+//    captures a precise before-state, and is reversible. No unlogged path.
+//  - `apply_tweaks` / `revert_*` REQUIRE explicit `confirm: true` from the user's
+//    per-action UI confirmation, and run RealMutator. Never called by tooling.
+//  - The apply/undo logic is proven by `cargo test` under MockMutator (touches
+//    nothing). No tweak is ever executed to "verify" during development.
+//  - AntiCheatGuard::ALWAYS_BLOCKED is enforced regardless of caller.
 
 mod modules;
 
 use serde::Serialize;
 
-use modules::{game_detector, hardware_profiler, network_monitor, profile_store, system_monitor,
-    tweak_catalog};
+use modules::{
+    benchmark, change_log, game_detector, hardware_profiler, network_monitor, profile_store,
+    rollback_engine, system_monitor, tweak_catalog, tweaks_engine,
+};
 
 /// Checkpoint 1 — IPC proof-of-life. The System Guard card renders this verbatim.
 #[derive(Serialize)]
@@ -36,12 +43,14 @@ fn ping(app: tauri::AppHandle) -> PingResponse {
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    // Restore the persisted change log so Revert All survives restarts.
+    change_log::load();
+
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_notification::init())
         .setup(|app| {
-            // Start the live monitors (each spawns its own thread, pushes events).
             let handle = app.handle().clone();
             system_monitor::start(handle.clone());
             network_monitor::start(handle.clone());
@@ -56,6 +65,12 @@ pub fn run() {
             profile_store::list_profiles,
             profile_store::save_profile,
             profile_store::delete_profile,
+            tweaks_engine::apply_tweaks,
+            rollback_engine::revert_single,
+            rollback_engine::revert_all,
+            rollback_engine::get_change_log,
+            benchmark::run_benchmark,
+            benchmark::get_latest_report,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

@@ -1,4 +1,3 @@
-import { useState } from "react";
 import {
   BarChart3,
   LineChart,
@@ -19,52 +18,46 @@ interface ActionDef {
   desc: string;
   icon: LucideIcon;
   primary?: boolean;
-  hint: string;
+  goto: PageId;
 }
 
+// Each card navigates to the real page that performs the action — no dead clicks.
 const ACTIONS: ActionDef[] = [
   {
     title: "BOOST",
-    desc: "Apply all optimizations for your current game now.",
+    desc: "Pick tweaks and apply them — confirmed, logged, reversible.",
     icon: Zap,
     primary: true,
-    hint: "BOOST comes online with TweaksEngine + ProfileApplicator (Checkpoints 9–12).",
+    goto: "tweaks",
   },
   {
     title: "SCAN",
-    desc: "Check your system for performance issues.",
+    desc: "Check your system and see what can be optimized.",
     icon: Search,
-    hint: "SCAN comes online with HardwareProfiler + SystemMonitor (Checkpoints 2–3).",
+    goto: "optimizer",
   },
   {
     title: "ANALYZE",
-    desc: "See what's slowing you down before we fix it.",
+    desc: "See what's limiting performance right now.",
     icon: BarChart3,
-    hint: "ANALYZE comes online with the Bottleneck Analyzer (v1.5 Intelligence Layer).",
+    goto: "diagnostics",
   },
   {
     title: "REVERT ALL",
-    desc: "Undo everything. Restore your original settings.",
+    desc: "Review the change log and undo anything.",
     icon: RotateCcw,
-    hint: "REVERT ALL comes online with RollbackEngine (Checkpoint 10).",
+    goto: "changelog",
   },
 ];
 
 export default function ActionCards({ onNavigate }: ActionCardsProps) {
-  const [hint, setHint] = useState<string | null>(null);
-
-  const showHint = (text: string) => {
-    setHint(text);
-    window.setTimeout(() => setHint(null), 2800);
-  };
-
   return (
     <div className="flex flex-col gap-3">
       <div className="grid grid-cols-2 gap-3">
-        {ACTIONS.map(({ title, desc, icon: Icon, primary, hint: h }) => (
+        {ACTIONS.map(({ title, desc, icon: Icon, primary, goto }) => (
           <button
             key={title}
-            onClick={() => showHint(h)}
+            onClick={() => onNavigate(goto)}
             className={`flex items-start gap-3.5 rounded-2xl border p-4 text-left transition-transform active:scale-[0.99] ${
               primary
                 ? "border-accent/60 bg-gradient-to-b from-accent to-[#a3000a] shadow-[0_0_26px_rgba(227,0,14,0.30)]"
@@ -101,12 +94,6 @@ export default function ActionCards({ onNavigate }: ActionCardsProps) {
           </button>
         ))}
       </div>
-
-      {hint && (
-        <p className="rounded-xl border border-edge bg-panel2 px-3 py-2 text-[11.5px] text-txt2">
-          {hint}
-        </p>
-      )}
 
       <div className="grid grid-cols-2 gap-3">
         <button

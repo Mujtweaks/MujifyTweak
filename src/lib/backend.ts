@@ -2,6 +2,10 @@ import { invoke } from "@tauri-apps/api/core";
 import { isTauri } from "./tauri";
 import { useSystemStore } from "../store/systemStore";
 import type {
+  ApplyOutcome,
+  BenchAverages,
+  BenchmarkReport,
+  ChangeLogEntry,
   GameInfo,
   HardwareProfile,
   PingResponse,
@@ -84,5 +88,79 @@ export async function deleteProfile(id: string): Promise<void> {
     await invoke("delete_profile", { id });
   } catch (err) {
     console.error("delete_profile failed:", err);
+  }
+}
+
+// ---- Apply / rollback (Checkpoints 8b–10) -----------------------------------
+// `confirm: true` is only ever passed after the user confirms in the modal.
+
+export async function applyTweaks(
+  ids: string[],
+  antiCheatActive: boolean,
+): Promise<ApplyOutcome | null> {
+  if (!isTauri) return null;
+  try {
+    return await invoke<ApplyOutcome>("apply_tweaks", {
+      ids,
+      confirm: true,
+      antiCheatActive,
+    });
+  } catch (err) {
+    console.error("apply_tweaks failed:", err);
+    return null;
+  }
+}
+
+export async function revertSingle(entryId: string): Promise<void> {
+  if (!isTauri) return;
+  try {
+    await invoke("revert_single", { entryId, confirm: true });
+  } catch (err) {
+    console.error("revert_single failed:", err);
+  }
+}
+
+export async function revertAll(): Promise<number> {
+  if (!isTauri) return 0;
+  try {
+    return await invoke<number>("revert_all", { confirm: true });
+  } catch (err) {
+    console.error("revert_all failed:", err);
+    return 0;
+  }
+}
+
+export async function getChangeLog(): Promise<ChangeLogEntry[]> {
+  if (!isTauri) return [];
+  try {
+    return await invoke<ChangeLogEntry[]>("get_change_log");
+  } catch (err) {
+    console.error("get_change_log failed:", err);
+    return [];
+  }
+}
+
+// ---- Proof loop (Checkpoints 13–15) -----------------------------------------
+
+export async function runBenchmark(
+  phase: "baseline" | "post",
+  gameName: string | null,
+): Promise<BenchAverages | null> {
+  if (!isTauri) return null;
+  try {
+    return await invoke<BenchAverages>("run_benchmark", { phase, gameName });
+  } catch (err) {
+    console.error("run_benchmark failed:", err);
+    return null;
+  }
+}
+
+export async function getLatestReport(): Promise<BenchmarkReport | null> {
+  if (!isTauri) return null;
+  try {
+    return await invoke<BenchmarkReport | null>("get_latest_report");
+  } catch (err) {
+    console.error("get_latest_report failed:", err);
+    return null;
   }
 }

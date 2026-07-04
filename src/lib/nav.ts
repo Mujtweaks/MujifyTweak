@@ -6,7 +6,6 @@ import {
   Rocket,
   Settings,
   SlidersHorizontal,
-  Wrench,
   type LucideIcon,
 } from "lucide-react";
 
@@ -33,7 +32,10 @@ export interface NavItem {
   icon: LucideIcon;
 }
 
-/** Sidebar order per the dashboard mockup. */
+/**
+ * Sidebar nav. Only fully-real pages appear here — no dead clicks, no
+ * placeholder stubs. Tools (Phase 6) is intentionally absent until it's real.
+ */
 export const NAV_ITEMS: NavItem[] = [
   { id: "home", label: "Home", icon: House },
   { id: "optimizer", label: "Optimizer", icon: Rocket },
@@ -41,6 +43,5 @@ export const NAV_ITEMS: NavItem[] = [
   { id: "diagnostics", label: "Diagnostics", icon: Activity },
   { id: "network", label: "Network", icon: Globe },
   { id: "tweaks", label: "Tweaks", icon: SlidersHorizontal },
-  { id: "tools", label: "Tools", icon: Wrench },
   { id: "settings", label: "Settings", icon: Settings },
 ];

@@ -46,8 +46,8 @@ export default function RecentActivity({ onNavigate }: RecentActivityProps) {
               No activity yet
             </p>
             <p className="mt-1 text-[11.5px] leading-snug text-txt2">
-              Every change Mujify makes will be logged here in plain English —
-              each one undoable. TweaksEngine lands at Checkpoint 9.
+              Every change Mujify makes is logged here in plain English — each
+              one undoable. Your system is currently untouched.
             </p>
           </div>
         </div>

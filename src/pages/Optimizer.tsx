@@ -20,7 +20,13 @@ import { useTweakStore } from "../store/tweakStore";
 import { useSystemStore } from "../store/systemStore";
 import { scanTweaks } from "../lib/backend";
 import { CATEGORY_META, CATEGORY_ORDER, PRESET_RISK } from "../lib/categories";
-import type { TweakInfo } from "../lib/types";
+import ApplyConfirmModal from "../components/ApplyConfirmModal";
+import type { ApplyOutcome, TweakInfo } from "../lib/types";
+import type { PageId } from "../lib/nav";
+
+interface OptimizerProps {
+  onNavigate: (page: PageId) => void;
+}
 
 const PRESETS: {
   id: string;
@@ -77,7 +83,7 @@ function StatCell({ icon: Icon, label, value }: { icon: LucideIcon; label: strin
   );
 }
 
-export default function Optimizer() {
+export default function Optimizer({ onNavigate }: OptimizerProps) {
   const scanResult = useTweakStore((s) => s.scanResult);
   const lastScanAt = useTweakStore((s) => s.lastScanAt);
   const setScan = useTweakStore((s) => s.setScan);
@@ -89,6 +95,10 @@ export default function Optimizer() {
   const [scanning, setScanning] = useState(false);
   const [advancedOpen, setAdvancedOpen] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
+  const [showConfirm, setShowConfirm] = useState(false);
+  const [result, setResult] = useState<ApplyOutcome | null>(null);
+
+  const selectedTweaks = (scanResult?.tweaks ?? []).filter((t) => selected.has(t.id));
 
   const total = scanResult?.total ?? 0;
   const applied = scanResult?.applied ?? 0;
@@ -129,11 +139,6 @@ export default function Optimizer() {
     return map;
   }, [scanResult]);
 
-  const gatedNotice = () =>
-    setNotice(
-      "Scanning is fully live. Applying tweaks is intentionally gated — the apply engine (Checkpoint 8b) isn't enabled, so nothing is changed on your PC.",
-    );
-
   return (
     <div className="grid grid-cols-12 gap-4">
       {/* Left */}
@@ -154,9 +159,9 @@ export default function Optimizer() {
                 </span>
               </div>
               <p className="mt-2 max-w-md text-[13px] leading-relaxed text-txt2">
-                One-click per-game optimization with a full plain-English change log. Scanning is
-                live now; applying stays gated until you enable it — nothing runs on your PC by
-                surprise.
+                One-click per-game optimization with a full plain-English change log. Scan your
+                system, pick a preset, and apply — every change is confirmed first, logged, and
+                fully reversible. All free, no tiers.
               </p>
             </div>
           </div>
@@ -251,28 +256,46 @@ export default function Optimizer() {
 
           <div className="mt-3 grid grid-cols-[1.6fr_1fr_1fr] gap-3">
             <button
-              onClick={runScan}
+              onClick={() => {
+                if (!scanResult || selected.size === 0) void runScan();
+                else setShowConfirm(true);
+              }}
               disabled={scanning}
               className="flex items-center justify-center gap-2 rounded-xl bg-gradient-to-b from-accent to-[#a3000a] py-3 text-[13px] font-semibold text-white shadow-[0_0_22px_rgba(227,0,14,0.3)] transition-transform active:scale-[0.99] disabled:opacity-70"
             >
               <Zap size={15} strokeWidth={2.25} fill="currentColor" />
-              {scanning ? "Scanning…" : scanResult ? "Re-Scan System" : "Start Optimization"}
+              {scanning
+                ? "Scanning…"
+                : scanResult && selected.size > 0
+                  ? `Apply ${selected.size} Optimization${selected.size === 1 ? "" : "s"}`
+                  : scanResult
+                    ? "Re-Scan System"
+                    : "Start Optimization"}
             </button>
             <button
-              onClick={gatedNotice}
-              className="flex items-center justify-center gap-2 rounded-xl border border-edge bg-panel2 py-3 text-[12.5px] font-medium text-txt transition-colors hover:border-edge2"
+              onClick={() => setShowConfirm(true)}
+              disabled={!scanResult || selected.size === 0}
+              className="flex items-center justify-center gap-2 rounded-xl border border-edge bg-panel2 py-3 text-[12.5px] font-medium text-txt transition-colors hover:border-edge2 disabled:opacity-50"
             >
               <FileText size={14} strokeWidth={2} className="text-txt2" />
               Preview Changes
             </button>
             <button
-              onClick={gatedNotice}
+              onClick={() => onNavigate("changelog")}
               className="flex items-center justify-center gap-2 rounded-xl border border-edge bg-panel2 py-3 text-[12.5px] font-medium text-txt transition-colors hover:border-edge2"
             >
               <RotateCcw size={14} strokeWidth={2} className="text-txt2" />
               Revert All
             </button>
           </div>
+          {result && (
+            <p className="mt-3 rounded-lg border border-good/30 bg-good/10 px-3 py-2 text-[11.5px] text-txt">
+              Applied {result.applied.length} change{result.applied.length === 1 ? "" : "s"}.{" "}
+              <button onClick={() => onNavigate("changelog")} className="font-semibold text-accent">
+                View / undo in Change Log →
+              </button>
+            </p>
+          )}
           {notice && (
             <p className="mt-3 rounded-lg border border-accent/25 bg-accent/5 px-3 py-2 text-[11.5px] leading-snug text-txt2">
               {notice}
@@ -363,6 +386,19 @@ export default function Optimizer() {
           )}
         </div>
       </section>
+
+      {showConfirm && (
+        <ApplyConfirmModal
+          tweaks={selectedTweaks}
+          title="Apply optimizations"
+          onClose={() => setShowConfirm(false)}
+          onApplied={(o) => {
+            setResult(o);
+            setSelected(new Set());
+            void runScan();
+          }}
+        />
+      )}
     </div>
   );
 }

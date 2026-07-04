@@ -1,7 +1,7 @@
-import { useState } from "react";
 import { ShieldCheck, Zap } from "lucide-react";
 import { NAV_ITEMS, type PageId } from "../lib/nav";
 import { useSystemStore } from "../store/systemStore";
+import { useGameStore } from "../store/gameStore";
 import logo from "../assets/logo.png";
 
 interface SidebarProps {
@@ -12,12 +12,7 @@ interface SidebarProps {
 export default function Sidebar({ page, onNavigate }: SidebarProps) {
   const backendConnected = useSystemStore((s) => s.backendConnected);
   const backendVersion = useSystemStore((s) => s.backendVersion);
-  const [hint, setHint] = useState<string | null>(null);
-
-  const showHint = (text: string) => {
-    setHint(text);
-    window.setTimeout(() => setHint(null), 2600);
-  };
+  const antiCheatActive = useGameStore((s) => s.antiCheatActive);
 
   return (
     <aside className="flex w-[190px] shrink-0 flex-col border-r border-edge bg-[#0d0d0f]">
@@ -69,40 +64,36 @@ export default function Sidebar({ page, onNavigate }: SidebarProps) {
       </nav>
 
       <div className="mt-auto flex flex-col gap-3 px-3 pb-4">
-        {hint && (
-          <p className="rounded-lg border border-edge bg-panel2 px-2.5 py-2 text-[11px] leading-snug text-txt2">
-            {hint}
-          </p>
-        )}
-
         <button
-          onClick={() =>
-            showHint("Not wired yet — one-click optimize comes online with TweaksEngine (Checkpoint 9).")
-          }
+          onClick={() => onNavigate("tweaks")}
           className="flex items-center justify-center gap-2 rounded-xl bg-gradient-to-b from-accent to-[#b0000b] px-3 py-2.5 text-[13px] font-semibold text-white shadow-[0_0_22px_rgba(227,0,14,0.35)] transition-transform active:scale-[0.98]"
         >
           <Zap size={15} strokeWidth={2.25} fill="currentColor" />
           Quick Optimize
         </button>
 
-        {/* System Guard — Checkpoint 1: this status is REAL (Rust ping round-trip) */}
+        {/* System Guard — real: backend ping + live anti-cheat detection. */}
         <div className="flex items-center gap-2.5 rounded-xl border border-edge bg-panel px-3 py-2.5">
           <ShieldCheck
             size={17}
             strokeWidth={1.75}
-            className={backendConnected ? "text-good" : "text-txt3"}
+            className={antiCheatActive ? "text-warn" : backendConnected ? "text-good" : "text-txt3"}
           />
           <div className="min-w-0 flex-1">
             <p className="text-[10px] font-semibold uppercase tracking-wider text-txt2">
               System Guard
             </p>
             <p className="truncate text-[11px] text-txt">
-              {backendConnected ? `Core connected v${backendVersion}` : "Connecting…"}
+              {antiCheatActive
+                ? "Protected game active"
+                : backendConnected
+                  ? `Core connected v${backendVersion}`
+                  : "Connecting…"}
             </p>
           </div>
           <span
             className={`h-2 w-2 shrink-0 rounded-full ${
-              backendConnected ? "bg-good" : "animate-pulse bg-txt3"
+              antiCheatActive ? "bg-warn" : backendConnected ? "bg-good" : "animate-pulse bg-txt3"
             }`}
           />
         </div>

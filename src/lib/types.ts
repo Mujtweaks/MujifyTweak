@@ -106,6 +106,51 @@ export interface TweakInfo {
   risk: RiskLevel;
   applied: boolean;
   available: boolean;
+  /** Real, tested apply path exists — otherwise the UI shows it scan-only. */
+  appliable: boolean;
+}
+
+export interface ChangeLogEntry {
+  id: string;
+  timestamp: number;
+  tweakId: string;
+  description: string;
+  riskLevel: RiskLevel;
+  reversible: boolean;
+  undone: boolean;
+}
+
+export interface ApplyOutcome {
+  applied: ChangeLogEntry[];
+  blocked: string[];
+}
+
+export interface BenchAverages {
+  samples: number;
+  cpuUsage: number;
+  gpuUsage: number | null;
+  ramUsage: number;
+  systemScore: number;
+  avgFps: number | null;
+}
+
+export interface MetricDelta {
+  label: string;
+  before: number | null;
+  after: number | null;
+  deltaPct: number | null;
+  better: "higher" | "lower";
+  measured: boolean;
+}
+
+export interface BenchmarkReport {
+  gameName: string | null;
+  createdAt: number;
+  baseline: BenchAverages;
+  post: BenchAverages;
+  metrics: MetricDelta[];
+  verdict: string;
+  fpsMeasured: boolean;
 }
 
 export interface CategorySummary {

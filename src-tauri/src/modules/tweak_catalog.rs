@@ -39,6 +39,9 @@ pub struct TweakInfo {
     pub applied: bool,
     /// False when this tweak can't run here (e.g. laptop-only guard).
     pub available: bool,
+    /// True when a real, tested apply/undo path exists for this tweak. The UI
+    /// shows scan-only tweaks without an apply control (never a fake button).
+    pub appliable: bool,
 }
 
 #[derive(Serialize, Clone)]
@@ -65,6 +68,19 @@ struct TweakDef {
     description: &'static str,
     category: Category,
     risk: Risk,
+}
+
+/// Lightweight catalog lookup used by TweaksEngine for description + risk.
+pub struct TweakMeta {
+    pub title: String,
+    pub risk: Risk,
+}
+
+pub fn info_for(id: &str) -> Option<TweakMeta> {
+    CATALOG.iter().find(|d| d.id == id).map(|d| TweakMeta {
+        title: d.title.to_string(),
+        risk: d.risk,
+    })
 }
 
 /// The catalog. This is the source of truth for the Optimizer's category counts.
@@ -171,6 +187,7 @@ pub fn scan_tweaks(is_laptop: Option<bool>) -> ScanResult {
                 risk: d.risk,
                 applied,
                 available,
+                appliable: super::tweak_ops::is_appliable(d.id),
             }
         })
         .collect();

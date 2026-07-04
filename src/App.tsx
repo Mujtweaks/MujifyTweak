@@ -35,7 +35,7 @@ export default function App() {
       case "home":
         return <Dashboard onNavigate={setPage} />;
       case "optimizer":
-        return <Optimizer />;
+        return <Optimizer onNavigate={setPage} />;
       case "profiles":
         return <Profiles />;
       case "profile-editor":

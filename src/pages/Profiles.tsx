@@ -1,16 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
 import {
-  Copy,
   Gamepad2,
   HardDriveDownload,
-  Pencil,
   Plus,
-  RotateCcw,
-  Save,
   Search,
   SlidersHorizontal,
   Trash2,
-  Upload,
 } from "lucide-react";
 import { fetchInstalledGames, listProfiles, saveProfile, deleteProfile } from "../lib/backend";
 import type { GameInfo, Profile } from "../lib/types";
@@ -124,6 +119,12 @@ export default function Profiles() {
     await reload();
   };
 
+  const saveLaunchOptions = async (val: string) => {
+    if (!selected) return;
+    await saveProfile({ ...selected, launchOptions: val.trim() || null });
+    await reload();
+  };
+
   return (
     <div className="flex flex-col gap-4">
       {/* Header */}
@@ -135,19 +136,13 @@ export default function Profiles() {
             locally to AppData, auto-detected from your installed games.
           </p>
         </div>
-        <div className="flex gap-2.5">
-          <button className="flex items-center gap-2 rounded-xl border border-edge bg-panel px-3.5 py-2 text-[12px] font-medium text-txt transition-colors hover:border-edge2">
-            <Upload size={14} strokeWidth={2} className="text-txt2" />
-            Import Profile
-          </button>
-          <button
-            onClick={() => createProfile()}
-            className="flex items-center gap-2 rounded-xl bg-gradient-to-b from-accent to-[#a3000a] px-3.5 py-2 text-[12px] font-semibold text-white shadow-[0_0_18px_rgba(227,0,14,0.3)]"
-          >
-            <Plus size={14} strokeWidth={2.5} />
-            Create New Profile
-          </button>
-        </div>
+        <button
+          onClick={() => createProfile()}
+          className="flex items-center gap-2 rounded-xl bg-gradient-to-b from-accent to-[#a3000a] px-3.5 py-2 text-[12px] font-semibold text-white shadow-[0_0_18px_rgba(227,0,14,0.3)]"
+        >
+          <Plus size={14} strokeWidth={2.5} />
+          Create New Profile
+        </button>
       </div>
 
       {/* Stat cards */}
@@ -299,20 +294,13 @@ export default function Profiles() {
                 <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-txt2">
                   Profile Details
                 </p>
-                <div className="flex gap-1">
-                  <button className="grid h-8 w-8 place-items-center rounded-lg border border-edge text-txt2 hover:text-txt">
-                    <Pencil size={13} strokeWidth={2} />
-                  </button>
-                  <button className="grid h-8 w-8 place-items-center rounded-lg border border-edge text-txt2 hover:text-txt">
-                    <Copy size={13} strokeWidth={2} />
-                  </button>
-                  <button
-                    onClick={() => removeProfile(selected.id)}
-                    className="grid h-8 w-8 place-items-center rounded-lg border border-edge text-txt2 hover:border-accent/40 hover:text-accent"
-                  >
-                    <Trash2 size={13} strokeWidth={2} />
-                  </button>
-                </div>
+                <button
+                  onClick={() => removeProfile(selected.id)}
+                  className="flex items-center gap-1.5 rounded-lg border border-edge px-2.5 py-1.5 text-[11px] font-medium text-txt2 hover:border-accent/40 hover:text-accent"
+                >
+                  <Trash2 size={13} strokeWidth={2} />
+                  Delete
+                </button>
               </div>
 
               <div className="flex items-center gap-3.5">
@@ -342,12 +330,14 @@ export default function Profiles() {
                 </p>
                 <div className="flex items-center gap-2 rounded-lg border border-edge bg-panel2 px-3 py-2">
                   <input
+                    key={selected.id}
                     defaultValue={selected.launchOptions ?? ""}
+                    onBlur={(e) => void saveLaunchOptions(e.target.value)}
                     placeholder="e.g. -high -USEALLAVAILABLECORES"
                     className="flex-1 bg-transparent font-mono text-[11.5px] text-txt placeholder:text-txt3 focus:outline-none"
                   />
-                  <Copy size={13} strokeWidth={2} className="text-txt3" />
                 </div>
+                <p className="mt-1 text-[10px] text-txt3">Saved automatically when you click away.</p>
               </div>
 
               {/* Performance preview — honest: only real measured sessions show numbers */}
@@ -371,22 +361,6 @@ export default function Profiles() {
                 )}
               </div>
 
-              {/* Backup */}
-              <div className="mt-4">
-                <p className="mb-2 text-[10px] font-bold uppercase tracking-[0.14em] text-txt2">
-                  Backup &amp; Restore
-                </p>
-                <div className="flex gap-2.5">
-                  <button className="flex flex-1 items-center justify-center gap-2 rounded-xl border border-edge bg-panel2 py-2.5 text-[12px] font-medium text-txt hover:border-edge2">
-                    <RotateCcw size={13} strokeWidth={2} className="text-txt2" />
-                    Restore Backup
-                  </button>
-                  <button className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-gradient-to-b from-accent to-[#a3000a] py-2.5 text-[12px] font-semibold text-white">
-                    <Save size={13} strokeWidth={2} />
-                    Create Backup
-                  </button>
-                </div>
-              </div>
             </>
           ) : (
             <div className="grid h-full place-items-center">
