@@ -27,6 +27,14 @@ pub enum RegHive {
     Hklm,
 }
 
+/// A Windows service's start type + running state — enough to precisely restore.
+#[derive(Serialize, Deserialize, Clone, PartialEq, Debug)]
+pub struct ServiceState {
+    /// "boot" | "system" | "auto" | "demand" | "disabled"
+    pub start_type: String,
+    pub running: bool,
+}
+
 pub trait SystemMutator {
     fn active_power_plan_guid(&self) -> Option<String>;
     fn set_power_plan(&self, guid: &str) -> Result<(), String>;
@@ -36,6 +44,8 @@ pub trait SystemMutator {
     fn get_sz(&self, hive: RegHive, path: &str, name: &str) -> Option<String>;
     fn set_sz(&self, hive: RegHive, path: &str, name: &str, val: &str) -> Result<(), String>;
     fn flush_dns(&self) -> Result<(), String>;
+    fn get_service(&self, name: &str) -> Option<ServiceState>;
+    fn set_service(&self, name: &str, state: &ServiceState) -> Result<(), String>;
 }
 
 // ---- RealMutator ------------------------------------------------------------
@@ -126,6 +136,61 @@ impl SystemMutator for RealMutator {
             .map_err(|e| e.to_string())
             .map(|_| ())
     }
+
+    fn get_service(&self, name: &str) -> Option<ServiceState> {
+        // START_TYPE code from `sc qc` (locale-independent numeric): 2 auto,
+        // 3 demand, 4 disabled, 0 boot, 1 system.
+        let qc = Command::new("sc")
+            .args(["qc", name])
+            .creation_flags(CREATE_NO_WINDOW)
+            .output()
+            .ok()?;
+        let qc_txt = String::from_utf8_lossy(&qc.stdout);
+        let start_code = qc_txt
+            .lines()
+            .find(|l| l.contains("START_TYPE"))
+            .and_then(|l| l.split(':').nth(1))
+            .and_then(|r| r.split_whitespace().next())
+            .and_then(|n| n.parse::<u32>().ok())?;
+        let start_type = match start_code {
+            0 => "boot",
+            1 => "system",
+            2 => "auto",
+            3 => "demand",
+            4 => "disabled",
+            _ => "demand",
+        }
+        .to_string();
+
+        // STATE code from `sc query`: 4 = RUNNING.
+        let q = Command::new("sc")
+            .args(["query", name])
+            .creation_flags(CREATE_NO_WINDOW)
+            .output()
+            .ok()?;
+        let q_txt = String::from_utf8_lossy(&q.stdout);
+        let running = q_txt
+            .lines()
+            .find(|l| l.contains("STATE"))
+            .map(|l| l.contains(" 4 ") || l.contains("RUNNING"))
+            .unwrap_or(false);
+
+        Some(ServiceState { start_type, running })
+    }
+
+    fn set_service(&self, name: &str, state: &ServiceState) -> Result<(), String> {
+        // Set start type first, then reconcile the running state.
+        let _ = Command::new("sc")
+            .args(["config", name, "start=", &state.start_type])
+            .creation_flags(CREATE_NO_WINDOW)
+            .status();
+        let action = if state.running { "start" } else { "stop" };
+        let _ = Command::new("sc")
+            .args([action, name])
+            .creation_flags(CREATE_NO_WINDOW)
+            .status();
+        Ok(())
+    }
 }
 
 // ---- MockMutator (tests only — touches nothing real) ------------------------
@@ -134,6 +199,7 @@ impl SystemMutator for RealMutator {
 pub struct MockMutator {
     power_plan: RefCell<String>,
     regs: RefCell<HashMap<String, String>>,
+    services: RefCell<HashMap<String, ServiceState>>,
     pub calls: RefCell<Vec<String>>,
 }
 
@@ -143,6 +209,7 @@ impl MockMutator {
         MockMutator {
             power_plan: RefCell::new("BALANCED-GUID".into()),
             regs: RefCell::new(HashMap::new()),
+            services: RefCell::new(HashMap::new()),
             calls: RefCell::new(Vec::new()),
         }
     }
@@ -151,6 +218,14 @@ impl MockMutator {
         self.regs
             .borrow_mut()
             .insert(key_of(hive, path, name), val.to_string());
+        self
+    }
+
+    pub fn with_service(self, name: &str, start_type: &str, running: bool) -> Self {
+        self.services.borrow_mut().insert(
+            name.to_string(),
+            ServiceState { start_type: start_type.to_string(), running },
+        );
         self
     }
 
@@ -202,6 +277,14 @@ impl SystemMutator for MockMutator {
     }
     fn flush_dns(&self) -> Result<(), String> {
         self.record("flush_dns".into());
+        Ok(())
+    }
+    fn get_service(&self, name: &str) -> Option<ServiceState> {
+        self.services.borrow().get(name).cloned()
+    }
+    fn set_service(&self, name: &str, state: &ServiceState) -> Result<(), String> {
+        self.record(format!("set_service {name} {}/{}", state.start_type, state.running));
+        self.services.borrow_mut().insert(name.to_string(), state.clone());
         Ok(())
     }
 }
