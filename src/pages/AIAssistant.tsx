@@ -1,5 +1,6 @@
+import { useEffect, useState } from "react";
 import { Bot, Eye, KeyRound, Search, Send, ShieldCheck, Wrench } from "lucide-react";
-import { NEMOTRON_MODEL } from "../lib/aiConfig";
+import { NEMOTRON_MODEL, nvidiaKey } from "../lib/aiConfig";
 import type { PageId } from "../lib/nav";
 
 const CAPS = [
@@ -10,7 +11,33 @@ const CAPS = [
 ];
 
 export default function AIAssistant({ onNavigate }: { onNavigate: (page: PageId) => void }) {
-  // Keys ship with the app — no user setup required.
+  // Key comes from the Rust-managed config (not the front-end bundle).
+  const [keyReady, setKeyReady] = useState<boolean | null>(null);
+  useEffect(() => {
+    void nvidiaKey().then((k) => setKeyReady(!!k));
+  }, []);
+
+  // No key configured → prompt setup instead of erroring (Fix 1).
+  if (keyReady === false) {
+    return (
+      <div className="grid h-full place-items-center">
+        <div className="max-w-sm text-center">
+          <span className="mx-auto grid h-16 w-16 place-items-center rounded-2xl bg-accent/10 shadow-[0_0_28px_rgba(227,0,14,0.18)]">
+            <Bot size={30} strokeWidth={1.5} className="text-accent" />
+          </span>
+          <h1 className="mt-4 text-xl font-bold text-txt">Set up your API key to enable AI</h1>
+          <p className="mt-2 text-[13px] leading-relaxed text-txt2">
+            Add your free NVIDIA NIM key in Settings to unlock the assistant. It's stored locally on
+            this PC only, never uploaded.
+          </p>
+          <button onClick={() => onNavigate("settings")} className="glint mt-4 rounded-btn bg-accent px-5 py-2.5 text-[13px] font-semibold text-white shadow-[0_4px_20px_rgba(227,0,14,0.3)] hover:bg-accent-hi">
+            Open Settings
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="mx-auto flex h-full max-w-3xl flex-col gap-4">
       <div className="flex items-center gap-3">
@@ -44,7 +71,7 @@ export default function AIAssistant({ onNavigate }: { onNavigate: (page: PageId)
       <div className="flex items-center gap-3 rounded-card border border-edge bg-card p-4">
         <KeyRound size={16} strokeWidth={1.75} className="text-success" />
         <p className="flex-1 text-[12.5px] text-txt2">
-          Ready — powered by <span className="font-mono text-[11px] text-txt">{NEMOTRON_MODEL}</span>. No key needed; it's built in and free.
+          Ready — powered by <span className="font-mono text-[11px] text-txt">{NEMOTRON_MODEL}</span>. Key is stored on this PC (Settings), not in the app bundle.
         </p>
         <button onClick={() => onNavigate("settings")} className="rounded-btn border border-edge bg-bg px-3 py-1.5 text-[12px] font-medium text-txt hover:border-edge2">
           Settings

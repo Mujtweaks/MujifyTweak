@@ -1,26 +1,42 @@
 /**
- * AI Assistant credentials — provided by the app owner so end users never need
- * their own key. These are embedded intentionally (owner's decision). A user
- * can still override them in Settings (stored in localStorage), which takes
- * precedence when present.
+ * AI Assistant credentials.
+ *
+ * Keys are NOT stored in this bundle (that would let anyone read them from the
+ * installed app's WebView source). They live in
+ * %AppData%\Roaming\MujifyTweaks\config.json and are fetched at runtime through
+ * the Rust `get_api_key` / `set_api_key` commands. Settings writes them; here we
+ * only read them.
  */
 
-const EMBEDDED_NVIDIA_KEY =
-  "nvapi-REDACTED";
-const EMBEDDED_TAVILY_KEY = "tvly-REDACTED";
+import { invoke } from "@tauri-apps/api/core";
+import { isTauri } from "./tauri";
 
 export const NEMOTRON_MODEL = "nvidia/nemotron-3-ultra-550b-a55b";
 export const NVIDIA_BASE = "https://integrate.api.nvidia.com/v1";
 
-/** Effective NVIDIA key — user override (Settings) wins, else the embedded one. */
-export function nvidiaKey(): string {
-  return localStorage.getItem("mujify_nvidia_key")?.trim() || EMBEDDED_NVIDIA_KEY;
+export async function nvidiaKey(): Promise<string | null> {
+  if (!isTauri) return null;
+  try {
+    return await invoke<string | null>("get_api_key", { key: "nvidia" });
+  } catch {
+    return null;
+  }
 }
 
-/** Effective Tavily key — user override wins, else the embedded one. */
-export function tavilyKey(): string {
-  return localStorage.getItem("mujify_tavily_key")?.trim() || EMBEDDED_TAVILY_KEY;
+export async function tavilyKey(): Promise<string | null> {
+  if (!isTauri) return null;
+  try {
+    return await invoke<string | null>("get_api_key", { key: "tavily" });
+  } catch {
+    return null;
+  }
 }
 
-/** The AI is always usable out of the box — keys ship with the app. */
-export const aiReady = true;
+export async function saveApiKey(key: "nvidia" | "tavily", value: string): Promise<void> {
+  if (!isTauri) return;
+  try {
+    await invoke("set_api_key", { key, value });
+  } catch {
+    /* ignore — surfaced by the caller's own state */
+  }
+}

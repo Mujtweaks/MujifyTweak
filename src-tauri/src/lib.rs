@@ -24,8 +24,8 @@ use tauri::{
 };
 
 use modules::{
-    benchmark, change_log, game_detector, hardware_profiler, network_monitor, profile_store,
-    rollback_engine, system_monitor, tweak_catalog, tweaks_engine,
+    benchmark, change_log, config, game_detector, hardware_profiler, network_monitor,
+    profile_store, rollback_engine, system_monitor, tweak_catalog, tweaks_engine,
 };
 
 fn show_main(app: &tauri::AppHandle) {
@@ -130,6 +130,8 @@ pub fn run() {
             rollback_engine::get_change_log,
             benchmark::run_benchmark,
             benchmark::get_latest_report,
+            config::get_api_key,
+            config::set_api_key,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

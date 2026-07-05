@@ -9,6 +9,7 @@
 pub mod anti_cheat_guard;
 pub mod benchmark;
 pub mod change_log;
+pub mod config;
 pub mod frame_time_monitor;
 pub mod game_detector;
 pub mod games_db;

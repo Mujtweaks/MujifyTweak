@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Check, Cpu, Download, Info, KeyRound, RefreshCw, Save, Settings as SettingsIcon } from "lucide-react";
 import { useSystemStore } from "../store/systemStore";
+import { nvidiaKey, saveApiKey, tavilyKey } from "../lib/aiConfig";
 
 function Section({ icon: Icon, title, children }: { icon: typeof Info; title: string; children: React.ReactNode }) {
   return (
@@ -35,13 +36,14 @@ export default function Settings() {
   const [checking, setChecking] = useState(false);
 
   useEffect(() => {
-    setNvidia(localStorage.getItem("mujify_nvidia_key") ?? "");
-    setTavily(localStorage.getItem("mujify_tavily_key") ?? "");
+    // Read the current effective keys from the Rust-managed config file.
+    void nvidiaKey().then((k) => setNvidia(k ?? ""));
+    void tavilyKey().then((k) => setTavily(k ?? ""));
   }, []);
 
-  const saveKeys = () => {
-    localStorage.setItem("mujify_nvidia_key", nvidia.trim());
-    localStorage.setItem("mujify_tavily_key", tavily.trim());
+  const saveKeys = async () => {
+    await saveApiKey("nvidia", nvidia.trim());
+    await saveApiKey("tavily", tavily.trim());
     setSavedKeys(true);
     window.setTimeout(() => setSavedKeys(false), 1500);
   };
