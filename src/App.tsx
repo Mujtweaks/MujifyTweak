@@ -21,20 +21,35 @@ import { connectBackend, fetchHardware } from "./lib/backend";
 import { initEventBridge, listenNavigate } from "./lib/events";
 import { NAV_ITEMS, type PageId } from "./lib/nav";
 
+const VALID_PAGES = new Set<string>([...NAV_ITEMS.map((n) => n.id), "changelog", "report"]);
+
+function pageFromHash(): PageId | null {
+  const h = window.location.hash.replace(/^#/, "");
+  return VALID_PAGES.has(h) ? (h as PageId) : null;
+}
+
 export default function App() {
-  const [page, setPage] = useState<PageId>("home");
+  const [page, setPage] = useState<PageId>(() => pageFromHash() ?? "home");
 
   useEffect(() => {
     void connectBackend();
     void fetchHardware();
     void initEventBridge();
     // Tray deep-links (e.g. Quick Optimize) navigate the UI.
-    const valid = new Set<string>([...NAV_ITEMS.map((n) => n.id), "changelog", "report"]);
     let unlisten: (() => void) | undefined;
     listenNavigate((p) => {
-      if (valid.has(p)) setPage(p as PageId);
+      if (VALID_PAGES.has(p)) setPage(p as PageId);
     }).then((u) => (unlisten = u));
-    return () => unlisten?.();
+    // Hash deep-links (#network, #optimizer, …).
+    const onHash = () => {
+      const p = pageFromHash();
+      if (p) setPage(p);
+    };
+    window.addEventListener("hashchange", onHash);
+    return () => {
+      unlisten?.();
+      window.removeEventListener("hashchange", onHash);
+    };
   }, []);
 
   const renderPage = () => {
@@ -52,11 +67,11 @@ export default function App() {
       case "network":
         return <Network />;
       case "tweaks":
-        return <Tweaks />;
+        return <Tweaks onNavigate={setPage} />;
       case "tools":
         return <Tools />;
       case "ai":
-        return <AIAssistant />;
+        return <AIAssistant onNavigate={setPage} />;
       case "changelog":
         return <ChangeLogView />;
       case "report":
@@ -80,7 +95,7 @@ export default function App() {
         <main className="min-h-0 flex-1 overflow-y-auto px-5 py-4">
           {renderPage()}
         </main>
-        <GamesBar />
+        <GamesBar onNavigate={setPage} />
       </div>
     </div>
   );

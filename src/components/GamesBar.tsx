@@ -1,62 +1,46 @@
-import { useState } from "react";
 import { Plus } from "lucide-react";
 import { useGameStore } from "../store/gameStore";
+import GameArt from "./GameArt";
+import type { PageId } from "../lib/nav";
 
-/**
- * MY GAMES strip. Populated by GameDetector's launcher scan (Checkpoint 4) —
- * shows an honest empty state until real games are found on this PC.
- */
-export default function GamesBar() {
+export default function GamesBar({ onNavigate }: { onNavigate: (page: PageId) => void }) {
   const installedGames = useGameStore((s) => s.installedGames);
   const activeGame = useGameStore((s) => s.activeGame);
-  const [hint, setHint] = useState(false);
-
-  const showHint = () => {
-    setHint(true);
-    window.setTimeout(() => setHint(false), 2600);
-  };
 
   return (
-    <footer className="flex h-[58px] shrink-0 items-center gap-3 border-t border-edge bg-bg px-5">
-      <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-txt3">
-        My Games
-      </span>
+    <footer className="flex h-[52px] shrink-0 items-center gap-3 border-t border-edge bg-[#0d0d0d] px-5">
+      <span className="mr-1 text-[10px] font-semibold uppercase tracking-widest text-txt3">My Games</span>
 
       <div className="flex min-w-0 flex-1 items-center gap-2 overflow-x-auto">
-        {installedGames.length === 0 ? (
-          <span className="text-[11.5px] text-txt3">
-            {hint
-              ? "Game library scanning (Steam, Epic, Xbox, GOG) arrives at Checkpoint 4."
-              : "No games detected yet"}
+        {activeGame && (
+          <span className="flex shrink-0 items-center gap-2 rounded-pill border border-success/20 bg-card px-3 py-1.5">
+            <span className="h-1.5 w-1.5 rounded-full bg-success" />
+            <span className="text-[13px] font-medium text-txt">{activeGame.name}</span>
+            <span className="rounded-pill bg-success/10 px-2 py-0.5 text-[9px] font-bold text-success">ACTIVE</span>
           </span>
+        )}
+        {installedGames.length === 0 && !activeGame ? (
+          <span className="text-[12px] text-txt3">No games detected yet</span>
         ) : (
-          installedGames.map((game) => {
-            const isActive = activeGame?.exe === game.exe;
-            return (
+          installedGames
+            .filter((g) => g.name !== activeGame?.name)
+            .slice(0, 8)
+            .map((g) => (
               <button
-                key={game.exe}
-                className={`flex shrink-0 items-center gap-2 rounded-xl border px-3.5 py-1.5 text-[12px] font-medium transition-colors ${
-                  isActive
-                    ? "border-good/40 bg-good/10 text-txt"
-                    : "border-edge bg-panel text-txt2 hover:border-edge2 hover:text-txt"
-                }`}
+                key={g.name}
+                onClick={() => onNavigate("profiles")}
+                className="flex shrink-0 items-center gap-2 rounded-pill border border-edge bg-card px-3 py-1.5 text-[13px] text-txt2 transition-colors hover:text-txt"
               >
-                {isActive && <span className="h-1.5 w-1.5 rounded-full bg-good" />}
-                {game.name}
-                {isActive && (
-                  <span className="text-[9px] font-bold tracking-wider text-good">
-                    ACTIVE
-                  </span>
-                )}
+                <GameArt name={g.name} appId={g.appId} className="h-4 w-4" rounded="rounded" />
+                {g.name}
               </button>
-            );
-          })
+            ))
         )}
       </div>
 
       <button
-        onClick={showHint}
-        className="flex shrink-0 items-center gap-1.5 rounded-xl border border-edge bg-panel px-3.5 py-1.5 text-[12px] font-medium text-txt2 transition-colors hover:border-edge2 hover:text-txt"
+        onClick={() => onNavigate("profiles")}
+        className="flex shrink-0 items-center gap-1.5 rounded-pill border border-edge px-3 py-1.5 text-[12px] text-txt3 transition-colors hover:border-white/20 hover:text-txt"
       >
         <Plus size={13} strokeWidth={2} />
         Add Game

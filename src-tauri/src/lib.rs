@@ -119,6 +119,7 @@ pub fn run() {
             ping,
             hardware_profiler::get_hardware_profile,
             game_detector::get_installed_games,
+            network_monitor::get_network_info,
             tweak_catalog::scan_tweaks,
             profile_store::list_profiles,
             profile_store::save_profile,

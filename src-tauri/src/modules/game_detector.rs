@@ -27,6 +27,8 @@ pub struct GameInfo {
     pub exe: String,
     pub launcher: Option<String>,
     pub install_path: Option<String>,
+    /// Steam appid when known — the frontend uses it to show the real header art.
+    pub app_id: Option<String>,
 }
 
 static RUNNING: AtomicBool = AtomicBool::new(false);
@@ -71,6 +73,7 @@ pub fn start(app: AppHandle) {
                             .exe()
                             .and_then(|p| p.parent())
                             .map(|p| p.to_string_lossy().to_string()),
+                        app_id: None,
                     });
                     break;
                 }
@@ -141,6 +144,11 @@ fn scan_steam(games: &mut Vec<GameInfo>) {
             if !name.starts_with("appmanifest_") || !name.ends_with(".acf") {
                 continue;
             }
+            // appmanifest_<appid>.acf → appid for the Steam header art.
+            let app_id = name
+                .trim_start_matches("appmanifest_")
+                .trim_end_matches(".acf")
+                .to_string();
             if let Ok(text) = std::fs::read_to_string(entry.path()) {
                 let title = text
                     .lines()
@@ -154,6 +162,7 @@ fn scan_steam(games: &mut Vec<GameInfo>) {
                             exe: String::new(),
                             launcher: Some("Steam".into()),
                             install_path: Some(steamapps.join("common").to_string_lossy().into()),
+                            app_id: if app_id.is_empty() { None } else { Some(app_id) },
                         });
                     }
                 }
@@ -193,6 +202,7 @@ fn scan_epic(games: &mut Vec<GameInfo>) {
                                     .get("InstallLocation")
                                     .and_then(|v| v.as_str())
                                     .map(|s| s.to_string()),
+                                app_id: None,
                             });
                         }
                     }

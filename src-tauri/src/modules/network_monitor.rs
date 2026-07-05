@@ -15,8 +15,12 @@ use tauri::{AppHandle, Emitter};
 
 use windows::Win32::Foundation::CloseHandle;
 use windows::Win32::NetworkManagement::IpHelper::{
-    IcmpCreateFile, IcmpSendEcho, ICMP_ECHO_REPLY,
+    GetAdaptersInfo, GetNetworkParams, IcmpCreateFile, IcmpSendEcho, FIXED_INFO_W2KSP1,
+    ICMP_ECHO_REPLY, IP_ADAPTER_INFO,
 };
+
+// GetAdaptersInfo / GetNetworkParams return a WIN32 error code as u32; 0 = success.
+const WIN32_OK: u32 = 0;
 
 #[derive(Serialize, Clone)]
 #[serde(rename_all = "camelCase")]
@@ -77,6 +81,80 @@ fn stddev(samples: &[f32]) -> f32 {
     let mean = samples.iter().sum::<f32>() / samples.len() as f32;
     let var = samples.iter().map(|v| (v - mean).powi(2)).sum::<f32>() / samples.len() as f32;
     var.sqrt()
+}
+
+/// Read-only adapter details for the Network page: adapter model, IP, gateway,
+/// DNS, and link type. Uses GetAdaptersInfo/GetNetworkParams which hand back
+/// pre-formatted IP strings (no sockaddr parsing). Nothing is changed.
+#[derive(Serialize, Clone, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct NetworkInfo {
+    pub adapter_name: Option<String>,
+    pub ip_address: Option<String>,
+    pub gateway: Option<String>,
+    pub dns_server: Option<String>,
+    pub connection_type: Option<String>,
+}
+
+unsafe fn ansi_arr(ptr: *const u8) -> Option<String> {
+    if ptr.is_null() {
+        return None;
+    }
+    let s = std::ffi::CStr::from_ptr(ptr as *const std::ffi::c_char)
+        .to_string_lossy()
+        .trim()
+        .to_string();
+    if s.is_empty() || s == "0.0.0.0" {
+        None
+    } else {
+        Some(s)
+    }
+}
+
+#[tauri::command]
+pub fn get_network_info() -> NetworkInfo {
+    let mut info = NetworkInfo::default();
+    unsafe {
+        // Adapters — pick the one that has a real default gateway (the active link).
+        let mut size: u32 = 0;
+        let _ = GetAdaptersInfo(None, &mut size);
+        if size > 0 {
+            let mut buf = vec![0u8; size as usize];
+            let head = buf.as_mut_ptr() as *mut IP_ADAPTER_INFO;
+            if GetAdaptersInfo(Some(head), &mut size) == WIN32_OK {
+                let mut cur = head;
+                while !cur.is_null() {
+                    let a = &*cur;
+                    let gw = ansi_arr(a.GatewayList.IpAddress.String.as_ptr() as *const u8);
+                    if gw.is_some() {
+                        info.gateway = gw;
+                        info.ip_address =
+                            ansi_arr(a.IpAddressList.IpAddress.String.as_ptr() as *const u8);
+                        info.adapter_name = ansi_arr(a.Description.as_ptr() as *const u8);
+                        info.connection_type = Some(match a.Type {
+                            71 => "Wi-Fi".into(),
+                            6 => "Wired".into(),
+                            _ => "Other".into(),
+                        });
+                        break;
+                    }
+                    cur = a.Next;
+                }
+            }
+        }
+        // DNS server via GetNetworkParams.
+        let mut size2: u32 = 0;
+        let _ = GetNetworkParams(None, &mut size2);
+        if size2 > 0 {
+            let mut buf2 = vec![0u8; size2 as usize];
+            let fp = buf2.as_mut_ptr() as *mut FIXED_INFO_W2KSP1;
+            if GetNetworkParams(Some(fp), &mut size2).0 == WIN32_OK {
+                let f = &*fp;
+                info.dns_server = ansi_arr(f.DnsServerList.IpAddress.String.as_ptr() as *const u8);
+            }
+        }
+    }
+    info
 }
 
 pub fn start(app: AppHandle) {

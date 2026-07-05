@@ -8,6 +8,7 @@ import type {
   ChangeLogEntry,
   GameInfo,
   HardwareProfile,
+  NetworkInfo,
   PingResponse,
   Profile,
   ScanResult,
@@ -58,6 +59,17 @@ export async function fetchInstalledGames(): Promise<GameInfo[]> {
   } catch (err) {
     console.error("get_installed_games failed:", err);
     return [];
+  }
+}
+
+/** Read-only adapter details (IP/gateway/DNS/type) for the Network page. */
+export async function getNetworkInfo(): Promise<NetworkInfo | null> {
+  if (!isTauri) return null;
+  try {
+    return await invoke<NetworkInfo>("get_network_info");
+  } catch (err) {
+    console.error("get_network_info failed:", err);
+    return null;
   }
 }
 

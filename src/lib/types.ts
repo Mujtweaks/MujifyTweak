@@ -81,11 +81,30 @@ export interface GameInfo {
   exe: string;
   launcher: string | null;
   installPath: string | null;
+  /** Steam appid when known — used to load real header art. */
+  appId: string | null;
 }
 
 export interface AntiCheatStatus {
   active: boolean;
   detected: string[];
+}
+
+/** Read-only adapter details for the Network page. */
+export interface NetworkInfo {
+  adapterName: string | null;
+  ipAddress: string | null;
+  gateway: string | null;
+  dnsServer: string | null;
+  connectionType: string | null;
+}
+
+/** One rolling network sample for the latency graph (t: seconds ago, 0 = now). */
+export interface NetSample {
+  t: number;
+  ping?: number;
+  jitter?: number;
+  loss?: number;
 }
 
 export type RiskLevel = "safe" | "moderate" | "advanced";

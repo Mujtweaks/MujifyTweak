@@ -1,29 +1,22 @@
-import { useEffect, useMemo, useState } from "react";
-import { CheckCircle2, RefreshCw, Search, Zap } from "lucide-react";
+import { useEffect, useState } from "react";
+import { AlertTriangle, RefreshCw } from "lucide-react";
 import { scanTweaks } from "../lib/backend";
 import { useSystemStore } from "../store/systemStore";
 import { useTweakStore } from "../store/tweakStore";
-import { CATEGORY_META, CATEGORY_ORDER } from "../lib/categories";
+import { CATEGORY_META } from "../lib/categories";
 import RiskLabel from "../components/RiskLabel";
+import Toggle from "../components/Toggle";
 import ApplyConfirmModal from "../components/ApplyConfirmModal";
-import type { ApplyOutcome, TweakInfo } from "../lib/types";
+import type { TweakInfo } from "../lib/types";
+import type { PageId } from "../lib/nav";
 
-/**
- * Real tweak catalog. Live-scanned state (applied/available), per-tweak select,
- * and a confirm-gated apply. Tweaks without a real apply path are shown clearly
- * as "scan-only" — never a fake button. No tiers, no locks: everything here is
- * free and applies the same way.
- */
-export default function Tweaks() {
+/** Advanced tweaks — moderate/advanced risk only, always confirmed. */
+export default function Tweaks({ onNavigate }: { onNavigate: (page: PageId) => void }) {
   const scanResult = useTweakStore((s) => s.scanResult);
   const setScan = useTweakStore((s) => s.setScan);
   const hardware = useSystemStore((s) => s.hardware);
-
   const [scanning, setScanning] = useState(false);
-  const [selected, setSelected] = useState<Set<string>>(new Set());
-  const [search, setSearch] = useState("");
-  const [showConfirm, setShowConfirm] = useState(false);
-  const [result, setResult] = useState<ApplyOutcome | null>(null);
+  const [confirm, setConfirm] = useState<TweakInfo[] | null>(null);
 
   const runScan = async () => {
     setScanning(true);
@@ -37,170 +30,67 @@ export default function Tweaks() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const tweaks = scanResult?.tweaks ?? [];
-  const filtered = useMemo(
-    () =>
-      tweaks.filter(
-        (t) =>
-          t.title.toLowerCase().includes(search.toLowerCase()) ||
-          t.description.toLowerCase().includes(search.toLowerCase()),
-      ),
-    [tweaks, search],
-  );
+  const rows = (scanResult?.tweaks ?? []).filter((t) => t.risk !== "safe");
 
-  const byCategory = (cat: string) => filtered.filter((t) => t.category === cat);
-  const selectedTweaks = tweaks.filter((t) => selected.has(t.id));
-
-  const toggle = (t: TweakInfo) => {
-    if (!t.appliable || t.applied || !t.available) return;
-    setSelected((prev) => {
-      const next = new Set(prev);
-      next.has(t.id) ? next.delete(t.id) : next.add(t.id);
-      return next;
-    });
+  const onToggle = (t: TweakInfo) => {
+    if (t.applied) return onNavigate("changelog");
+    if (!t.appliable || !t.available) return;
+    setConfirm([t]);
   };
 
   return (
     <div className="flex flex-col gap-4">
       <div className="flex items-start justify-between">
         <div>
-          <h1 className="font-display text-2xl font-bold tracking-wide text-txt">Tweaks</h1>
-          <p className="mt-1 max-w-lg text-[12.5px] text-txt2">
-            The full catalog — {tweaks.length} tweaks, all free. Live state read from your system.
-            Select what you want; every apply is confirmed, logged, and fully reversible.
-          </p>
+          <h1 className="text-2xl font-bold text-txt">Advanced Tweaks</h1>
+          <p className="mt-1 text-[12.5px] text-txt2">Higher-impact tweaks — opt-in, risk-labeled, and reversible. Free like everything else.</p>
         </div>
-        <div className="flex items-center gap-2.5">
-          <div className="flex items-center gap-2 rounded-lg border border-edge bg-panel px-2.5 py-1.5">
-            <Search size={13} strokeWidth={2} className="text-txt3" />
-            <input
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search tweaks…"
-              className="w-32 bg-transparent text-[12px] text-txt placeholder:text-txt3 focus:outline-none"
-            />
-          </div>
-          <button
-            onClick={runScan}
-            disabled={scanning}
-            className="flex items-center gap-2 rounded-xl border border-edge bg-panel px-3 py-2 text-[12px] font-medium text-txt hover:border-edge2 disabled:opacity-60"
-          >
-            <RefreshCw size={13} strokeWidth={2} className={scanning ? "animate-spin text-txt2" : "text-txt2"} />
-            {scanning ? "Scanning…" : "Re-scan"}
-          </button>
-        </div>
+        <button onClick={runScan} disabled={scanning} className="flex items-center gap-2 rounded-btn border border-edge bg-card px-3.5 py-2 text-[12px] font-medium text-txt hover:border-edge2 disabled:opacity-60">
+          <RefreshCw size={13} strokeWidth={2} className={scanning ? "animate-spin text-txt2" : "text-txt2"} />
+          {scanning ? "Scanning…" : "Re-scan"}
+        </button>
       </div>
 
-      {result && (
-        <div className="rounded-xl border border-good/30 bg-good/10 px-3.5 py-2.5 text-[12px] text-txt">
-          Applied {result.applied.length} change{result.applied.length === 1 ? "" : "s"}.
-          {result.blocked.length > 0 && ` ${result.blocked.length} held or skipped.`} See the Change
-          Log to undo anything.
-        </div>
-      )}
+      <div className="flex items-start gap-3 rounded-card border border-warning/30 bg-warning/10 p-4">
+        <AlertTriangle size={18} strokeWidth={2} className="mt-0.5 shrink-0 text-warning" />
+        <p className="text-[12.5px] leading-snug text-warning">
+          Advanced tweaks are opt-in only. Read each description before enabling. Every one shows a
+          confirmation with the exact change first, is written to the Change Log, and can be undone.
+          Kernel-level tweaks (v2.0) will create a Windows Restore Point before applying.
+        </p>
+      </div>
 
-      <div className="grid grid-cols-2 gap-4">
-        {CATEGORY_ORDER.map((cat) => {
-          const meta = CATEGORY_META[cat];
-          const Icon = meta.icon;
-          const items = byCategory(cat);
-          if (items.length === 0) return null;
+      <div className="flex flex-col gap-2.5">
+        {rows.length === 0 && <p className="py-8 text-center text-[12px] text-txt3">{scanning ? "Scanning…" : "No advanced tweaks available."}</p>}
+        {rows.map((t) => {
+          const Icon = CATEGORY_META[t.category].icon;
+          const scanOnly = !t.appliable || !t.available;
           return (
-            <div key={cat} className="rounded-2xl border border-edge bg-panel p-4">
-              <div className="mb-3 flex items-center gap-2.5">
-                <span className="grid h-8 w-8 place-items-center rounded-lg border border-edge bg-panel2">
-                  <Icon size={15} strokeWidth={1.75} className="text-txt2" />
-                </span>
-                <div>
-                  <p className="text-[12.5px] font-semibold text-txt">{meta.label}</p>
-                  <p className="text-[10px] text-txt3">
-                    {items.filter((t) => t.applied).length} active · {items.length} total
-                  </p>
+            <div key={t.id} className="flex items-center gap-4 rounded-card border border-edge bg-card p-4">
+              <span className="grid h-10 w-10 shrink-0 place-items-center rounded-btn bg-bg">
+                <Icon size={17} strokeWidth={1.75} className="text-txt2" />
+              </span>
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-2">
+                  <p className="text-[14px] font-medium text-txt">{t.title}</p>
+                  <RiskLabel level={t.risk} />
+                  <span className="text-[10px] text-txt3">· {CATEGORY_META[t.category].label}</span>
                 </div>
+                <p className="mt-0.5 text-[12px] text-txt2">{t.description}</p>
+                {t.applied ? (
+                  <p className="mt-1 text-[10px] font-semibold uppercase tracking-wide text-success">Active — manage in Change Log</p>
+                ) : scanOnly ? (
+                  <p className="mt-1 text-[10px] font-medium uppercase tracking-wide text-txt3">{!t.available ? "Not available on this system" : "Scan-only (apply path coming)"}</p>
+                ) : null}
               </div>
-              <div className="flex flex-col gap-1.5">
-                {items.map((t) => {
-                  const isSelected = selected.has(t.id);
-                  const locked = !t.appliable || t.applied || !t.available;
-                  return (
-                    <button
-                      key={t.id}
-                      onClick={() => toggle(t)}
-                      className={`flex items-start gap-2.5 rounded-lg border px-3 py-2.5 text-left transition-colors ${
-                        isSelected
-                          ? "border-accent/50 bg-accent/5"
-                          : "border-edge bg-panel2 hover:border-edge2"
-                      } ${locked ? "cursor-default" : ""}`}
-                    >
-                      <span
-                        className={`mt-0.5 grid h-4 w-4 shrink-0 place-items-center rounded border ${
-                          t.applied
-                            ? "border-good bg-good/20"
-                            : isSelected
-                              ? "border-accent bg-accent"
-                              : "border-edge2"
-                        }`}
-                      >
-                        {t.applied ? (
-                          <CheckCircle2 size={11} className="text-good" />
-                        ) : isSelected ? (
-                          <span className="h-1.5 w-1.5 rounded-full bg-white" />
-                        ) : null}
-                      </span>
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-center gap-2">
-                          <p className="text-[12px] font-medium text-txt">{t.title}</p>
-                          <RiskLabel level={t.risk} />
-                        </div>
-                        <p className="text-[10.5px] leading-snug text-txt2">{t.description}</p>
-                        {t.applied ? (
-                          <span className="text-[9.5px] font-semibold uppercase tracking-wider text-good">
-                            Already active
-                          </span>
-                        ) : !t.appliable ? (
-                          <span className="text-[9.5px] font-medium uppercase tracking-wider text-txt3">
-                            Scan-only (apply path coming)
-                          </span>
-                        ) : !t.available ? (
-                          <span className="text-[9.5px] font-medium uppercase tracking-wider text-txt3">
-                            Not available on this system
-                          </span>
-                        ) : null}
-                      </div>
-                    </button>
-                  );
-                })}
-              </div>
+              <Toggle on={t.applied} onClick={() => onToggle(t)} disabled={scanOnly && !t.applied} />
             </div>
           );
         })}
       </div>
 
-      {/* Sticky apply bar */}
-      <div className="sticky bottom-0 flex items-center justify-between rounded-2xl border border-edge bg-panel/95 px-4 py-3 backdrop-blur">
-        <span className="text-[12.5px] text-txt2">
-          {selected.size} selected · all free, all reversible
-        </span>
-        <button
-          onClick={() => setShowConfirm(true)}
-          disabled={selected.size === 0}
-          className="flex items-center gap-2 rounded-xl bg-gradient-to-b from-accent to-[#a3000a] px-4 py-2 text-[12.5px] font-semibold text-white shadow-[0_0_18px_rgba(227,0,14,0.3)] disabled:opacity-50"
-        >
-          <Zap size={14} strokeWidth={2.25} fill="currentColor" />
-          Apply selected
-        </button>
-      </div>
-
-      {showConfirm && (
-        <ApplyConfirmModal
-          tweaks={selectedTweaks}
-          onClose={() => setShowConfirm(false)}
-          onApplied={(o) => {
-            setResult(o);
-            setSelected(new Set());
-            void runScan();
-          }}
-        />
+      {confirm && (
+        <ApplyConfirmModal tweaks={confirm} title={`Apply — ${confirm[0].title}`} onClose={() => setConfirm(null)} onApplied={() => runScan()} />
       )}
     </div>
   );

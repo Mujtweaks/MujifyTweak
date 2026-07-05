@@ -1,8 +1,9 @@
 import {
   Activity,
+  Bot,
   Gamepad2,
   Globe,
-  House,
+  LayoutDashboard,
   Rocket,
   Settings,
   SlidersHorizontal,
@@ -32,16 +33,14 @@ export interface NavItem {
   icon: LucideIcon;
 }
 
-/**
- * Sidebar nav. Only fully-real pages appear here — no dead clicks, no
- * placeholder stubs. Tools (Phase 6) is intentionally absent until it's real.
- */
+/** Sidebar nav — every entry is a real, working page. */
 export const NAV_ITEMS: NavItem[] = [
-  { id: "home", label: "Home", icon: House },
+  { id: "home", label: "Home", icon: LayoutDashboard },
   { id: "optimizer", label: "Optimizer", icon: Rocket },
   { id: "profiles", label: "Profiles", icon: Gamepad2 },
   { id: "diagnostics", label: "Diagnostics", icon: Activity },
   { id: "network", label: "Network", icon: Globe },
   { id: "tweaks", label: "Tweaks", icon: SlidersHorizontal },
+  { id: "ai", label: "AI Assistant", icon: Bot },
   { id: "settings", label: "Settings", icon: Settings },
 ];

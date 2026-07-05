@@ -11,89 +11,73 @@ interface SidebarProps {
 
 export default function Sidebar({ page, onNavigate }: SidebarProps) {
   const backendConnected = useSystemStore((s) => s.backendConnected);
-  const backendVersion = useSystemStore((s) => s.backendVersion);
   const antiCheatActive = useGameStore((s) => s.antiCheatActive);
 
   return (
-    <aside className="flex w-[190px] shrink-0 flex-col border-r border-edge bg-[#0d0d0f]">
-      {/* Logo — mix-blend-screen lets the PNG's black background melt into the rail */}
-      <div className="flex h-[60px] items-center border-b border-edge px-4">
+    <aside className="flex w-[220px] shrink-0 flex-col border-r border-edge bg-[#0d0d0d]">
+      {/* Logo */}
+      <div className="flex h-[68px] items-center px-5">
         <img
           src={logo}
           alt="Mujify Tweaks"
-          className="h-11 w-full object-contain mix-blend-screen"
+          className="h-10 w-auto object-contain mix-blend-screen"
           draggable={false}
         />
       </div>
 
-      {/* Nav — active item gets the red glow chip treatment */}
-      <nav className="flex flex-col gap-1 px-3 py-4">
+      {/* Nav */}
+      <nav className="flex flex-1 flex-col gap-1 px-3 py-2">
         {NAV_ITEMS.map(({ id, label, icon: Icon }) => {
           const active = page === id;
           return (
             <button
               key={id}
               onClick={() => onNavigate(id)}
-              className={`group flex items-center gap-3 rounded-xl px-2.5 py-[7px] text-left transition-colors ${
-                active ? "bg-accent/10" : "hover:bg-white/[0.04]"
+              className={`group relative flex items-center gap-3 rounded-btn px-4 py-3 text-left transition-colors ${
+                active
+                  ? "bg-accent/10 text-txt"
+                  : "text-txt3 hover:bg-white/5 hover:text-txt2"
               }`}
             >
-              <span
-                className={`grid h-8 w-8 shrink-0 place-items-center rounded-lg border transition-all ${
-                  active
-                    ? "border-accent/50 bg-accent/15 shadow-[0_0_14px_rgba(227,0,14,0.35)]"
-                    : "border-transparent"
-                }`}
-              >
-                <Icon
-                  size={17}
-                  strokeWidth={1.75}
-                  className={active ? "text-accent" : "text-txt2 group-hover:text-txt"}
-                />
-              </span>
-              <span
-                className={`text-[13px] font-medium ${
-                  active ? "text-txt" : "text-txt2 group-hover:text-txt"
-                }`}
-              >
-                {label}
-              </span>
+              {active && (
+                <span className="absolute left-0 top-1/2 h-5 w-[3px] -translate-y-1/2 rounded-r bg-accent" />
+              )}
+              <Icon
+                size={18}
+                strokeWidth={1.5}
+                className={active ? "text-accent" : "text-current"}
+              />
+              <span className="text-[13.5px] font-medium">{label}</span>
             </button>
           );
         })}
       </nav>
 
-      <div className="mt-auto flex flex-col gap-3 px-3 pb-4">
+      {/* Bottom */}
+      <div className="flex flex-col gap-3 border-t border-edge px-3 py-4">
         <button
-          onClick={() => onNavigate("tweaks")}
-          className="flex items-center justify-center gap-2 rounded-xl bg-gradient-to-b from-accent to-[#b0000b] px-3 py-2.5 text-[13px] font-semibold text-white shadow-[0_0_22px_rgba(227,0,14,0.35)] transition-transform active:scale-[0.98]"
+          onClick={() => onNavigate("optimizer")}
+          className="flex items-center justify-center gap-2 rounded-btn bg-accent px-3 py-2.5 text-[13px] font-semibold text-white shadow-[0_4px_20px_rgba(227,0,14,0.3)] transition-transform active:scale-[0.98] hover:bg-accent-hi"
         >
-          <Zap size={15} strokeWidth={2.25} fill="currentColor" />
+          <Zap size={15} strokeWidth={2.5} fill="currentColor" />
           Quick Optimize
         </button>
 
-        {/* System Guard — real: backend ping + live anti-cheat detection. */}
-        <div className="flex items-center gap-2.5 rounded-xl border border-edge bg-panel px-3 py-2.5">
+        <div className="flex items-center gap-2.5 px-1">
           <ShieldCheck
-            size={17}
+            size={16}
             strokeWidth={1.75}
-            className={antiCheatActive ? "text-warn" : backendConnected ? "text-good" : "text-txt3"}
+            className={antiCheatActive ? "text-warning" : backendConnected ? "text-success" : "text-txt3"}
           />
           <div className="min-w-0 flex-1">
-            <p className="text-[10px] font-semibold uppercase tracking-wider text-txt2">
-              System Guard
-            </p>
-            <p className="truncate text-[11px] text-txt">
-              {antiCheatActive
-                ? "Protected game active"
-                : backendConnected
-                  ? `Core connected v${backendVersion}`
-                  : "Connecting…"}
+            <p className="text-[12px] font-medium text-txt">System Guard</p>
+            <p className="truncate text-[10.5px] text-txt2">
+              {antiCheatActive ? "Protected game active" : backendConnected ? "Protected" : "Connecting…"}
             </p>
           </div>
           <span
-            className={`h-2 w-2 shrink-0 rounded-full ${
-              antiCheatActive ? "bg-warn" : backendConnected ? "bg-good" : "animate-pulse bg-txt3"
+            className={`h-1.5 w-1.5 shrink-0 rounded-full ${
+              antiCheatActive ? "bg-warning" : backendConnected ? "bg-success" : "animate-pulse bg-txt3"
             }`}
           />
         </div>

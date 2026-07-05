@@ -1,28 +1,33 @@
 @import "tailwindcss";
 @import "@fontsource-variable/inter";
-@import "@fontsource/rajdhani/500.css";
-@import "@fontsource/rajdhani/600.css";
-@import "@fontsource/rajdhani/700.css";
 
 @theme {
-  --font-sans: "Inter Variable", ui-sans-serif, system-ui, sans-serif;
-  --font-display: "Rajdhani", "Inter Variable", ui-sans-serif, sans-serif;
+  --font-sans: "Inter Variable", "Inter", system-ui, sans-serif;
+  --font-display: "Inter Variable", "Inter", system-ui, sans-serif;
 
-  /* Mujify Tweaks palette — dark #0A0A0A base, #E3000E accent */
+  /* Mujify Tweaks brand — clean dark, #E3000E red */
   --color-bg: #0a0a0a;
-  --color-panel: #101012;
-  --color-panel2: #16161a;
-  --color-edge: #1f1f24;
-  --color-edge2: #2a2a30;
+  --color-panel: #111111;
+  --color-panel2: #161616;
+  --color-card: #161616;
+  --color-edge: rgba(255, 255, 255, 0.06);
+  --color-edge2: rgba(255, 255, 255, 0.1);
   --color-accent: #e3000e;
   --color-accent-hi: #ff2634;
-  --color-txt: #f5f5f6;
-  --color-txt2: #8e8e95;
-  --color-txt3: #55555c;
-  --color-good: #2fd466;
-  --color-warn: #eab308;
-  --color-cpu: #3e8bff;
-  --color-gpu: #2fd466;
+  --color-txt: #ffffff;
+  --color-txt2: #888888;
+  --color-txt3: #444444;
+  --color-good: #22c55e;
+  --color-success: #22c55e;
+  --color-warn: #f59e0b;
+  --color-warning: #f59e0b;
+  --color-cpu: #4a9eff;
+  --color-gpu: #22c55e;
+
+  --radius-card: 16px;
+  --radius-btn: 10px;
+  --radius-chip: 8px;
+  --radius-pill: 999px;
 }
 
 html,
@@ -37,6 +42,7 @@ body {
   background: var(--color-bg);
   color: var(--color-txt);
   font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
   cursor: default;
   user-select: none;
   -webkit-user-select: none;
@@ -48,14 +54,17 @@ textarea {
   -webkit-user-select: text;
 }
 
-*::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
+::-webkit-scrollbar {
+  width: 4px;
+  height: 4px;
 }
-*::-webkit-scrollbar-thumb {
-  background: #232329;
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.1);
   border-radius: 4px;
 }
-*::-webkit-scrollbar-track {
-  background: transparent;
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.2);
 }

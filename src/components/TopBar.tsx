@@ -1,14 +1,5 @@
 import { useEffect, useState } from "react";
-import {
-  Bell,
-  ChevronDown,
-  Copy,
-  Gamepad2,
-  Minus,
-  Settings,
-  Square,
-  X,
-} from "lucide-react";
+import { Bell, ChevronDown, Copy, Gamepad2, Minus, Settings, Square, X } from "lucide-react";
 import {
   closeWindow,
   isWindowMaximized,
@@ -38,28 +29,21 @@ export default function TopBar({ onNavigate }: TopBarProps) {
   return (
     <header
       data-tauri-drag-region
-      className="flex h-[60px] shrink-0 items-center gap-3 border-b border-edge bg-bg pl-5"
+      className="flex h-[56px] shrink-0 items-center gap-3 border-b border-edge bg-[#0d0d0d] pl-5"
     >
-      {/* Identity */}
       <div data-tauri-drag-region className="flex items-center gap-2.5">
-        <span className="font-display text-xl font-bold tracking-[0.18em] text-txt">
-          GAMER
-        </span>
-        <span className="rounded-md bg-accent/15 px-2 py-0.5 text-[10px] font-bold tracking-[0.14em] text-accent">
-          LEGEND
+        <span className="text-lg font-bold tracking-tight text-txt">GAMER</span>
+        <span className="rounded-pill bg-accent/15 px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.15em] text-accent">
+          Legend
         </span>
       </div>
 
-      {/* Game selector — real data only; GameDetector lands at Checkpoint 4 */}
       <div data-tauri-drag-region className="flex flex-1 justify-center">
         <button
-          title={
-            activeGame
-              ? activeGame.name
-              : "Game detection comes online at Checkpoint 4"
-          }
-          className={`flex items-center gap-2.5 rounded-xl border border-edge bg-panel px-4 py-2 text-[13px] font-medium transition-colors hover:border-edge2 ${
-            activeGame ? "text-txt" : "text-txt2"
+          onClick={() => onNavigate("profiles")}
+          title={activeGame ? activeGame.name : "Open Profiles"}
+          className={`flex items-center gap-2.5 rounded-pill border border-edge bg-card px-4 py-2 text-[13px] font-medium transition-colors hover:border-edge2 ${
+            activeGame ? "text-txt" : "text-txt3"
           }`}
         >
           <Gamepad2 size={16} strokeWidth={1.75} />
@@ -68,20 +52,16 @@ export default function TopBar({ onNavigate }: TopBarProps) {
         </button>
       </div>
 
-      {/* Game Mode toggle */}
       <div className="flex items-center gap-2.5">
         <span className="text-[12px] font-medium text-txt2">Game Mode</span>
         <button
           onClick={toggleGameMode}
-          title="UI state only for now — wires to TweaksEngine at Checkpoint 9"
-          className={`relative flex h-[22px] w-[46px] items-center rounded-full border transition-colors ${
-            gameModeEnabled
-              ? "border-accent/60 bg-accent"
-              : "border-edge2 bg-panel2"
+          className={`relative flex h-[22px] w-[46px] items-center rounded-pill border transition-colors ${
+            gameModeEnabled ? "border-accent/60 bg-accent" : "border-edge2 bg-card"
           }`}
         >
           <span
-            className={`absolute text-[8px] font-bold tracking-wide ${
+            className={`absolute text-[8px] font-bold ${
               gameModeEnabled ? "left-1.5 text-white" : "right-1.5 text-txt3"
             }`}
           >
@@ -97,43 +77,39 @@ export default function TopBar({ onNavigate }: TopBarProps) {
 
       <div className="flex items-center gap-0.5 pl-1">
         <button
-          title="Notifications — coming later"
-          className="grid h-9 w-9 place-items-center rounded-lg text-txt2 transition-colors hover:bg-white/[0.05] hover:text-txt"
+          onClick={() => onNavigate("changelog")}
+          title="Recent changes"
+          className="grid h-9 w-9 place-items-center rounded-btn text-txt3 transition-colors hover:bg-white/5 hover:text-txt"
         >
           <Bell size={16} strokeWidth={1.75} />
         </button>
         <button
           onClick={() => onNavigate("settings")}
           title="Settings"
-          className="grid h-9 w-9 place-items-center rounded-lg text-txt2 transition-colors hover:bg-white/[0.05] hover:text-txt"
+          className="grid h-9 w-9 place-items-center rounded-btn text-txt3 transition-colors hover:bg-white/5 hover:text-txt"
         >
           <Settings size={16} strokeWidth={1.75} />
         </button>
       </div>
 
-      {/* Window controls */}
       <div className="ml-1 flex h-full items-stretch border-l border-edge">
         <button
           onClick={() => void minimizeWindow()}
-          className="grid w-[46px] place-items-center text-txt2 transition-colors hover:bg-white/[0.06] hover:text-txt"
+          className="grid w-[46px] place-items-center text-txt3 transition-colors hover:bg-white/5 hover:text-txt"
           aria-label="Minimize"
         >
           <Minus size={15} strokeWidth={2} />
         </button>
         <button
           onClick={() => void toggleMaximizeWindow()}
-          className="grid w-[46px] place-items-center text-txt2 transition-colors hover:bg-white/[0.06] hover:text-txt"
+          className="grid w-[46px] place-items-center text-txt3 transition-colors hover:bg-white/5 hover:text-txt"
           aria-label={maximized ? "Restore" : "Maximize"}
         >
-          {maximized ? (
-            <Copy size={13} strokeWidth={2} className="-scale-x-100" />
-          ) : (
-            <Square size={13} strokeWidth={2} />
-          )}
+          {maximized ? <Copy size={13} strokeWidth={2} className="-scale-x-100" /> : <Square size={13} strokeWidth={2} />}
         </button>
         <button
           onClick={() => void closeWindow()}
-          className="grid w-[46px] place-items-center text-txt2 transition-colors hover:bg-accent hover:text-white"
+          className="grid w-[46px] place-items-center text-txt3 transition-colors hover:bg-accent hover:text-white"
           aria-label="Close"
         >
           <X size={16} strokeWidth={2} />
