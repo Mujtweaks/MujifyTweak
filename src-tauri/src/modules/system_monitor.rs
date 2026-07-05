@@ -108,23 +108,35 @@ fn active_power_plan() -> Option<String> {
 
 static RUNNING: AtomicBool = AtomicBool::new(false);
 
-/// GPU utilization = max UtilizationPercentage across all engine instances
-/// (mirrors Task Manager's headline GPU figure). Works for Intel/AMD/NVIDIA.
+/// GPU utilization from the 3D/graphics engine — what games actually use and
+/// what Task Manager shows as the headline figure. Filtering to `engtype_3D`
+/// excludes video-encode engines (e.g. a Parsec/DeskIn remote-desktop stream),
+/// which would otherwise dominate the max and misreport GPU load. Falls back to
+/// the overall max if no 3D engine is present.
 fn gpu_utilization(conn: &WMIConnection) -> Option<f32> {
     let rows = query(
         conn,
-        "SELECT UtilizationPercentage FROM Win32_PerfFormattedData_GPUPerformanceCounters_GPUEngine",
+        "SELECT Name, UtilizationPercentage FROM Win32_PerfFormattedData_GPUPerformanceCounters_GPUEngine",
     );
-    let max = rows
-        .iter()
-        .filter_map(|r| r.get("UtilizationPercentage"))
-        .filter_map(variant_to_f64)
-        .fold(0.0_f64, f64::max);
     if rows.is_empty() {
-        None
-    } else {
-        Some(max.min(100.0) as f32)
+        return None;
     }
+    let util_of = |r: &Row| r.get("UtilizationPercentage").and_then(variant_to_f64);
+    let is_3d = |r: &Row| match r.get("Name") {
+        Some(wmi::Variant::String(s)) => s.contains("engtype_3D") || s.contains("engtype_Graphics"),
+        _ => false,
+    };
+
+    let max_3d = rows
+        .iter()
+        .filter(|r| is_3d(r))
+        .filter_map(util_of)
+        .fold(0.0_f64, f64::max);
+    let max_any = rows.iter().filter_map(util_of).fold(0.0_f64, f64::max);
+    // Prefer the 3D engine reading; use overall only if there is no 3D engine.
+    let has_3d = rows.iter().any(is_3d);
+    let max = if has_3d { max_3d } else { max_any };
+    Some(max.min(100.0) as f32)
 }
 
 /// Dedicated VRAM in use = max DedicatedUsage across adapters, in MB.

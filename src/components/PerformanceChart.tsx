@@ -36,7 +36,10 @@ export default function PerformanceChart() {
     <div className="flex flex-col gap-4">
       <div className="rounded-card border border-edge bg-card p-5">
         <div className="mb-3 flex items-center justify-between">
-          <p className="text-[11px] font-semibold uppercase tracking-widest text-txt3">Live Performance Monitor</p>
+          <p className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-widest text-txt3">
+            {hasData && <span className="live-dot h-1.5 w-1.5 rounded-full bg-success text-success" />}
+            Live Performance Monitor
+          </p>
           <div className="flex items-center gap-3">
             <Legend color="#e3000e" label="FPS" />
             <Legend color="#4a9eff" label="CPU" />

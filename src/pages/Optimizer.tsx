@@ -15,7 +15,7 @@ export default function Optimizer({ onNavigate }: { onNavigate: (page: PageId) =
   const setScan = useTweakStore((s) => s.setScan);
   const hardware = useSystemStore((s) => s.hardware);
 
-  const [cat, setCat] = useState<TweakCategory>("system-performance");
+  const [cat, setCat] = useState<TweakCategory>("system");
   const [scanning, setScanning] = useState(false);
   const [confirm, setConfirm] = useState<TweakInfo[] | null>(null);
 

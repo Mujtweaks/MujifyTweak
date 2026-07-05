@@ -1,5 +1,5 @@
-import { useEffect, useState } from "react";
 import { Bot, Eye, KeyRound, Search, Send, ShieldCheck, Wrench } from "lucide-react";
+import { NEMOTRON_MODEL } from "../lib/aiConfig";
 import type { PageId } from "../lib/nav";
 
 const CAPS = [
@@ -10,11 +10,7 @@ const CAPS = [
 ];
 
 export default function AIAssistant({ onNavigate }: { onNavigate: (page: PageId) => void }) {
-  const [hasKey, setHasKey] = useState(false);
-  useEffect(() => {
-    setHasKey(!!localStorage.getItem("mujify_nvidia_key"));
-  }, []);
-
+  // Keys ship with the app — no user setup required.
   return (
     <div className="mx-auto flex h-full max-w-3xl flex-col gap-4">
       <div className="flex items-center gap-3">
@@ -44,14 +40,14 @@ export default function AIAssistant({ onNavigate }: { onNavigate: (page: PageId)
         ))}
       </div>
 
-      {/* Key status */}
+      {/* Key status — the key ships with the app; users never bring their own. */}
       <div className="flex items-center gap-3 rounded-card border border-edge bg-card p-4">
-        <KeyRound size={16} strokeWidth={1.75} className={hasKey ? "text-success" : "text-warning"} />
+        <KeyRound size={16} strokeWidth={1.75} className="text-success" />
         <p className="flex-1 text-[12.5px] text-txt2">
-          {hasKey ? "NVIDIA key detected — the assistant activates when chat ships in v2.5." : "Add your free NVIDIA NIM key in Settings to be ready when chat ships."}
+          Ready — powered by <span className="font-mono text-[11px] text-txt">{NEMOTRON_MODEL}</span>. No key needed; it's built in and free.
         </p>
         <button onClick={() => onNavigate("settings")} className="rounded-btn border border-edge bg-bg px-3 py-1.5 text-[12px] font-medium text-txt hover:border-edge2">
-          {hasKey ? "Manage key" : "Add key"}
+          Settings
         </button>
       </div>
 

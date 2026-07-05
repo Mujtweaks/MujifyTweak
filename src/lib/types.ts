@@ -110,12 +110,12 @@ export interface NetSample {
 export type RiskLevel = "safe" | "moderate" | "advanced";
 
 export type TweakCategory =
-  | "system-performance"
-  | "graphics-display"
-  | "network-optimization"
-  | "windows-services"
-  | "storage-optimization"
-  | "game-input";
+  | "system"
+  | "performance"
+  | "network"
+  | "graphics"
+  | "privacy"
+  | "gaming";
 
 export interface TweakInfo {
   id: string;
@@ -123,6 +123,8 @@ export interface TweakInfo {
   description: string;
   category: TweakCategory;
   risk: RiskLevel;
+  /** 1–5 performance impact rating. */
+  impact: number;
   applied: boolean;
   available: boolean;
   /** Real, tested apply path exists — otherwise the UI shows it scan-only. */

@@ -1,9 +1,9 @@
 import {
   Cpu,
-  Gauge,
   Gamepad2,
+  Gauge,
   Globe,
-  HardDrive,
+  Lock,
   Monitor,
   Settings2,
   type LucideIcon,
@@ -14,45 +14,45 @@ export const CATEGORY_META: Record<
   TweakCategory,
   { label: string; subtitle: string; icon: LucideIcon }
 > = {
-  "system-performance": {
-    label: "System Performance",
-    subtitle: "Optimize CPU, memory and system settings",
-    icon: Gauge,
-  },
-  "graphics-display": {
-    label: "Graphics & Display",
-    subtitle: "Optimize GPU, display and visual settings",
-    icon: Monitor,
-  },
-  "network-optimization": {
-    label: "Network Optimization",
-    subtitle: "Optimize network for lower latency",
-    icon: Globe,
-  },
-  "windows-services": {
-    label: "Windows Services",
-    subtitle: "Optimize background services and tasks",
+  system: {
+    label: "System",
+    subtitle: "Windows services, startup and memory",
     icon: Settings2,
   },
-  "storage-optimization": {
-    label: "Storage Optimization",
-    subtitle: "Optimize storage, cache and indexing",
-    icon: HardDrive,
+  performance: {
+    label: "Performance",
+    subtitle: "CPU, timer resolution and latency",
+    icon: Gauge,
   },
-  "game-input": {
-    label: "Game & Input",
-    subtitle: "Optimize game settings & input latency",
+  network: {
+    label: "Network",
+    subtitle: "Latency, throughput and DNS",
+    icon: Globe,
+  },
+  graphics: {
+    label: "Graphics",
+    subtitle: "GPU, display and frame pacing",
+    icon: Monitor,
+  },
+  privacy: {
+    label: "Privacy",
+    subtitle: "Telemetry, tracking and background data",
+    icon: Lock,
+  },
+  gaming: {
+    label: "Gaming",
+    subtitle: "Input latency and game settings",
     icon: Gamepad2,
   },
 };
 
 export const CATEGORY_ORDER: TweakCategory[] = [
-  "system-performance",
-  "graphics-display",
-  "network-optimization",
-  "windows-services",
-  "storage-optimization",
-  "game-input",
+  "system",
+  "performance",
+  "network",
+  "graphics",
+  "privacy",
+  "gaming",
 ];
 
 export const CPU_ICON = Cpu;

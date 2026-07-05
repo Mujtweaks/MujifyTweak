@@ -72,9 +72,9 @@ export default function Settings() {
       </Section>
 
       <Section icon={KeyRound} title="AI API Keys">
-        <p className="mb-3 text-[11.5px] text-txt2">Used by the AI Assistant (v2.5). Stored locally on this PC only — never committed or uploaded.</p>
-        <label className="mb-1 block text-[11px] font-medium text-txt2">NVIDIA NIM (Nemotron)</label>
-        <input type="password" value={nvidia} onChange={(e) => setNvidia(e.target.value)} placeholder="nvapi-…" className="mb-3 w-full rounded-btn border border-edge bg-bg px-3 py-2 font-mono text-[12px] text-txt placeholder:text-txt3 focus:border-accent/50 focus:outline-none" />
+        <p className="mb-3 text-[11.5px] text-txt2">The AI Assistant ships with a built-in key — you never need your own. Override it below only if you want to use your own key (stored locally on this PC, never uploaded).</p>
+        <label className="mb-1 block text-[11px] font-medium text-txt2">NVIDIA NIM (Nemotron) <span className="text-success">· built-in active</span></label>
+        <input type="password" value={nvidia} onChange={(e) => setNvidia(e.target.value)} placeholder="Using built-in key — paste your own to override" className="mb-3 w-full rounded-btn border border-edge bg-bg px-3 py-2 font-mono text-[12px] text-txt placeholder:text-txt3 focus:border-accent/50 focus:outline-none" />
         <label className="mb-1 block text-[11px] font-medium text-txt2">Tavily (web search)</label>
         <input type="password" value={tavily} onChange={(e) => setTavily(e.target.value)} placeholder="tvly-…" className="mb-3 w-full rounded-btn border border-edge bg-bg px-3 py-2 font-mono text-[12px] text-txt placeholder:text-txt3 focus:border-accent/50 focus:outline-none" />
         <button onClick={saveKeys} className="flex items-center gap-2 rounded-btn bg-accent px-4 py-2 text-[12.5px] font-semibold text-white hover:bg-accent-hi">

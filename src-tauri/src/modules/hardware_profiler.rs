@@ -42,6 +42,19 @@ fn is_virtual_gpu(name: &str) -> bool {
         || n.contains("basic display")
 }
 
+/// Tidy a raw adapter name: "Intel(R) Arc(TM) 140V GPU (16GB)" → "Intel Arc 140V".
+fn clean_gpu_name(raw: &str) -> String {
+    let mut s = raw.replace("(R)", "").replace("(TM)", "").replace("(tm)", "");
+    // Drop a trailing "(16GB)"-style memory suffix.
+    if let Some(idx) = s.find(" (") {
+        if s[idx..].contains("GB") || s[idx..].contains("MB") {
+            s.truncate(idx);
+        }
+    }
+    s = s.replace(" GPU", "").replace("  ", " ");
+    s.split_whitespace().collect::<Vec<_>>().join(" ")
+}
+
 fn vendor_of(name: &str) -> String {
     let n = name.to_lowercase();
     if n.contains("nvidia") || n.contains("geforce") || n.contains("rtx") || n.contains("gtx") {
@@ -111,7 +124,7 @@ fn build_profile() -> HardwareProfile {
         });
     if let Some((row, name)) = real {
         p.gpu_vendor = vendor_of(&name);
-        p.gpu_name = name;
+        p.gpu_name = clean_gpu_name(&name);
         p.gpu_driver_version = get_string(row, "DriverVersion");
     }
 

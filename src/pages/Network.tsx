@@ -141,7 +141,7 @@ function DetailRow({ icon: Icon, label, value, copyable }: { icon: LucideIcon; l
 const NET_TWEAKS: { id: string; icon: LucideIcon; title: string; desc: string }[] = [
   { id: "tcp_optimize", icon: Layers, title: "TCP Optimizations", desc: "Congestion control and buffer settings tuned." },
   { id: "network_qos", icon: NetworkIcon, title: "QoS / Traffic Priority", desc: "Game traffic prioritized for lower latency." },
-  { id: "disable_nagle", icon: Activity, title: "Background Traffic", desc: "Non-essential bandwidth minimized." },
+  { id: "network_throttling_index", icon: Activity, title: "Throttling Index", desc: "Network throttle removed for full bandwidth." },
   { id: "flush_dns", icon: Globe, title: "DNS Optimization", desc: "Faster DNS resolution for game servers." },
 ];
 
@@ -177,7 +177,7 @@ export default function Network() {
     const r = scanResult ?? (await scanTweaks(hardware?.isLaptop ?? null));
     if (!r) return;
     if (!scanResult) setScan(r);
-    setConfirmTweaks(r.tweaks.filter((t) => t.category === "network-optimization"));
+    setConfirmTweaks(r.tweaks.filter((t) => t.category === "network"));
   };
 
   const isApplied = (id: string) => scanResult?.tweaks.find((t) => t.id === id)?.applied ?? false;

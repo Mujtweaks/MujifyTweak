@@ -1,10 +1,11 @@
 //! Checkpoint 8 (scan half) — the real tweak catalog + read-only scanner.
 //!
-//! Defines every optimization Mujify offers, grouped into the six categories the
-//! Optimizer UI shows, each carrying a real risk level. `scan_tweaks` READS the
-//! current system (power plan, registry values, mouse params) to report which
-//! tweaks are already applied vs. available — it applies NOTHING. The apply path
-//! is deliberately not built in this pass: no tweak is executed on the machine.
+//! Defines every optimization Mujify offers across the six user-facing
+//! categories, each with a real risk level and a 1–5 impact rating. `scan_tweaks`
+//! READS the current system (power plan, registry, mouse params) to report which
+//! tweaks are already applied — it applies NOTHING. Only a handful have a tested
+//! apply path today (see tweak_ops); the rest are shown scan-only, never a fake
+//! button. All tweaks are free — there is no tier.
 
 use serde::Serialize;
 
@@ -17,14 +18,14 @@ pub enum Risk {
 }
 
 #[derive(Serialize, Clone, Copy, PartialEq)]
-#[serde(rename_all = "kebab-case")]
+#[serde(rename_all = "lowercase")]
 pub enum Category {
-    SystemPerformance,
-    GraphicsDisplay,
-    NetworkOptimization,
-    WindowsServices,
-    StorageOptimization,
-    GameInput,
+    System,
+    Performance,
+    Network,
+    Graphics,
+    Privacy,
+    Gaming,
 }
 
 #[derive(Serialize, Clone)]
@@ -35,12 +36,9 @@ pub struct TweakInfo {
     pub description: String,
     pub category: Category,
     pub risk: Risk,
-    /// True when the system is already in the optimized state (read live).
+    pub impact: u8, // 1–5
     pub applied: bool,
-    /// False when this tweak can't run here (e.g. laptop-only guard).
     pub available: bool,
-    /// True when a real, tested apply/undo path exists for this tweak. The UI
-    /// shows scan-only tweaks without an apply control (never a fake button).
     pub appliable: bool,
 }
 
@@ -68,6 +66,7 @@ struct TweakDef {
     description: &'static str,
     category: Category,
     risk: Risk,
+    impact: u8,
 }
 
 /// Lightweight catalog lookup used by TweaksEngine for description + risk.
@@ -83,48 +82,72 @@ pub fn info_for(id: &str) -> Option<TweakMeta> {
     })
 }
 
-/// The catalog. This is the source of truth for the Optimizer's category counts.
+use Category::*;
+use Risk::*;
+
+/// The full catalog. Source of truth for the Optimizer + Tweaks tabs.
 const CATALOG: &[TweakDef] = &[
-    // ---- System Performance ----
-    TweakDef { id: "power_high_perf", title: "High Performance power plan", description: "Prevents CPU/GPU frequency dips during play. Reverts on reboot anyway.", category: Category::SystemPerformance, risk: Risk::Safe },
-    TweakDef { id: "power_ultimate", title: "Ultimate Performance power plan", description: "Disables CPU idle states for max responsiveness. More heat/power draw.", category: Category::SystemPerformance, risk: Risk::Moderate },
-    TweakDef { id: "game_priority", title: "Above-normal game priority", description: "Gives the running game's threads scheduler preference.", category: Category::SystemPerformance, risk: Risk::Safe },
-    TweakDef { id: "clear_standby", title: "Clear standby memory", description: "Frees cached standby memory back to the game.", category: Category::SystemPerformance, risk: Risk::Safe },
-    TweakDef { id: "timer_resolution", title: "1 ms timer resolution", description: "Tightens the system timer for smoother frame pacing. Auto-reverts on exit.", category: Category::SystemPerformance, risk: Risk::Moderate },
-    TweakDef { id: "cpu_affinity", title: "Performance-core affinity", description: "Pins the game to performance cores. Skipped on hybrid CPUs by default.", category: Category::SystemPerformance, risk: Risk::Advanced },
+    // ---------- System ----------
+    TweakDef { id: "power_high_perf", title: "High Performance Power Plan", description: "Switches Windows to the High Performance plan to prevent CPU/GPU frequency dips.", category: System, risk: Safe, impact: 4 },
+    TweakDef { id: "power_ultimate", title: "Ultimate Performance Power Plan", description: "Enables the hidden Ultimate Performance plan — disables CPU idle states for max responsiveness.", category: System, risk: Moderate, impact: 5 },
+    TweakDef { id: "disable_startup_apps", title: "Trim Startup Programs", description: "Disables non-essential apps that launch at boot to free RAM and speed up startup.", category: System, risk: Safe, impact: 3 },
+    TweakDef { id: "disable_sysmain", title: "Disable SysMain (Superfetch)", description: "Stops background prefetching that competes for disk I/O during gameplay.", category: System, risk: Moderate, impact: 3 },
+    TweakDef { id: "disable_search_index", title: "Disable Search Indexing", description: "Halts Windows Search indexing to free CPU and disk while gaming.", category: System, risk: Moderate, impact: 3 },
+    TweakDef { id: "disable_print_spooler", title: "Disable Print Spooler", description: "Stops the print service if you don't print — one less background process.", category: System, risk: Safe, impact: 2 },
+    TweakDef { id: "disable_tips", title: "Disable Windows Tips & Ads", description: "Turns off suggestion notifications and lock-screen tips.", category: System, risk: Safe, impact: 1 },
+    TweakDef { id: "disable_hibernation", title: "Disable Hibernation", description: "Frees several GB of disk (hiberfil.sys) and removes hybrid-sleep overhead.", category: System, risk: Safe, impact: 2 },
+    TweakDef { id: "clear_standby", title: "Clear Standby Memory", description: "Flushes the standby memory list back to the game when RAM runs low.", category: System, risk: Safe, impact: 3 },
+    TweakDef { id: "disable_memory_compression", title: "Disable Memory Compression", description: "Reduces CPU overhead from compressing RAM pages on high-memory systems.", category: System, risk: Moderate, impact: 3 },
 
-    // ---- Graphics & Display ----
-    TweakDef { id: "gpu_low_latency", title: "GPU low-latency mode", description: "Enables the driver's low-latency render queue (NVIDIA/AMD).", category: Category::GraphicsDisplay, risk: Risk::Safe },
-    TweakDef { id: "hags", title: "Hardware-accelerated GPU scheduling", description: "Lets the GPU manage its own memory scheduling on supported cards.", category: Category::GraphicsDisplay, risk: Risk::Moderate },
-    TweakDef { id: "disable_game_bar", title: "Disable Xbox Game Bar", description: "Removes the DVR capture hook overhead.", category: Category::GraphicsDisplay, risk: Risk::Safe },
-    TweakDef { id: "disable_gamedvr", title: "Disable background recording (GameDVR)", description: "Stops background frame capture that can cost FPS.", category: Category::GraphicsDisplay, risk: Risk::Safe },
-    TweakDef { id: "fso_disable", title: "Disable fullscreen optimizations", description: "Forces true exclusive fullscreen for lower latency.", category: Category::GraphicsDisplay, risk: Risk::Moderate },
+    // ---------- Performance ----------
+    TweakDef { id: "disable_core_parking", title: "Disable CPU Core Parking", description: "Keeps all CPU cores active instead of parking idle ones — smoother frame pacing.", category: Performance, risk: Moderate, impact: 5 },
+    TweakDef { id: "timer_resolution", title: "Timer Resolution Optimization", description: "Locks the system timer to 1 ms for smoother frames and lower input latency.", category: Performance, risk: Moderate, impact: 5 },
+    TweakDef { id: "disable_dynamic_tick", title: "Disable Dynamic Tick", description: "Prevents variable interrupt timing for more consistent frame times (needs restart).", category: Performance, risk: Advanced, impact: 4 },
+    TweakDef { id: "disable_hpet", title: "Disable HPET", description: "Removes the High Precision Event Timer, a known latency source on modern CPUs.", category: Performance, risk: Advanced, impact: 4 },
+    TweakDef { id: "cpu_affinity_pcore", title: "Pin Games to Performance Cores", description: "Steers the game to P-cores on hybrid CPUs (auto-skips where it would hurt).", category: Performance, risk: Advanced, impact: 4 },
+    TweakDef { id: "disable_power_throttling", title: "Disable Power Throttling", description: "Stops Windows from throttling foreground apps to save power.", category: Performance, risk: Moderate, impact: 4 },
+    TweakDef { id: "win32_priority", title: "Optimize Win32 Priority Separation", description: "Tunes the scheduler quantum to favor foreground game threads.", category: Performance, risk: Moderate, impact: 3 },
+    TweakDef { id: "game_priority", title: "Above-Normal Game Priority", description: "Raises the running game's process priority so it gets scheduler preference.", category: Performance, risk: Safe, impact: 3 },
+    TweakDef { id: "mmcss_gaming", title: "MMCSS Gaming Profile", description: "Gives games a larger GPU/CPU scheduling share via the multimedia scheduler.", category: Performance, risk: Moderate, impact: 3 },
+    TweakDef { id: "large_system_cache", title: "Optimize System Responsiveness", description: "Sets SystemResponsiveness to 0 so 100% of CPU can go to the game.", category: Performance, risk: Moderate, impact: 3 },
 
-    // ---- Network Optimization ----
-    TweakDef { id: "disable_nagle", title: "Disable Nagle's algorithm", description: "Sends small game packets immediately instead of batching them.", category: Category::NetworkOptimization, risk: Risk::Moderate },
-    TweakDef { id: "network_qos", title: "QoS DSCP priority for game traffic", description: "Tags the active game's packets as high-priority (DSCP 46).", category: Category::NetworkOptimization, risk: Risk::Safe },
-    TweakDef { id: "flush_dns", title: "Flush DNS cache", description: "Clears stale routing entries before an online session.", category: Category::NetworkOptimization, risk: Risk::Safe },
-    TweakDef { id: "tcp_optimize", title: "TCP throughput tuning", description: "Tunes TCP autotuning/window scaling for gaming traffic.", category: Category::NetworkOptimization, risk: Risk::Moderate },
+    // ---------- Network ----------
+    TweakDef { id: "disable_nagle", title: "Disable Nagle's Algorithm", description: "Sends small game packets immediately instead of batching them — lower input lag.", category: Network, risk: Moderate, impact: 4 },
+    TweakDef { id: "network_throttling_index", title: "Network Throttling Index", description: "Removes the multimedia network throttle for better bandwidth and throughput.", category: Network, risk: Moderate, impact: 4 },
+    TweakDef { id: "network_qos", title: "QoS DSCP Priority", description: "Tags the active game's packets as high priority (DSCP 46) on your network.", category: Network, risk: Safe, impact: 3 },
+    TweakDef { id: "tcp_optimize", title: "TCP Auto-Tuning", description: "Tunes TCP window auto-tuning and scaling for gaming traffic.", category: Network, risk: Moderate, impact: 3 },
+    TweakDef { id: "tcp_ack_frequency", title: "TCP ACK Frequency", description: "Acknowledges packets immediately rather than delaying — pairs with Nagle off.", category: Network, risk: Moderate, impact: 3 },
+    TweakDef { id: "flush_dns", title: "Flush DNS Cache", description: "Clears stale DNS entries before an online session.", category: Network, risk: Safe, impact: 2 },
+    TweakDef { id: "dns_cloudflare", title: "Fast DNS (1.1.1.1)", description: "Points DNS at Cloudflare for faster, private name resolution.", category: Network, risk: Safe, impact: 2 },
+    TweakDef { id: "disable_teredo", title: "Disable Teredo / ISATAP", description: "Removes legacy IPv6 tunneling that can add latency and instability.", category: Network, risk: Safe, impact: 2 },
 
-    // ---- Windows Services ----
-    TweakDef { id: "svc_sysmain", title: "Pause SysMain (Superfetch)", description: "Stops background prefetching that competes for disk during play.", category: Category::WindowsServices, risk: Risk::Moderate },
-    TweakDef { id: "svc_search", title: "Pause Windows Search indexing", description: "Halts indexing while gaming to free CPU and disk.", category: Category::WindowsServices, risk: Risk::Moderate },
-    TweakDef { id: "svc_print", title: "Pause Print Spooler", description: "Stops an unused service if you don't print.", category: Category::WindowsServices, risk: Risk::Safe },
-    TweakDef { id: "kill_bloat", title: "Close known background apps", description: "Ends user-selected background apps freeing RAM/CPU.", category: Category::WindowsServices, risk: Risk::Safe },
+    // ---------- Graphics ----------
+    TweakDef { id: "gpu_low_latency", title: "GPU Low Latency Mode", description: "Enables the driver's low-latency render queue (NVIDIA Reflex / AMD Anti-Lag).", category: Graphics, risk: Safe, impact: 4 },
+    TweakDef { id: "disable_fso", title: "Disable Fullscreen Optimizations", description: "Forces true exclusive fullscreen for lower input lag and better compatibility.", category: Graphics, risk: Moderate, impact: 4 },
+    TweakDef { id: "hags", title: "Hardware-Accelerated GPU Scheduling", description: "Lets the GPU manage its own memory scheduling on supported cards.", category: Graphics, risk: Moderate, impact: 3 },
+    TweakDef { id: "disable_game_bar", title: "Disable Xbox Game Bar", description: "Removes the DVR/overlay capture hook overhead.", category: Graphics, risk: Safe, impact: 3 },
+    TweakDef { id: "disable_gamedvr", title: "Disable Background Game DVR", description: "Stops background frame capture that silently costs FPS.", category: Graphics, risk: Safe, impact: 3 },
+    TweakDef { id: "gpu_priority", title: "GPU Scheduling Priority", description: "Raises the GPU priority of games via the multimedia scheduler tasks.", category: Graphics, risk: Moderate, impact: 3 },
+    TweakDef { id: "shader_cache", title: "Increase Shader Cache Size", description: "Lets the driver keep more compiled shaders to reduce traversal stutter.", category: Graphics, risk: Safe, impact: 2 },
+    TweakDef { id: "disable_vsync_hint", title: "Disable Windowed VSync Hint", description: "Removes the DWM VSync hint that can cap windowed frame rates.", category: Graphics, risk: Moderate, impact: 2 },
 
-    // ---- Storage Optimization ----
-    TweakDef { id: "clear_temp", title: "Clear temp files", description: "Deletes %TEMP% junk. Never touches game or user files.", category: Category::StorageOptimization, risk: Risk::Safe },
-    TweakDef { id: "clear_shadercache", title: "Clear stale shader caches", description: "Removes old DirectX/NVIDIA/AMD shader cache.", category: Category::StorageOptimization, risk: Risk::Safe },
-    TweakDef { id: "trim_ssd", title: "Run SSD TRIM", description: "Issues TRIM so the SSD keeps write performance up.", category: Category::StorageOptimization, risk: Risk::Safe },
+    // ---------- Privacy ----------
+    TweakDef { id: "disable_telemetry", title: "Disable Windows Telemetry", description: "Turns off diagnostic data collection and its background uploads.", category: Privacy, risk: Safe, impact: 3 },
+    TweakDef { id: "disable_cortana", title: "Disable Cortana", description: "Removes the Cortana background process and its indexing hooks.", category: Privacy, risk: Safe, impact: 2 },
+    TweakDef { id: "disable_ad_id", title: "Disable Advertising ID", description: "Stops apps from tracking you with a per-device advertising identifier.", category: Privacy, risk: Safe, impact: 2 },
+    TweakDef { id: "disable_activity_history", title: "Disable Activity History", description: "Stops Windows from recording and syncing your activity timeline.", category: Privacy, risk: Safe, impact: 2 },
+    TweakDef { id: "disable_location", title: "Disable Location Tracking", description: "Turns off the system location service and its background polling.", category: Privacy, risk: Safe, impact: 2 },
+    TweakDef { id: "disable_feedback", title: "Disable Feedback Requests", description: "Stops Windows from periodically asking for feedback.", category: Privacy, risk: Safe, impact: 1 },
 
-    // ---- Game & Input ----
-    TweakDef { id: "mouse_accel_off", title: "Disable mouse acceleration", description: "Makes cursor/aim movement 1:1 for consistent aim.", category: Category::GameInput, risk: Risk::Safe },
-    TweakDef { id: "keyboard_delay", title: "Minimize keyboard repeat delay", description: "Sets the fastest keyboard repeat/response for input.", category: Category::GameInput, risk: Risk::Safe },
-    TweakDef { id: "fps_cap", title: "Smart FPS cap", description: "Caps FPS just under refresh to reduce latency with sync on.", category: Category::GameInput, risk: Risk::Safe },
+    // ---------- Gaming ----------
+    TweakDef { id: "mouse_accel_off", title: "Disable Mouse Acceleration", description: "Makes cursor and aim movement 1:1 for consistent aim.", category: Gaming, risk: Safe, impact: 4 },
+    TweakDef { id: "raw_input", title: "Raw Input Priority", description: "Prioritizes raw mouse/keyboard input for lower input latency.", category: Gaming, risk: Moderate, impact: 3 },
+    TweakDef { id: "fps_cap", title: "Smart FPS Cap", description: "Caps FPS just under your refresh to cut latency when sync is on.", category: Gaming, risk: Safe, impact: 3 },
+    TweakDef { id: "keyboard_delay", title: "Minimize Keyboard Repeat Delay", description: "Sets the fastest keyboard repeat/response for input.", category: Gaming, risk: Safe, impact: 2 },
+    TweakDef { id: "disable_sticky_keys", title: "Disable Sticky Keys", description: "Prevents the Sticky Keys prompt from interrupting games.", category: Gaming, risk: Safe, impact: 1 },
 ];
 
 /// Read-only: is the active power plan already High/Ultimate Performance?
-/// Uses powercfg (works unelevated).
 fn high_perf_active() -> bool {
     super::power_util::active_power_plan_name()
         .map(|n| {
@@ -134,7 +157,6 @@ fn high_perf_active() -> bool {
         .unwrap_or(false)
 }
 
-/// Read-only: is Xbox Game Bar capture already disabled?
 fn game_bar_disabled() -> bool {
     use winreg::enums::HKEY_CURRENT_USER;
     use winreg::RegKey;
@@ -145,7 +167,6 @@ fn game_bar_disabled() -> bool {
         .unwrap_or(false)
 }
 
-/// Read-only: is mouse acceleration already off? (MouseSpeed = "0")
 fn mouse_accel_off() -> bool {
     use winreg::enums::HKEY_CURRENT_USER;
     use winreg::RegKey;
@@ -154,10 +175,6 @@ fn mouse_accel_off() -> bool {
         .and_then(|k| k.get_value::<String, _>("MouseSpeed"))
         .map(|v| v.trim() == "0")
         .unwrap_or(false)
-}
-
-fn category_of(c: Category) -> Category {
-    c
 }
 
 /// Scan current state and report per-tweak applied/available + category rollups.
@@ -177,14 +194,14 @@ pub fn scan_tweaks(is_laptop: Option<bool>) -> ScanResult {
                 "mouse_accel_off" => ma,
                 _ => false,
             };
-            // Ultimate plan is unsafe on battery-powered laptops → mark unavailable.
             let available = !(d.id == "power_ultimate" && is_laptop == Some(true));
             TweakInfo {
                 id: d.id.to_string(),
                 title: d.title.to_string(),
                 description: d.description.to_string(),
-                category: category_of(d.category),
+                category: d.category,
                 risk: d.risk,
+                impact: d.impact,
                 applied,
                 available,
                 appliable: super::tweak_ops::is_appliable(d.id),
@@ -192,19 +209,11 @@ pub fn scan_tweaks(is_laptop: Option<bool>) -> ScanResult {
         })
         .collect();
 
-    let cats = [
-        Category::SystemPerformance,
-        Category::GraphicsDisplay,
-        Category::NetworkOptimization,
-        Category::WindowsServices,
-        Category::StorageOptimization,
-        Category::GameInput,
-    ];
+    let cats = [System, Performance, Network, Graphics, Privacy, Gaming];
     let categories: Vec<CategorySummary> = cats
         .iter()
         .map(|&c| {
-            let members: Vec<&TweakInfo> =
-                tweaks.iter().filter(|t| t.category == c).collect();
+            let members: Vec<&TweakInfo> = tweaks.iter().filter(|t| t.category == c).collect();
             CategorySummary {
                 category: c,
                 total: members.len(),
@@ -216,10 +225,5 @@ pub fn scan_tweaks(is_laptop: Option<bool>) -> ScanResult {
 
     let applied = tweaks.iter().filter(|t| t.applied).count();
     let total = tweaks.len();
-    ScanResult {
-        tweaks,
-        categories,
-        total,
-        applied,
-    }
+    ScanResult { tweaks, categories, total, applied }
 }
