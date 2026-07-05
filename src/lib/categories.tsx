@@ -12,39 +12,50 @@ import type { RiskLevel, TweakCategory } from "./types";
 
 export const CATEGORY_META: Record<
   TweakCategory,
-  { label: string; subtitle: string; icon: LucideIcon }
+  { label: string; subtitle: string; icon: LucideIcon; color: string }
 > = {
   system: {
     label: "System",
     subtitle: "Windows services, startup and memory",
     icon: Settings2,
+    color: "#f97316",
   },
   performance: {
     label: "Performance",
     subtitle: "CPU, timer resolution and latency",
     icon: Gauge,
+    color: "#e3000e",
   },
   network: {
     label: "Network",
     subtitle: "Latency, throughput and DNS",
     icon: Globe,
+    color: "#3b82f6",
   },
   graphics: {
     label: "Graphics",
     subtitle: "GPU, display and frame pacing",
     icon: Monitor,
+    color: "#a855f7",
   },
   privacy: {
     label: "Privacy",
     subtitle: "Telemetry, tracking and background data",
     icon: Lock,
+    color: "#14b8a6",
   },
   gaming: {
     label: "Gaming",
     subtitle: "Input latency and game settings",
     icon: Gamepad2,
+    color: "#22c55e",
   },
 };
+
+/** Display boost % for a tweak's 1–5 impact (RIP-style headline number). */
+export function boostPct(impact: number): number {
+  return { 1: 3, 2: 7, 3: 11, 4: 21, 5: 35 }[impact] ?? impact * 5;
+}
 
 export const CATEGORY_ORDER: TweakCategory[] = [
   "system",

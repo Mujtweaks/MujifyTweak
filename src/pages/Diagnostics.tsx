@@ -118,10 +118,10 @@ export default function Diagnostics() {
       {/* Header */}
       <div className="flex items-start justify-between">
         <div>
-          <div className="flex items-center gap-2.5">
-            <h1 className="font-display text-2xl font-bold tracking-wide text-txt">Diagnostics</h1>
+          <div className="flex items-center gap-3">
+            <h1 className="text-[42px] font-black uppercase leading-none tracking-tight text-txt">Diagnostics</h1>
             <span className="rounded-md bg-accent/15 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-accent">
-              v1.5 Intelligence Layer
+              Live
             </span>
           </div>
           <p className="mt-1.5 max-w-lg text-[12.5px] leading-relaxed text-txt2">

@@ -4,7 +4,7 @@ interface ToggleProps {
   disabled?: boolean;
 }
 
-/** Custom red toggle switch — the core control on every tweak row. */
+/** RIP-Tweaks-style toggle — red when on, no text labels. */
 export default function Toggle({ on, onClick, disabled }: ToggleProps) {
   return (
     <button
@@ -12,13 +12,13 @@ export default function Toggle({ on, onClick, disabled }: ToggleProps) {
       disabled={disabled}
       role="switch"
       aria-checked={on}
-      className={`relative flex h-[22px] w-[40px] shrink-0 items-center rounded-pill border transition-colors ${
-        on ? "border-accent/50 bg-accent" : "border-edge2 bg-white/5"
+      className={`relative flex h-[28px] w-[52px] shrink-0 items-center rounded-full border transition-all ${
+        on ? "border-accent/60 bg-accent" : "border-edge2 bg-[#222]"
       } ${disabled ? "cursor-not-allowed opacity-40" : ""}`}
     >
       <span
-        className={`absolute h-[16px] w-[16px] rounded-full bg-white shadow transition-transform ${
-          on ? "translate-x-[20px]" : "translate-x-[3px]"
+        className={`absolute h-[22px] w-[22px] rounded-full bg-white shadow-md transition-transform ${
+          on ? "translate-x-[25px]" : "translate-x-[3px]"
         }`}
       />
     </button>

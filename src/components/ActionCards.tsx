@@ -33,7 +33,7 @@ function Card({
       disabled={busy}
       className={`flex items-start gap-4 rounded-card border p-5 text-left transition-all active:scale-[0.99] ${
         primary
-          ? "border-accent bg-accent shadow-[0_4px_20px_rgba(227,0,14,0.3)]"
+          ? "glint border-accent bg-accent shadow-[0_4px_20px_rgba(227,0,14,0.3)]"
           : "border-edge bg-card hover:border-accent/40"
       }`}
     >

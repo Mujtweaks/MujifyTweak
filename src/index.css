@@ -124,3 +124,18 @@ textarea {
     opacity: 0;
   }
 }
+
+/* Page transition — a gentle fade-and-rise on navigation. */
+@keyframes pageFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.page-enter {
+  animation: pageFadeIn 0.18s ease-out;
+}

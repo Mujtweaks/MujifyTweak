@@ -33,6 +33,25 @@ export interface NavItem {
   icon: LucideIcon;
 }
 
+/** Uppercase page titles shown in the TopBar (sidebar is icon-only). */
+export const PAGE_TITLES: Record<PageId, string> = {
+  home: "Home",
+  optimizer: "Optimizer",
+  profiles: "Games",
+  "profile-editor": "Profile",
+  diagnostics: "Diagnostics",
+  network: "Network",
+  tweaks: "Tweaks",
+  tools: "Tools",
+  ai: "AI Assistant",
+  changelog: "Change Log",
+  report: "Performance Report",
+  history: "History",
+  drivers: "Drivers",
+  startup: "Startup",
+  settings: "Settings",
+};
+
 /** Sidebar nav — every entry is a real, working page. */
 export const NAV_ITEMS: NavItem[] = [
   { id: "home", label: "Home", icon: LayoutDashboard },

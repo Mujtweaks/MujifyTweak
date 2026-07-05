@@ -4,7 +4,7 @@ import { useSystemStore } from "../store/systemStore";
 const R = 34;
 const CIRC = 2 * Math.PI * R;
 
-function Ring({ label, percent, sub }: { label: string; percent: number | null; sub: string | null }) {
+function Ring({ label, percent, sub, color }: { label: string; percent: number | null; sub: string | null; color: string }) {
   const frac = percent === null ? 0 : Math.min(100, Math.max(0, percent)) / 100;
   return (
     <div className="flex flex-1 flex-col items-center gap-1.5">
@@ -17,11 +17,11 @@ function Ring({ label, percent, sub }: { label: string; percent: number | null; 
               cy="42"
               r={R}
               fill="none"
-              stroke="#e3000e"
+              stroke={color}
               strokeWidth="6"
               strokeLinecap="round"
               strokeDasharray={`${frac * CIRC} ${CIRC}`}
-              style={{ filter: "drop-shadow(0 0 6px rgba(227,0,14,0.4))" }}
+              style={{ filter: `drop-shadow(0 0 6px ${color}66)` }}
             />
           )}
         </svg>
@@ -68,16 +68,19 @@ export default function StatGauges() {
       <div className="flex">
         <Ring
           label="CPU"
+          color="#e3000e"
           percent={stats?.cpuUsagePercent ?? null}
           sub={stats?.cpuTempC != null ? `${Math.round(stats.cpuTempC)}°C` : null}
         />
         <Ring
           label="GPU"
+          color="#4a9eff"
           percent={stats?.gpuUsagePercent ?? null}
           sub={stats?.gpuTempC != null ? `${Math.round(stats.gpuTempC)}°C` : null}
         />
         <Ring
           label="RAM"
+          color="#a855f7"
           percent={stats?.ramUsagePercent ?? null}
           sub={stats ? `${stats.ramUsedGb.toFixed(1)} / ${stats.ramTotalGb.toFixed(0)} GB` : null}
         />

@@ -45,8 +45,8 @@ export default function ChangeLogView() {
       <div className="flex items-start justify-between">
         <div>
           <div className="flex items-center gap-2.5">
-            <ListChecks size={20} strokeWidth={1.75} className="text-accent" />
-            <h1 className="font-display text-2xl font-bold tracking-wide text-txt">Change Log</h1>
+            <ListChecks size={26} strokeWidth={1.75} className="text-accent" />
+            <h1 className="text-[42px] font-black uppercase leading-none tracking-tight text-txt">Change Log</h1>
           </div>
           <p className="mt-1 max-w-lg text-[12.5px] text-txt2">
             Every change Mujify has made, in plain English — with the exact before-state saved so any

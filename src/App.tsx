@@ -59,7 +59,7 @@ export default function App() {
       case "optimizer":
         return <Optimizer onNavigate={setPage} />;
       case "profiles":
-        return <Profiles />;
+        return <Profiles onNavigate={setPage} />;
       case "profile-editor":
         return <ProfileEditor />;
       case "diagnostics":
@@ -67,7 +67,7 @@ export default function App() {
       case "network":
         return <Network />;
       case "tweaks":
-        return <Tweaks onNavigate={setPage} />;
+        return <Tweaks />;
       case "tools":
         return <Tools />;
       case "ai":
@@ -91,9 +91,11 @@ export default function App() {
     <div className="flex h-screen w-screen overflow-hidden bg-bg text-txt">
       <Sidebar page={page} onNavigate={setPage} />
       <div className="flex min-w-0 flex-1 flex-col">
-        <TopBar onNavigate={setPage} />
-        <main className="min-h-0 flex-1 overflow-y-auto px-5 py-4">
-          {renderPage()}
+        <TopBar page={page} onNavigate={setPage} />
+        <main className="min-h-0 flex-1 overflow-y-auto px-6 py-5">
+          <div key={page} className="page-enter">
+            {renderPage()}
+          </div>
         </main>
         <GamesBar onNavigate={setPage} />
       </div>

@@ -29,6 +29,7 @@ import { getNetworkInfo, scanTweaks } from "../lib/backend";
 import { useSystemStore } from "../store/systemStore";
 import { useTweakStore } from "../store/tweakStore";
 import ApplyConfirmModal from "../components/ApplyConfirmModal";
+import TweakCard from "../components/TweakCard";
 import type { NetSample, NetworkInfo, TweakInfo } from "../lib/types";
 
 const EMPTY: NetSample[] = Array.from({ length: 61 }, (_, t) => ({ t }));
@@ -164,8 +165,10 @@ export default function Network() {
 
   useEffect(() => {
     void getNetworkInfo().then(setInfo);
+    if (!scanResult) void scanTweaks(hardware?.isLaptop ?? null).then((r) => r && setScan(r));
     const t = window.setInterval(() => setNow(Date.now()), 1000);
     return () => window.clearInterval(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const grade = pingGrade(net?.pingMs);
@@ -188,11 +191,11 @@ export default function Network() {
       {/* Header */}
       <div className="flex items-start justify-between">
         <div>
-          <div className="flex items-center gap-2.5">
-            <h1 className="text-2xl font-bold text-txt">Network</h1>
-            <span className="rounded-pill bg-accent/15 px-2 py-0.5 text-[10px] font-bold uppercase tracking-widest text-accent">Live Monitoring</span>
+          <div className="flex items-center gap-3">
+            <h1 className="text-[42px] font-black uppercase leading-none tracking-tight text-txt">Network</h1>
+            <span className="rounded-pill bg-accent/15 px-2 py-0.5 text-[10px] font-bold uppercase tracking-widest text-accent">Live</span>
           </div>
-          <p className="mt-1 text-[12.5px] text-txt2">Real-time network performance for the lowest possible latency.</p>
+          <p className="mt-1.5 text-[13px] text-txt2">Optimize your internet connection for the lowest possible latency.</p>
           <p className="text-[11px] text-txt3">— Data refreshes every ~1.5 seconds.</p>
         </div>
         <div className="flex gap-2.5">
@@ -328,6 +331,20 @@ export default function Network() {
           Review network tweaks <ChevronRight size={14} />
         </button>
       </div>
+
+      {/* Network tweak cards */}
+      {scanResult && (
+        <div>
+          <h2 className="mb-3 text-[16px] font-bold text-txt">Network & Ping Tweaks</h2>
+          <div className="grid grid-cols-2 gap-4">
+            {scanResult.tweaks
+              .filter((t) => t.category === "network")
+              .map((t) => (
+                <TweakCard key={t.id} tweak={t} selected={false} onToggle={(tw) => setConfirmTweaks([tw])} />
+              ))}
+          </div>
+        </div>
+      )}
 
       {confirmTweaks && (
         <ApplyConfirmModal

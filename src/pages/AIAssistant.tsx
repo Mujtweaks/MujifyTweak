@@ -1,90 +1,122 @@
-import { useEffect, useState } from "react";
-import { Bot, Eye, KeyRound, Search, Send, ShieldCheck, Wrench } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { Bot, Cpu, Send, Sparkles } from "lucide-react";
 import { NEMOTRON_MODEL, nvidiaKey } from "../lib/aiConfig";
+import { useSystemStore } from "../store/systemStore";
+import { useGameStore } from "../store/gameStore";
 import type { PageId } from "../lib/nav";
 
-const CAPS = [
-  { icon: Search, title: "Understands plain English", desc: "Describe a problem — it scans your PC to find the cause." },
-  { icon: Wrench, title: "Proposes real fixes", desc: "Every fix shows a risk label and the exact change before anything runs." },
-  { icon: ShieldCheck, title: "Confirm + undo", desc: "Nothing applies without your approval; each action gets an undo card." },
-  { icon: Eye, title: "Sees your system", desc: "Live hardware, temps, FPS, drivers and the change log as context." },
-];
+interface Msg {
+  role: "user" | "assistant";
+  text: string;
+}
+
+const QUICK = ["Why is my FPS low?", "Fix my high ping", "What did you change?", "Optimize my system"];
 
 export default function AIAssistant({ onNavigate }: { onNavigate: (page: PageId) => void }) {
-  // Key comes from the Rust-managed config (not the front-end bundle).
   const [keyReady, setKeyReady] = useState<boolean | null>(null);
+  const [msgs, setMsgs] = useState<Msg[]>([]);
+  const [input, setInput] = useState("");
+  const stats = useSystemStore((s) => s.stats);
+  const activeGame = useGameStore((s) => s.activeGame);
+  const endRef = useRef<HTMLDivElement>(null);
+
   useEffect(() => {
     void nvidiaKey().then((k) => setKeyReady(!!k));
   }, []);
+  useEffect(() => {
+    endRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [msgs]);
 
-  // No key configured → prompt setup instead of erroring (Fix 1).
+  const send = (text: string) => {
+    const q = text.trim();
+    if (!q) return;
+    setInput("");
+    setMsgs((m) => [
+      ...m,
+      { role: "user", text: q },
+      {
+        role: "assistant",
+        text:
+          "The live AI backend (NVIDIA Nemotron) is the next major phase — your key is configured and ready. Until then, the whole safe-apply pipeline it will use is already built: try the Optimizer or Tweaks tabs, and every change is confirmed and reversible.",
+      },
+    ]);
+  };
+
   if (keyReady === false) {
     return (
       <div className="grid h-full place-items-center">
         <div className="max-w-sm text-center">
-          <span className="mx-auto grid h-16 w-16 place-items-center rounded-2xl bg-accent/10 shadow-[0_0_28px_rgba(227,0,14,0.18)]">
-            <Bot size={30} strokeWidth={1.5} className="text-accent" />
-          </span>
+          <span className="mx-auto grid h-16 w-16 place-items-center rounded-2xl bg-accent/10 shadow-[0_0_28px_rgba(227,0,14,0.18)]"><Bot size={30} strokeWidth={1.5} className="text-accent" /></span>
           <h1 className="mt-4 text-xl font-bold text-txt">Set up your API key to enable AI</h1>
-          <p className="mt-2 text-[13px] leading-relaxed text-txt2">
-            Add your free NVIDIA NIM key in Settings to unlock the assistant. It's stored locally on
-            this PC only, never uploaded.
-          </p>
-          <button onClick={() => onNavigate("settings")} className="glint mt-4 rounded-btn bg-accent px-5 py-2.5 text-[13px] font-semibold text-white shadow-[0_4px_20px_rgba(227,0,14,0.3)] hover:bg-accent-hi">
-            Open Settings
-          </button>
+          <p className="mt-2 text-[13px] leading-relaxed text-txt2">Add your free NVIDIA NIM key in Settings to unlock the assistant. Stored locally on this PC only.</p>
+          <button onClick={() => onNavigate("settings")} className="glint mt-4 rounded-btn bg-accent px-5 py-2.5 text-[13px] font-semibold text-white shadow-[0_4px_20px_rgba(227,0,14,0.3)] hover:bg-accent-hi">Open Settings</button>
         </div>
       </div>
     );
   }
 
+  const pct = (v: number | null | undefined) => (v != null ? `${Math.round(v)}%` : "—");
+
   return (
-    <div className="mx-auto flex h-full max-w-3xl flex-col gap-4">
-      <div className="flex items-center gap-3">
-        <span className="grid h-11 w-11 place-items-center rounded-btn bg-accent/10 shadow-[0_0_24px_rgba(227,0,14,0.15)]">
-          <Bot size={22} strokeWidth={1.75} className="text-accent" />
-        </span>
-        <div>
-          <div className="flex items-center gap-2">
-            <h1 className="text-2xl font-bold text-txt">AI Assistant</h1>
-            <span className="rounded-pill bg-accent/15 px-2 py-0.5 text-[10px] font-bold uppercase tracking-widest text-accent">v2.5 · Nemotron</span>
-          </div>
-          <p className="text-[12.5px] text-txt2">Your PC's expert — powered by NVIDIA Nemotron. Free, like everything here.</p>
-        </div>
+    <div className="flex h-full flex-col gap-4">
+      <div>
+        <h1 className="text-[42px] font-black uppercase leading-none tracking-tight text-txt">AI Assistant</h1>
+        <p className="mt-1.5 text-[13px] text-txt2">Powered by <span className="font-mono text-[11px] text-txt">{NEMOTRON_MODEL}</span></p>
       </div>
 
-      <div className="grid grid-cols-2 gap-3">
-        {CAPS.map((c) => (
-          <div key={c.title} className="flex items-start gap-3 rounded-card border border-edge bg-card p-4">
-            <span className="grid h-9 w-9 shrink-0 place-items-center rounded-btn bg-bg">
-              <c.icon size={16} strokeWidth={1.75} className="text-accent" />
-            </span>
-            <div>
-              <p className="text-[13px] font-semibold text-txt">{c.title}</p>
-              <p className="mt-0.5 text-[11.5px] leading-snug text-txt2">{c.desc}</p>
+      <div className="grid min-h-0 flex-1 grid-cols-[1fr_300px] gap-4">
+        {/* Chat */}
+        <div className="flex min-h-0 flex-col rounded-2xl border border-edge bg-card">
+          <div className="flex-1 space-y-3 overflow-y-auto p-5">
+            {msgs.length === 0 && (
+              <div className="grid h-full place-items-center text-center">
+                <div>
+                  <Bot size={30} className="mx-auto text-accent/70" />
+                  <p className="mt-2 text-[13px] text-txt2">Describe a problem or ask anything about your PC.</p>
+                </div>
+              </div>
+            )}
+            {msgs.map((m, i) => (
+              <div key={i} className={`flex ${m.role === "user" ? "justify-end" : "justify-start"}`}>
+                <div className={`max-w-[80%] rounded-2xl px-4 py-3 text-[13px] leading-relaxed ${m.role === "user" ? "bg-accent/15 text-txt" : "border border-edge bg-bg text-txt"}`}>{m.text}</div>
+              </div>
+            ))}
+            <div ref={endRef} />
+          </div>
+          <div className="border-t border-edge p-3">
+            <div className="flex items-center gap-2 rounded-full border border-edge bg-bg px-4 py-2">
+              <input
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && send(input)}
+                placeholder="Describe a problem or ask anything about your PC..."
+                className="flex-1 bg-transparent text-[13px] text-txt placeholder:text-txt3 focus:outline-none"
+              />
+              <button onClick={() => send(input)} className="grid h-8 w-8 place-items-center rounded-full bg-accent text-white hover:bg-accent-hi"><Send size={15} /></button>
             </div>
           </div>
-        ))}
-      </div>
-
-      {/* Key status — the key ships with the app; users never bring their own. */}
-      <div className="flex items-center gap-3 rounded-card border border-edge bg-card p-4">
-        <KeyRound size={16} strokeWidth={1.75} className="text-success" />
-        <p className="flex-1 text-[12.5px] text-txt2">
-          Ready — powered by <span className="font-mono text-[11px] text-txt">{NEMOTRON_MODEL}</span>. Key is stored on this PC (Settings), not in the app bundle.
-        </p>
-        <button onClick={() => onNavigate("settings")} className="rounded-btn border border-edge bg-bg px-3 py-1.5 text-[12px] font-medium text-txt hover:border-edge2">
-          Settings
-        </button>
-      </div>
-
-      {/* Chat preview (disabled — honest) */}
-      <div className="mt-auto rounded-card border border-edge bg-card p-4">
-        <div className="flex items-center gap-2 rounded-btn border border-edge bg-bg px-3 py-2.5 opacity-60">
-          <input disabled placeholder="Ask anything — e.g. “my game stutters, what's wrong?” (arrives in v2.5)" className="flex-1 bg-transparent text-[13px] text-txt placeholder:text-txt3 focus:outline-none" />
-          <Send size={16} className="text-txt3" />
         </div>
-        <p className="mt-2 text-center text-[10.5px] text-txt3">Live chat is the next major phase. The whole safe-apply pipeline it needs is already built and tested.</p>
+
+        {/* Context */}
+        <div className="flex flex-col gap-3">
+          <div className="rounded-2xl border border-edge bg-card p-4">
+            <p className="mb-3 flex items-center gap-2 text-[11px] font-semibold uppercase tracking-widest text-txt3"><Cpu size={13} /> PC Context</p>
+            <div className="flex flex-col gap-2 text-[12.5px]">
+              <div className="flex justify-between"><span className="text-txt2">CPU</span><span className="text-txt">{pct(stats?.cpuUsagePercent)}</span></div>
+              <div className="flex justify-between"><span className="text-txt2">GPU</span><span className="text-txt">{pct(stats?.gpuUsagePercent)}</span></div>
+              <div className="flex justify-between"><span className="text-txt2">RAM</span><span className="text-txt">{pct(stats?.ramUsagePercent)}</span></div>
+              <div className="flex justify-between"><span className="text-txt2">Active game</span><span className="text-txt">{activeGame?.name ?? "None"}</span></div>
+            </div>
+          </div>
+          <div className="rounded-2xl border border-edge bg-card p-4">
+            <p className="mb-2 flex items-center gap-2 text-[11px] font-semibold uppercase tracking-widest text-txt3"><Sparkles size={13} /> Quick prompts</p>
+            <div className="flex flex-col gap-1.5">
+              {QUICK.map((q) => (
+                <button key={q} onClick={() => send(q)} className="rounded-btn border border-edge bg-bg px-3 py-2 text-left text-[12px] text-txt2 transition-colors hover:text-txt">{q}</button>
+              ))}
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   );

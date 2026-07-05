@@ -57,8 +57,8 @@ export default function ReportView() {
     <div className="mx-auto flex max-w-3xl flex-col gap-4">
       <div>
         <div className="flex items-center gap-2.5">
-          <LineChart size={20} strokeWidth={1.75} className="text-accent" />
-          <h1 className="font-display text-2xl font-bold tracking-wide text-txt">Before / After Report</h1>
+          <LineChart size={26} strokeWidth={1.75} className="text-accent" />
+          <h1 className="text-[38px] font-black uppercase leading-none tracking-tight text-txt">Performance Report</h1>
         </div>
         <p className="mt-1 max-w-xl text-[12.5px] text-txt2">
           The proof loop. Capture a baseline, apply tweaks, then capture a post-run — Mujify only
