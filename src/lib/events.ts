@@ -3,6 +3,7 @@ import { isTauri } from "./tauri";
 import { useSystemStore } from "../store/systemStore";
 import { useGameStore } from "../store/gameStore";
 import { useTweakStore } from "../store/tweakStore";
+import { toast } from "../store/toastStore";
 import type {
   ActivityEntry,
   AntiCheatStatus,
@@ -38,9 +39,14 @@ export async function initEventBridge(): Promise<void> {
     useSystemStore.getState().setNetStats(e.payload),
   );
 
-  await listen<GameInfo | null>("game_changed", (e) =>
-    useGameStore.getState().setActiveGame(e.payload),
-  );
+  await listen<GameInfo | null>("game_changed", (e) => {
+    const prev = useGameStore.getState().activeGame;
+    useGameStore.getState().setActiveGame(e.payload);
+    // Toast only when a game actually starts (not on close, not on no-op).
+    if (e.payload && e.payload.name !== prev?.name) {
+      toast.info(`${e.payload.name} detected`, "Game launched — profile ready to apply.");
+    }
+  });
 
   await listen<AntiCheatStatus>("anti_cheat_status", (e) =>
     useGameStore.getState().setAntiCheatActive(e.payload.active),

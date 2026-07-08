@@ -31,10 +31,10 @@ function Card({
     <button
       onClick={onClick}
       disabled={busy}
-      className={`flex items-start gap-4 rounded-card border p-5 text-left transition-all active:scale-[0.99] ${
+      className={`flex items-start gap-4 rounded-card border p-5 text-left transition-all duration-150 active:scale-[0.99] ${
         primary
           ? "glint border-accent bg-accent shadow-[0_4px_20px_rgba(227,0,14,0.3)]"
-          : "border-edge bg-card hover:border-accent/40"
+          : "border-edge bg-card hover:-translate-y-0.5 hover:scale-[1.015] hover:border-accent/40"
       }`}
     >
       <span className={`grid h-10 w-10 shrink-0 place-items-center rounded-btn ${primary ? "bg-white/15" : "bg-bg"}`}>

@@ -52,9 +52,12 @@ export const CATEGORY_META: Record<
   },
 };
 
-/** Display boost % for a tweak's 1–5 impact (RIP-style headline number). */
-export function boostPct(impact: number): number {
-  return { 1: 3, 2: 7, 3: 11, 4: 21, 5: 35 }[impact] ?? impact * 5;
+/** Honest impact tier for a tweak's 1–5 rating. We never fabricate a "boost %" —
+ *  a real percentage only ever appears in the measured before/after report. */
+export function impactTier(impact: number): "Low" | "Medium" | "High" {
+  if (impact >= 4) return "High";
+  if (impact >= 2) return "Medium";
+  return "Low";
 }
 
 export const CATEGORY_ORDER: TweakCategory[] = [

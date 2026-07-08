@@ -22,6 +22,15 @@ use windows::Win32::NetworkManagement::IpHelper::{
 // GetAdaptersInfo / GetNetworkParams return a WIN32 error code as u32; 0 = success.
 const WIN32_OK: u32 = 0;
 
+// Most recent ICMP round-trip (ms), shared so the benchmark can sample ping in
+// its before/after window without running a second probe loop.
+static LATEST_PING: std::sync::Mutex<Option<f32>> = std::sync::Mutex::new(None);
+
+/// The latest measured ping in ms, or None if the last probe timed out.
+pub fn latest_ping() -> Option<f32> {
+    *LATEST_PING.lock().unwrap()
+}
+
 #[derive(Serialize, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct NetworkStats {
@@ -32,16 +41,19 @@ pub struct NetworkStats {
     pub up_mbps: Option<f32>,
 }
 
-/// One ICMP echo to `1.1.1.1`. Returns round-trip ms, or None on timeout/failure.
-fn ping_once() -> Option<f32> {
+/// One ICMP echo to an arbitrary IPv4 (octets in a.b.c.d order). Returns
+/// round-trip ms, or None on timeout/failure. Works unelevated. Read-only —
+/// this is the same mechanism as `ping`; it changes nothing on the system.
+pub fn ping_ipv4(octets: [u8; 4], timeout_ms: u32) -> Option<u32> {
     unsafe {
         let handle = IcmpCreateFile().ok()?;
         if handle.is_invalid() {
             return None;
         }
 
-        // 1.1.1.1 in network byte order (little-endian u32 = 1.1.1.1).
-        let dest: u32 = u32::from_ne_bytes([1, 1, 1, 1]);
+        // Windows IPAddr is network byte order; on little-endian x64 that is
+        // exactly from_ne_bytes([a,b,c,d]) (matches inet_addr).
+        let dest: u32 = u32::from_ne_bytes(octets);
         let send_data = [0u8; 32];
         // Reply buffer: one ICMP_ECHO_REPLY + data + slack, per API guidance.
         let reply_size = std::mem::size_of::<ICMP_ECHO_REPLY>() + send_data.len() + 8;
@@ -55,13 +67,13 @@ fn ping_once() -> Option<f32> {
             None,
             reply_buf.as_mut_ptr() as *mut _,
             reply_size as u32,
-            1000, // 1s timeout
+            timeout_ms,
         );
 
         let result = if ret > 0 {
             let reply = &*(reply_buf.as_ptr() as *const ICMP_ECHO_REPLY);
             if reply.Status == 0 {
-                Some(reply.RoundTripTime as f32)
+                Some(reply.RoundTripTime)
             } else {
                 None
             }
@@ -72,6 +84,11 @@ fn ping_once() -> Option<f32> {
         let _ = CloseHandle(handle);
         result
     }
+}
+
+/// One ICMP echo to `1.1.1.1` — the live monitor's fixed probe target.
+fn ping_once() -> Option<f32> {
+    ping_ipv4([1, 1, 1, 1], 1000).map(|ms| ms as f32)
 }
 
 fn stddev(samples: &[f32]) -> f32 {
@@ -166,6 +183,7 @@ pub fn start(app: AppHandle) {
 
         loop {
             let ping = ping_once();
+            *LATEST_PING.lock().unwrap() = ping;
             if window.len() == 20 {
                 window.pop_front();
             }

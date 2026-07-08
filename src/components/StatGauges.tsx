@@ -21,12 +21,15 @@ function Ring({ label, percent, sub, color }: { label: string; percent: number |
               strokeWidth="6"
               strokeLinecap="round"
               strokeDasharray={`${frac * CIRC} ${CIRC}`}
-              style={{ filter: `drop-shadow(0 0 6px ${color}66)` }}
+              style={{
+                filter: `drop-shadow(0 0 6px ${color}66)`,
+                transition: "stroke-dasharray 300ms ease-out",
+              }}
             />
           )}
         </svg>
         <span className="absolute inset-0 grid place-items-center text-xl font-bold text-txt">
-          {percent !== null ? `${Math.round(percent)}%` : "--"}
+          {percent !== null ? `${Math.round(percent)}%` : <span className="skeleton h-5 w-10 rounded-md" />}
         </span>
       </div>
       <p className="text-[10px] font-semibold uppercase tracking-widest text-txt3">{label}</p>

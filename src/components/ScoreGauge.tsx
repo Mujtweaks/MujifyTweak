@@ -2,6 +2,7 @@ import { Clock, Shield, Wifi, Zap, type LucideIcon } from "lucide-react";
 import { useSystemStore } from "../store/systemStore";
 import { useGameStore } from "../store/gameStore";
 import { useTweakStore } from "../store/tweakStore";
+import { useAnimatedNumber } from "../lib/useAnimatedNumber";
 
 function scoreWord(score: number): string {
   if (score >= 85) return "EXCELLENT";
@@ -27,13 +28,13 @@ function netTier(ping: number | null | undefined): string | null {
 
 function Chip({ icon: Icon, label, value }: { icon: LucideIcon; label: string; value: string | null }) {
   return (
-    <div className="flex items-center gap-2.5">
+    <div className="flex min-w-0 items-center gap-2.5">
       <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-accent/10">
         <Icon size={14} strokeWidth={2} className="text-accent" />
       </span>
-      <div>
+      <div className="min-w-0">
         <p className="text-[10px] font-medium uppercase tracking-wide text-txt3">{label}</p>
-        <p className="text-[13px] font-medium text-txt">{value ?? "—"}</p>
+        <p className="truncate text-[13px] font-medium text-txt">{value ?? "—"}</p>
       </div>
     </div>
   );
@@ -48,6 +49,9 @@ export default function ScoreGauge() {
   const score = stats?.systemScore ?? null;
   const powerPlan = stats?.activePowerPlan ?? null;
   const status = score == null ? null : score >= 85 ? "Optimal" : score >= 65 ? "Good" : "Strained";
+
+  // Animate the arc + number from 0 → score (~0.9s first, ~0.4s on updates).
+  const animScore = useAnimatedNumber(score, { first: 900, rest: 400 });
 
   return (
     <div className="rounded-card border border-edge bg-card p-6">
@@ -75,18 +79,30 @@ export default function ScoreGauge() {
               strokeWidth="14"
               strokeLinecap="round"
               pathLength={100}
-              strokeDasharray={`${score} 100`}
+              strokeDasharray={`${animScore ?? 0} 100`}
               style={{ filter: "drop-shadow(0 0 24px rgba(227,0,14,0.25))" }}
             />
           )}
         </svg>
         <div className="absolute inset-x-0 bottom-1 text-center">
-          <span className="text-[72px] font-bold leading-none text-txt">{score ?? "--"}</span>
+          {score !== null ? (
+            <span className="text-[72px] font-bold leading-none tabular-nums text-txt">
+              {Math.round(animScore ?? 0)}
+            </span>
+          ) : (
+            <span className="skeleton mx-auto block h-[52px] w-[92px] rounded-xl" />
+          )}
         </div>
       </div>
 
       <p className="mt-1 text-center text-lg font-bold tracking-[0.15em] text-accent">
-        {score !== null ? scoreWord(score) : "AWAITING DATA"}
+        {score !== null ? (
+          <span className="inline-block" style={{ animation: "pageFadeIn 0.4s ease-out both", animationDelay: "0.75s" }}>
+            {scoreWord(score)}
+          </span>
+        ) : (
+          "AWAITING DATA"
+        )}
       </p>
       <p className="mt-1.5 text-center text-sm text-txt2">
         {score !== null

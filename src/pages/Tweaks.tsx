@@ -76,7 +76,7 @@ export default function Tweaks() {
       <div className="flex gap-4">
         <Stat icon={<Zap size={18} strokeWidth={2} />} label="Total Tweaks" value={`${tweaks.length}`} sub="100% Free" />
         <Stat icon={<CheckCircle2 size={18} strokeWidth={2} />} label="Selected" value={`${selected.size}`} sub="Ready to apply" />
-        <Stat icon={<Sparkles size={18} strokeWidth={2} />} label="Potential Boost" value={boostWord} sub="Estimated from selection" />
+        <Stat icon={<Sparkles size={18} strokeWidth={2} />} label="Selected Impact" value={boostWord} sub="Impact tier of your selection" />
         <Stat icon={<RotateCcw size={18} strokeWidth={2} />} label="Applied" value={`${tweaks.filter((t) => t.applied).length}`} sub="Active on this PC" />
       </div>
 

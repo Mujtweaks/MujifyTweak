@@ -7,6 +7,7 @@ import {
   Rocket,
   Settings,
   SlidersHorizontal,
+  Wrench,
   type LucideIcon,
 } from "lucide-react";
 
@@ -18,6 +19,7 @@ export type PageId =
   | "diagnostics"
   | "network"
   | "tweaks"
+  | "fixes"
   | "tools"
   | "ai"
   | "changelog"
@@ -42,6 +44,7 @@ export const PAGE_TITLES: Record<PageId, string> = {
   diagnostics: "Diagnostics",
   network: "Network",
   tweaks: "Tweaks",
+  fixes: "Fixes",
   tools: "Tools",
   ai: "AI Assistant",
   changelog: "Change Log",
@@ -60,6 +63,7 @@ export const NAV_ITEMS: NavItem[] = [
   { id: "diagnostics", label: "Diagnostics", icon: Activity },
   { id: "network", label: "Network", icon: Globe },
   { id: "tweaks", label: "Tweaks", icon: SlidersHorizontal },
+  { id: "fixes", label: "Fixes", icon: Wrench },
   { id: "ai", label: "AI Assistant", icon: Bot },
   { id: "settings", label: "Settings", icon: Settings },
 ];

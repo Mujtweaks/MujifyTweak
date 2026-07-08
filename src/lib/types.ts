@@ -46,6 +46,10 @@ export interface FrameStats {
   pointOnePercentLow: number;
   avgFrameTimeMs: number;
   frameTimeStability: number;
+  /** Mean GPU-busy time per frame (ms), when PresentMon reports it. */
+  gpuBusyMs: number | null;
+  /** Live bottleneck: "gpu" | "cpu" | "balanced". */
+  bottleneck: string | null;
 }
 
 /** Emitted every ~2s by NetworkMonitor (Checkpoint 7) as "network_stats". */
@@ -153,6 +157,7 @@ export interface BenchAverages {
   ramUsage: number;
   systemScore: number;
   avgFps: number | null;
+  pingMs: number | null;
 }
 
 export interface MetricDelta {
@@ -172,6 +177,7 @@ export interface BenchmarkReport {
   metrics: MetricDelta[];
   verdict: string;
   fpsMeasured: boolean;
+  appliedTweaks: string[];
 }
 
 export interface CategorySummary {
@@ -186,6 +192,92 @@ export interface ScanResult {
   categories: CategorySummary[];
   total: number;
   applied: number;
+}
+
+/** One misconfiguration found by the Bottleneck / Health Scan. */
+export interface HealthFinding {
+  id: string;
+  title: string;
+  detail: string;
+  severity: "critical" | "warning" | "info";
+  fpsCost: string;
+  fixable: "one-click" | "bios" | "manual" | "detection-only";
+}
+
+export interface SystemHealthReport {
+  findings: HealthFinding[];
+  scannedAt: number;
+  problems: number;
+}
+
+/** A device/driver reporting a problem (Device Manager ConfigManagerErrorCode). */
+export interface DeviceIssue {
+  name: string;
+  class: string;
+  instanceId: string;
+  errorCode: number;
+  errorText: string;
+}
+
+/** A repair in the Fixes Hub (from resources/fixes.json). */
+export interface FixInfo {
+  id: string;
+  title: string;
+  description: string;
+  category: string;
+  risk: string;
+  action: string;
+  what: string;
+  changes: string;
+  reversible: boolean;
+}
+
+/** One region's latency in the Game Server Ping Tester. pingMs null = no reply. */
+export interface RegionPing {
+  region: string;
+  host: string;
+  pingMs: number | null;
+}
+
+export interface GameServersResult {
+  id: string;
+  name: string;
+  appId: string | null;
+  regions: RegionPing[];
+}
+
+/** A game we can ping (for the Ping Optimizer grid), without ping data. */
+export interface GameCatalogEntry {
+  id: string;
+  name: string;
+  appId: string | null;
+}
+
+/** One recommended (or not-recommended) tweak for a game, with the reason. */
+export interface TweakRec {
+  id: string;
+  why: string;
+}
+
+/** Per-game recommended tweak preset from the bundled database. */
+export interface GameRecProfile {
+  match?: string[];
+  name: string;
+  impact: string;
+  recommended: TweakRec[];
+  notRecommended: TweakRec[];
+}
+
+/** Universal per-game profile: preset, engine-detected, or safe generic. */
+export interface GameProfileResult {
+  gameName: string;
+  source: "preset" | "engine" | "generic";
+  engine: string | null;
+  bottleneck: string | null;
+  reason: string;
+  impact: string;
+  recommended: TweakRec[];
+  notRecommended: TweakRec[];
 }
 
 export interface Profile {

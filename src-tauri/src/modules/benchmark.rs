@@ -28,6 +28,7 @@ pub struct Averages {
     pub system_score: f32,
     // FPS/frame-time intentionally absent until PresentMon lands.
     pub avg_fps: Option<f32>,
+    pub ping_ms: Option<f32>,
 }
 
 #[derive(Serialize, Deserialize, Clone)]
@@ -53,6 +54,8 @@ pub struct BenchmarkReport {
     pub verdict: String,
     /// True only when FPS was actually captured. Drives honest UI copy.
     pub fps_measured: bool,
+    /// Plain-English descriptions of the tweaks applied during this session.
+    pub applied_tweaks: Vec<String>,
 }
 
 static LATEST_REPORT: Mutex<Option<BenchmarkReport>> = Mutex::new(None);
@@ -66,6 +69,8 @@ async fn collect(count: u32, interval: Duration) -> Averages {
     let mut score = 0.0f32;
     let mut fps_sum = 0.0f32;
     let mut fps_n = 0u32;
+    let mut ping_sum = 0.0f32;
+    let mut ping_n = 0u32;
     let mut got = 0u32;
 
     for _ in 0..count {
@@ -84,6 +89,10 @@ async fn collect(count: u32, interval: Duration) -> Averages {
             fps_sum += f.avg_fps;
             fps_n += 1;
         }
+        if let Some(pg) = super::network_monitor::latest_ping() {
+            ping_sum += pg;
+            ping_n += 1;
+        }
         tokio::time::sleep(interval).await;
     }
 
@@ -96,6 +105,7 @@ async fn collect(count: u32, interval: Duration) -> Averages {
         system_score: score / n,
         // Measured only when a game was actually presenting during the window.
         avg_fps: if fps_n > 0 { Some(fps_sum / fps_n as f32) } else { None },
+        ping_ms: if ping_n > 0 { Some(ping_sum / ping_n as f32) } else { None },
     }
 }
 
@@ -149,6 +159,17 @@ fn build_metrics(b: &Averages, p: &Averages) -> Vec<MetricDelta> {
             measured: true,
         },
         MetricDelta {
+            label: "Ping".into(),
+            before: b.ping_ms,
+            after: p.ping_ms,
+            delta_pct: match (b.ping_ms, p.ping_ms) {
+                (Some(x), Some(y)) => pct(x, y),
+                _ => None,
+            },
+            better: "lower".into(),
+            measured: b.ping_ms.is_some() && p.ping_ms.is_some(),
+        },
+        MetricDelta {
             label: "System Score".into(),
             before: Some(b.system_score),
             after: Some(p.system_score),
@@ -194,15 +215,15 @@ fn verdict(metrics: &[MetricDelta], fps_measured: bool) -> String {
 }
 
 /// Run one baseline OR post capture. `phase` is "baseline" | "post".
-/// ~20 samples at 1s = a ~20s window (shorter than the spec's 60s so the UI
-/// stays responsive during development; the mechanism is identical either way).
+/// 60 samples at 1s = a ~60s window — long enough for a real, comparable FPS
+/// average when a game is presenting during both the baseline and the post run.
 #[tauri::command]
 pub async fn run_benchmark(
     _app: AppHandle,
     phase: String,
     game_name: Option<String>,
 ) -> Result<Averages, String> {
-    let avg = collect(20, Duration::from_secs(1)).await;
+    let avg = collect(60, Duration::from_secs(1)).await;
     // Stash baseline so a later "post" can diff against it.
     if phase == "baseline" {
         *LATEST_REPORT.lock().unwrap() = Some(BenchmarkReport {
@@ -213,16 +234,24 @@ pub async fn run_benchmark(
             metrics: Vec::new(),
             verdict: "Baseline captured. Apply tweaks, then run the post-benchmark.".into(),
             fps_measured: false,
+            applied_tweaks: Vec::new(),
         });
     } else {
         // Complete the report by diffing against the stored baseline.
         let mut guard = LATEST_REPORT.lock().unwrap();
         if let Some(report) = guard.as_mut() {
+            let baseline_ts = report.created_at; // captured at baseline time
             report.post = avg.clone();
             report.metrics = build_metrics(&report.baseline, &report.post);
             report.fps_measured =
                 report.baseline.avg_fps.is_some() && report.post.avg_fps.is_some();
             report.verdict = verdict(&report.metrics, report.fps_measured);
+            // Tweaks applied between the baseline capture and now, still active.
+            report.applied_tweaks = super::change_log::all()
+                .into_iter()
+                .filter(|e| !e.undone && e.timestamp >= baseline_ts)
+                .map(|e| e.description)
+                .collect();
             report.created_at = chrono::Utc::now().timestamp_millis();
         }
     }
@@ -247,7 +276,16 @@ mod tests {
             ram_usage: 60.0,
             system_score: 90.0,
             avg_fps: fps,
+            ping_ms: Some(30.0),
         }
+    }
+
+    #[test]
+    fn ping_row_is_measured_when_both_sides_have_it() {
+        let m = build_metrics(&avg(50.0, Some(100.0)), &avg(45.0, Some(120.0)));
+        let ping = m.iter().find(|r| r.label == "Ping").unwrap();
+        assert!(ping.measured);
+        assert_eq!(ping.better, "lower");
     }
 
     #[test]

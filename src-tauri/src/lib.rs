@@ -24,8 +24,9 @@ use tauri::{
 };
 
 use modules::{
-    benchmark, change_log, config, game_detector, hardware_profiler, network_monitor,
-    profile_store, rollback_engine, system_monitor, tweak_catalog, tweaks_engine,
+    ai_backend, benchmark, change_log, config, driver_doctor, fix_catalog, game_detector,
+    game_profiler, game_profiles, hardware_profiler, health_scan, network_monitor, profile_store,
+    rollback_engine, server_ping, speed_test, system_monitor, tweak_catalog, tweaks_engine,
 };
 
 fn show_main(app: &tauri::AppHandle) {
@@ -90,6 +91,19 @@ fn ping(app: tauri::AppHandle) -> PingResponse {
     }
 }
 
+/// Ask the updater plugin whether a newer release exists. Returns an honest
+/// status string; errors (e.g. no public release channel yet) surface as Err.
+#[tauri::command]
+async fn check_for_updates(app: tauri::AppHandle) -> Result<String, String> {
+    use tauri_plugin_updater::UpdaterExt;
+    let updater = app.updater().map_err(|e| e.to_string())?;
+    match updater.check().await {
+        Ok(Some(update)) => Ok(format!("Update available: v{}", update.version)),
+        Ok(None) => Ok("You're on the latest version.".into()),
+        Err(e) => Err(format!("Update check unavailable: {e}")),
+    }
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     // Restore the persisted change log so Revert All survives restarts.
@@ -117,14 +131,27 @@ pub fn run() {
         })
         .invoke_handler(tauri::generate_handler![
             ping,
+            check_for_updates,
             hardware_profiler::get_hardware_profile,
             game_detector::get_installed_games,
+            game_profiles::get_recommended_tweaks,
+            game_profiler::get_game_profile,
             network_monitor::get_network_info,
+            server_ping::ping_game_servers,
+            server_ping::list_game_catalog,
+            speed_test::speed_test_download,
+            speed_test::speed_test_upload,
             tweak_catalog::scan_tweaks,
+            fix_catalog::scan_fixes,
+            fix_catalog::apply_fix,
+            driver_doctor::scan_device_health,
+            driver_doctor::repair_drivers,
+            health_scan::scan_system_health,
             profile_store::list_profiles,
             profile_store::save_profile,
             profile_store::delete_profile,
             tweaks_engine::apply_tweaks,
+            tweaks_engine::check_reset_tweaks,
             rollback_engine::revert_single,
             rollback_engine::revert_all,
             rollback_engine::get_change_log,
@@ -132,6 +159,9 @@ pub fn run() {
             benchmark::get_latest_report,
             config::get_api_key,
             config::set_api_key,
+            ai_backend::ai_chat,
+            ai_backend::save_ai_session,
+            ai_backend::load_ai_session,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

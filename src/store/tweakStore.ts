@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import type { ActivityEntry, ScanResult } from "../lib/types";
+import { toast } from "./toastStore";
 
 interface TweakState {
   /** Plain-English feed shown in RecentActivity; fed by change_log_update events. */
@@ -23,7 +24,7 @@ interface TweakState {
   setSelected: (ids: Set<string>) => void;
 }
 
-export const useTweakStore = create<TweakState>((set) => ({
+export const useTweakStore = create<TweakState>((set, get) => ({
   activity: [],
   lastOptimizedAt: null,
   powerPlan: null,
@@ -37,6 +38,14 @@ export const useTweakStore = create<TweakState>((set) => ({
     set((s) => ({ activity: [entry, ...s.activity].slice(0, 100) })),
   setPowerPlan: (powerPlan) => set({ powerPlan }),
   setLastOptimizedAt: (lastOptimizedAt) => set({ lastOptimizedAt }),
-  setScan: (scanResult) => set({ scanResult, lastScanAt: Date.now() }),
+  setScan: (scanResult) => {
+    // Toast once, on the first real scan of the session (later rescans after an
+    // apply already show their own "applied" toast — don't double up).
+    const firstScan = get().scanResult === null;
+    set({ scanResult, lastScanAt: Date.now() });
+    if (firstScan) {
+      toast.success("System scan complete", `${scanResult.tweaks.length} optimizations found.`);
+    }
+  },
   setSelected: (selected) => set({ selected: new Set(selected) }),
 }));

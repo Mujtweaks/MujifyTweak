@@ -102,8 +102,8 @@ const CATALOG: &[TweakDef] = &[
     // ---------- Performance ----------
     TweakDef { id: "disable_core_parking", title: "Disable CPU Core Parking", description: "Keeps all CPU cores active instead of parking idle ones — smoother frame pacing.", category: Performance, risk: Moderate, impact: 5 },
     TweakDef { id: "timer_resolution", title: "Timer Resolution Optimization", description: "Locks the system timer to 1 ms for smoother frames and lower input latency.", category: Performance, risk: Moderate, impact: 5 },
-    TweakDef { id: "disable_dynamic_tick", title: "Disable Dynamic Tick", description: "Prevents variable interrupt timing for more consistent frame times (needs restart).", category: Performance, risk: Advanced, impact: 4 },
-    TweakDef { id: "disable_hpet", title: "Disable HPET", description: "Removes the High Precision Event Timer, a known latency source on modern CPUs.", category: Performance, risk: Advanced, impact: 4 },
+    TweakDef { id: "disable_dynamic_tick", title: "Disable Dynamic Tick", description: "Legacy timer tweak — modern Windows handles this well; often no gain and it can hurt. Experimental.", category: Performance, risk: Advanced, impact: 2 },
+    TweakDef { id: "disable_hpet", title: "Disable HPET", description: "Legacy timer tweak — community consensus moved away years ago; can even hurt on modern CPUs. Experimental.", category: Performance, risk: Advanced, impact: 2 },
     TweakDef { id: "cpu_affinity_pcore", title: "Pin Games to Performance Cores", description: "Steers the game to P-cores on hybrid CPUs (auto-skips where it would hurt).", category: Performance, risk: Advanced, impact: 4 },
     TweakDef { id: "disable_power_throttling", title: "Disable Power Throttling", description: "Stops Windows from throttling foreground apps to save power.", category: Performance, risk: Moderate, impact: 4 },
     TweakDef { id: "win32_priority", title: "Optimize Win32 Priority Separation", description: "Tunes the scheduler quantum to favor foreground game threads.", category: Performance, risk: Moderate, impact: 3 },
@@ -170,11 +170,16 @@ fn game_bar_disabled() -> bool {
 fn mouse_accel_off() -> bool {
     use winreg::enums::HKEY_CURRENT_USER;
     use winreg::RegKey;
-    RegKey::predef(HKEY_CURRENT_USER)
-        .open_subkey(r"Control Panel\Mouse")
-        .and_then(|k| k.get_value::<String, _>("MouseSpeed"))
-        .map(|v| v.trim() == "0")
-        .unwrap_or(false)
+    // Acceleration is only truly off when MouseSpeed AND both thresholds are 0.
+    let Ok(key) = RegKey::predef(HKEY_CURRENT_USER).open_subkey(r"Control Panel\Mouse") else {
+        return false;
+    };
+    let is_zero = |name: &str| {
+        key.get_value::<String, _>(name)
+            .map(|v| v.trim() == "0")
+            .unwrap_or(false)
+    };
+    is_zero("MouseSpeed") && is_zero("MouseThreshold1") && is_zero("MouseThreshold2")
 }
 
 /// Scan current state and report per-tweak applied/available + category rollups.

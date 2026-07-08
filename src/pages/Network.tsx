@@ -30,6 +30,8 @@ import { useSystemStore } from "../store/systemStore";
 import { useTweakStore } from "../store/tweakStore";
 import ApplyConfirmModal from "../components/ApplyConfirmModal";
 import TweakCard from "../components/TweakCard";
+import ServerPing from "../components/ServerPing";
+import SpeedTest from "../components/SpeedTest";
 import type { NetSample, NetworkInfo, TweakInfo } from "../lib/types";
 
 const EMPTY: NetSample[] = Array.from({ length: 61 }, (_, t) => ({ t }));
@@ -224,6 +226,9 @@ export default function Network() {
         <StatCard icon={Shield} label="Route Quality" value={route.grade} badge={route.grade === "A+" || route.grade === "A" ? "OPTIMAL" : "—"} badgeTone={route.tone} sub={route.note} ringValue={net?.pingMs ?? null} />
       </div>
 
+      {/* Bandwidth speed test — download / upload cards alongside the live stats */}
+      <SpeedTest />
+
       {/* Graph + details + throughput */}
       <div className="grid grid-cols-[1.4fr_1fr_1fr] gap-4">
         {/* Latency graph */}
@@ -295,6 +300,9 @@ export default function Network() {
           </div>
         </div>
       </div>
+
+      {/* Game server ping tester */}
+      <ServerPing />
 
       {/* Optimization status */}
       <div className="rounded-card border border-edge bg-card p-5">

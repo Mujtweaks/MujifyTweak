@@ -27,6 +27,10 @@ pub struct FrameStats {
     pub point_one_percent_low: f32,
     pub avg_frame_time_ms: f32,
     pub frame_time_stability: f32,
+    /// Mean GPU-busy time per frame (ms), when PresentMon reports it.
+    pub gpu_busy_ms: Option<f32>,
+    /// Live bottleneck: "gpu" | "cpu" | "balanced" (from GPU-busy vs frame time).
+    pub bottleneck: Option<String>,
 }
 
 static CURRENT_CHILD: Mutex<Option<CommandChild>> = Mutex::new(None);
@@ -41,6 +45,41 @@ fn frame_time_column(header: &str) -> Option<usize> {
     header
         .split(',')
         .position(|c| c.trim().eq_ignore_ascii_case("msBetweenPresents"))
+}
+
+/// Column index of the GPU-busy time, if PresentMon includes it (names vary by
+/// version: msGPUActive / msGPUBusy / GPUBusy).
+fn gpu_busy_column(header: &str) -> Option<usize> {
+    header.split(',').position(|c| {
+        let c = c.trim();
+        c.eq_ignore_ascii_case("msGPUActive")
+            || c.eq_ignore_ascii_case("msGPUBusy")
+            || c.eq_ignore_ascii_case("GPUBusy")
+    })
+}
+
+/// Classify GPU- vs CPU-bound from mean GPU-busy time vs mean frame time. A high
+/// ratio means the GPU is busy almost the whole frame (GPU-bound); a low ratio
+/// means the frame is waiting on the CPU / main thread. Strong heuristic, not
+/// absolute — and Hardware-Accelerated GPU Scheduling can slightly skew it.
+pub fn classify_bottleneck(gpu_busy_ms: f32, frame_time_ms: f32, stability_ms: f32) -> &'static str {
+    if frame_time_ms <= 0.0 {
+        return "balanced";
+    }
+    let ratio = gpu_busy_ms / frame_time_ms;
+    // Extremely consistent frame times with the GPU idle → a frame cap / V-sync /
+    // engine limit, NOT a real CPU bottleneck (a CPU bottleneck has far more
+    // frame-time variance). Without this, capped games get mislabeled CPU-bound.
+    if ratio <= 0.85 && stability_ms < 0.6 {
+        return "capped";
+    }
+    if ratio >= 0.90 {
+        "gpu"
+    } else if ratio <= 0.80 {
+        "cpu"
+    } else {
+        "balanced"
+    }
 }
 
 /// Parse one CSV data row's frame time (ms) at the known column index.
@@ -88,6 +127,8 @@ pub fn compute_frame_stats(frame_times: &[f32]) -> Option<FrameStats> {
         point_one_percent_low: low_fps(&sorted_desc, 0.001),
         avg_frame_time_ms: mean,
         frame_time_stability: variance.sqrt(),
+        gpu_busy_ms: None,
+        bottleneck: None,
     })
 }
 
@@ -137,7 +178,10 @@ fn start_capture(app: AppHandle, exe: String) {
 
     tauri::async_runtime::spawn(async move {
         let mut col: Option<usize> = None;
+        let mut gpu_col: Option<usize> = None;
+        let mut header_seen = false;
         let mut window: Vec<f32> = Vec::with_capacity(600);
+        let mut gpu_window: Vec<f32> = Vec::with_capacity(600);
         let mut last_emit = Instant::now();
 
         while let Some(event) = rx.recv().await {
@@ -151,20 +195,44 @@ fn start_capture(app: AppHandle, exe: String) {
             }
 
             // First comma-bearing line is the header.
-            if col.is_none() {
+            if !header_seen {
+                header_seen = true;
                 col = frame_time_column(line);
+                gpu_col = gpu_busy_column(line);
                 continue;
             }
-            if let Some(ft) = parse_frame_time(line, col.unwrap()) {
+            let Some(fcol) = col else { continue };
+            if let Some(ft) = parse_frame_time(line, fcol) {
                 window.push(ft);
+            }
+            if let Some(gc) = gpu_col {
+                if let Some(gb) = parse_frame_time(line, gc) {
+                    gpu_window.push(gb);
+                }
             }
             if window.len() > 600 {
                 let drop = window.len() - 600;
                 window.drain(0..drop);
             }
+            if gpu_window.len() > 600 {
+                let drop = gpu_window.len() - 600;
+                gpu_window.drain(0..drop);
+            }
 
             if last_emit.elapsed() >= Duration::from_secs(1) {
-                if let Some(stats) = compute_frame_stats(&window) {
+                if let Some(mut stats) = compute_frame_stats(&window) {
+                    if !gpu_window.is_empty() {
+                        let mean_gpu = gpu_window.iter().sum::<f32>() / gpu_window.len() as f32;
+                        stats.gpu_busy_ms = Some(mean_gpu);
+                        stats.bottleneck = Some(
+                            classify_bottleneck(
+                                mean_gpu,
+                                stats.avg_frame_time_ms,
+                                stats.frame_time_stability,
+                            )
+                            .to_string(),
+                        );
+                    }
                     *LATEST_FRAME.lock().unwrap() = Some(stats.clone());
                     let _ = app.emit("frame_stats", &stats);
                 }
@@ -204,6 +272,16 @@ mod tests {
         let s = compute_frame_stats(&ft).unwrap();
         assert!((s.avg_fps - 60.0).abs() < 1.0);
         assert!(s.frame_time_stability < 0.01); // perfectly stable
+    }
+
+    #[test]
+    fn bottleneck_classifies_gpu_cpu_and_capped() {
+        // Unstable frames (real load) → genuine bottleneck classification.
+        assert_eq!(classify_bottleneck(15.5, 16.0, 3.0), "gpu"); // GPU ~ whole frame
+        assert_eq!(classify_bottleneck(8.0, 16.0, 3.0), "cpu"); // GPU idle, variable
+        assert_eq!(classify_bottleneck(14.0, 16.0, 3.0), "balanced"); // in between
+        // GPU idle but rock-steady frame times → a frame cap / V-sync, not CPU-bound.
+        assert_eq!(classify_bottleneck(8.0, 16.67, 0.2), "capped");
     }
 
     #[test]

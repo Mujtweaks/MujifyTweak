@@ -17,7 +17,7 @@ use tauri::{AppHandle, Emitter};
 use super::anti_cheat_guard;
 use super::change_log::{self, ChangeLogEntry};
 use super::system_mutator::{RealMutator, SystemMutator};
-use super::tweak_ops::{apply_op, ops_for};
+use super::tweak_ops::{apply_op, ops_for, Op};
 use super::tweak_catalog;
 
 fn now_ms() -> i64 {
@@ -118,6 +118,46 @@ pub fn apply_tweaks(
     Ok(ApplyOutcome { applied, blocked })
 }
 
+/// Read-only drift check: active ChangeLog tweaks whose registry value Windows
+/// has since reset back to default (e.g. after a feature update). Only registry
+/// ops are verified. Used to offer a one-click re-apply.
+pub fn drifted_from_entries(m: &dyn SystemMutator, entries: &[ChangeLogEntry]) -> Vec<String> {
+    let mut out: Vec<String> = Vec::new();
+    for entry in entries {
+        let id = &entry.tweak_id;
+        if id.starts_with("fix:") {
+            continue; // fixes are one-shot repairs, not persistent state to verify
+        }
+        let mut drifted = false;
+        for op in ops_for(id) {
+            match op {
+                Op::Dword { hive, path, name, value } => {
+                    if m.get_dword(hive, path, name) != Some(value) {
+                        drifted = true;
+                    }
+                }
+                Op::Sz { hive, path, name, value } => {
+                    if m.get_sz(hive, path, name).as_deref() != Some(value) {
+                        drifted = true;
+                    }
+                }
+                _ => {} // services / commands / power aren't verified here
+            }
+        }
+        if drifted && !out.iter().any(|x| x == id) {
+            out.push(id.clone());
+        }
+    }
+    out
+}
+
+/// Tauri command — tweak ids that were applied but Windows has since reverted.
+/// Read-only; the UI offers to re-apply them.
+#[tauri::command]
+pub fn check_reset_tweaks() -> Vec<String> {
+    drifted_from_entries(&RealMutator, &change_log::active_entries())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -149,5 +189,29 @@ mod tests {
         let res = apply_one(&m, "mouse_accel_off", true);
         assert!(res.is_ok());
         assert_eq!(m.get_sz(RegHive::Hkcu, r"Control Panel\Mouse", "MouseSpeed").unwrap(), "0");
+    }
+
+    #[test]
+    fn detects_a_tweak_windows_reset() {
+        let path = r"SYSTEM\CurrentControlSet\Control\Power\PowerThrottling";
+        let m = MockMutator::new();
+        let entry = ChangeLogEntry {
+            id: "x".into(),
+            timestamp: 0,
+            tweak_id: "disable_power_throttling".into(),
+            description: String::new(),
+            risk_level: "moderate".into(),
+            reversible: true,
+            undone: false,
+            undo_ops: vec![],
+        };
+        // Value present = still applied → no drift.
+        m.set_dword(RegHive::Hklm, path, "PowerThrottlingOff", 1).unwrap();
+        assert!(drifted_from_entries(&m, std::slice::from_ref(&entry)).is_empty());
+        // Windows resets it → drift detected.
+        m.delete_value(RegHive::Hklm, path, "PowerThrottlingOff").unwrap();
+        assert!(drifted_from_entries(&m, std::slice::from_ref(&entry))
+            .iter()
+            .any(|x| x == "disable_power_throttling"));
     }
 }

@@ -1,0 +1,137 @@
+{
+  "_comment": "Fixes Hub catalog (metadata + transparency). The reversible ops for each id live in Rust fix_catalog::fix_ops (capture-before + revert), proven by MockMutator tests. Applying a fix goes through the same confirm + ChangeLog + rollback pipeline as tweaks. A test enforces every id here has a fix_ops implementation.",
+  "fixes": [
+    {
+      "id": "teredo_repair",
+      "title": "Xbox Live / Teredo Repair",
+      "description": "Fixes Xbox party chat and multiplayer matchmaking by restoring Teredo IPv6 tunnelling.",
+      "category": "gaming",
+      "risk": "moderate",
+      "action": "service-start",
+      "what": "Re-enables Teredo (used by Xbox party chat and NAT traversal) and makes sure the IP Helper service is running.",
+      "changes": "netsh teredo → default; HKLM\\...\\Tcpip6\\Parameters → DisabledComponents = 0 (prior value captured); service iphlpsvc → Automatic + running. Reversible.",
+      "reversible": true
+    },
+    {
+      "id": "shader_cache_clear",
+      "title": "Shader Cache Clear",
+      "description": "Fixes shader-compilation stutter by clearing stale GPU shader caches (they rebuild automatically).",
+      "category": "gaming",
+      "risk": "safe",
+      "action": "cache-clear",
+      "what": "Deletes the NVIDIA, AMD and DirectX shader cache folders so the driver rebuilds them cleanly.",
+      "changes": "Clears %LOCALAPPDATA%\\NVIDIA\\DXCache & GLCache, %LOCALAPPDATA%\\AMD\\DxCache, %LOCALAPPDATA%\\D3DSCache. Rebuilds automatically — nothing to undo.",
+      "reversible": false
+    },
+    {
+      "id": "gamedvr_repair",
+      "title": "Game Bar / Game DVR Repair",
+      "description": "Resets Xbox Game Bar and Game DVR registry state to working defaults when the overlay is broken.",
+      "category": "gaming",
+      "risk": "safe",
+      "action": "registry",
+      "what": "Restores the Game Bar / Game DVR registry values to Windows defaults so the overlay works again.",
+      "changes": "GameConfigStore → GameDVR_Enabled = 1; GameBar → AppCaptureEnabled = 1; Policies\\GameDVR → AllowGameDVR = 1 (prior values captured). Reversible.",
+      "reversible": true
+    },
+    {
+      "id": "network_stack_reset",
+      "title": "DNS & Network Stack Reset",
+      "description": "Escalating network repair: flush DNS, release/renew, then Winsock + IP reset (needs a reboot).",
+      "category": "network",
+      "risk": "moderate",
+      "action": "command",
+      "what": "Runs the standard network repair sequence from least to most invasive; the last two steps reset the stack to defaults and need a restart.",
+      "changes": "ipconfig /flushdns → /release → /renew → netsh winsock reset → netsh int ip reset. The reset steps revert the stack to Windows defaults (reboot required).",
+      "reversible": false
+    },
+    {
+      "id": "network_discovery_repair",
+      "title": "Network Discovery & Casting Repair",
+      "description": "Makes other PCs and TVs visible again by enabling the discovery services and firewall rules.",
+      "category": "network",
+      "risk": "safe",
+      "action": "service-start",
+      "what": "Starts the Function Discovery services and enables the Network Discovery firewall rules.",
+      "changes": "Services FDResPub, fdPHost, SSDPSRV → Automatic + running (prior state captured); enables the Network Discovery firewall group. Reversible.",
+      "reversible": true
+    },
+    {
+      "id": "system_file_repair",
+      "title": "System File Repair (SFC + DISM)",
+      "description": "Runs Microsoft's own tools to find and repair corrupted Windows system files.",
+      "category": "system",
+      "risk": "safe",
+      "action": "command",
+      "what": "Runs SFC /scannow and DISM RestoreHealth — Microsoft's non-destructive repair tools that fix corrupted system files from Windows Update.",
+      "changes": "sfc /scannow; dism /online /cleanup-image /restorehealth. These repair only — they don't remove your data. Runs in the background (can take several minutes).",
+      "reversible": false
+    },
+    {
+      "id": "windows_update_repair",
+      "title": "Windows Update Repair",
+      "description": "Fixes stuck Windows Update by resetting its cache folders and restarting the update services.",
+      "category": "system",
+      "risk": "moderate",
+      "action": "command",
+      "what": "Stops the update services, renames the SoftwareDistribution and catroot2 caches to .bak so Windows rebuilds them, then restarts the services.",
+      "changes": "Stops wuauserv/bits/cryptsvc; renames %windir%\\SoftwareDistribution and %windir%\\System32\\catroot2 to .bak; restarts the services. Windows rebuilds the caches.",
+      "reversible": false
+    },
+    {
+      "id": "windows_store_repair",
+      "title": "Microsoft Store Repair",
+      "description": "Clears the Microsoft Store cache to fix download and install problems.",
+      "category": "system",
+      "risk": "safe",
+      "action": "command",
+      "what": "Runs wsreset to clear the Store cache — the standard fix for Store errors.",
+      "changes": "wsreset.exe. Clears the Store download cache; does not remove installed apps.",
+      "reversible": false
+    },
+    {
+      "id": "search_index_rebuild",
+      "title": "Search Index Rebuild",
+      "description": "Rebuilds the Windows Search index to fix missing or wrong search results.",
+      "category": "system",
+      "risk": "safe",
+      "action": "command",
+      "what": "Tells Windows Search to rebuild its index from scratch, then restarts the search service.",
+      "changes": "HKLM\\...\\Windows Search → SetupCompletedSuccessfully = 0 (prior captured); service WSearch restarted so it rebuilds. Reversible.",
+      "reversible": true
+    },
+    {
+      "id": "print_spooler_reset",
+      "title": "Print Spooler Reset",
+      "description": "Fixes stuck print jobs by clearing the print queue and restarting the spooler.",
+      "category": "system",
+      "risk": "safe",
+      "action": "command",
+      "what": "Stops the print spooler, clears the stuck print queue, and restarts it.",
+      "changes": "Stops Spooler; clears %windir%\\System32\\spool\\PRINTERS; restarts Spooler. Only queued jobs are cleared.",
+      "reversible": false
+    },
+    {
+      "id": "audio_repair",
+      "title": "Audio Device Repair",
+      "description": "Fixes 'no sound' and dead audio devices by restoring the Windows audio services.",
+      "category": "audio",
+      "risk": "safe",
+      "action": "service-start",
+      "what": "Ensures the Windows Audio and Audio Endpoint Builder services are set to Automatic and running.",
+      "changes": "Services Audiosrv, AudioEndpointBuilder → Automatic + running (prior state captured). Reversible.",
+      "reversible": true
+    },
+    {
+      "id": "bluetooth_repair",
+      "title": "Bluetooth Repair",
+      "description": "Fixes Bluetooth pairing and audio by restoring the Bluetooth support services.",
+      "category": "hardware",
+      "risk": "safe",
+      "action": "service-start",
+      "what": "Ensures the Bluetooth Support Service and Bluetooth Audio Gateway are running.",
+      "changes": "Service bthserv → Automatic + running; BTAGService → running (prior state captured). Reversible.",
+      "reversible": true
+    }
+  ]
+}

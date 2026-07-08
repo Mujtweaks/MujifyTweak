@@ -3,6 +3,7 @@ import { Check, Gamepad2, Plus, Search, Zap } from "lucide-react";
 import { fetchInstalledGames, listProfiles, saveProfile } from "../lib/backend";
 import { useGameStore } from "../store/gameStore";
 import GameArt from "../components/GameArt";
+import GameOptimizeModal from "../components/GameOptimizeModal";
 import type { GameInfo, Profile } from "../lib/types";
 import type { PageId } from "../lib/nav";
 
@@ -13,6 +14,7 @@ export default function Profiles({ onNavigate }: { onNavigate: (page: PageId) =>
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [search, setSearch] = useState("");
   const [busy, setBusy] = useState(true);
+  const [optimizeGame, setOptimizeGame] = useState<GameInfo | null>(null);
 
   const reload = async () => {
     const [g, ps] = await Promise.all([fetchInstalledGames(), listProfiles()]);
@@ -70,14 +72,19 @@ export default function Profiles({ onNavigate }: { onNavigate: (page: PageId) =>
         <p className="py-16 text-center text-[13px] text-txt3">Detecting your games…</p>
       ) : (
         <div className="grid grid-cols-6 gap-4">
-          {filtered.map((g) => {
+          {filtered.map((g, i) => {
             const isActive = activeGame?.name === g.name;
             const isProfiled = profiled.has(g.name.toLowerCase());
             return (
-              <button key={g.name + (g.appId ?? "")} onClick={() => addProfile(g)} className="group relative">
+              <button
+                key={g.name + (g.appId ?? "")}
+                onClick={() => setOptimizeGame(g)}
+                style={{ animationDelay: `${50 + Math.min(i, 20) * 40}ms` }}
+                className="stagger-item group relative"
+              >
                 <div className={`relative aspect-[3/4] overflow-hidden rounded-xl border ${isActive ? "border-success/50" : "border-edge"}`}>
                   <GameArt name={g.name} appId={g.appId} className="h-full w-full" rounded="rounded-xl" />
-                  <div className="absolute inset-0 grid place-items-center bg-black/60 opacity-0 transition-opacity group-hover:opacity-100">
+                  <div className="absolute inset-0 grid place-items-center bg-black/60 opacity-0 transition-opacity duration-100 group-hover:opacity-100">
                     <span className="flex items-center gap-1.5 rounded-btn bg-accent px-3 py-1.5 text-[11px] font-semibold text-white"><Zap size={12} fill="currentColor" /> {isProfiled ? "Optimized" : "Optimize"}</span>
                   </div>
                   {isActive && <span className="absolute right-1.5 top-1.5 rounded-full bg-success px-2 py-0.5 text-[8px] font-bold text-white">ACTIVE</span>}
@@ -107,6 +114,10 @@ export default function Profiles({ onNavigate }: { onNavigate: (page: PageId) =>
           <p className="mt-1 max-w-[300px] text-[11.5px] text-txt2">Install a game via Steam or Epic, or add one manually. Then optimize it from the Optimizer.</p>
           <button onClick={() => onNavigate("optimizer")} className="mt-3 rounded-btn border border-edge bg-card px-4 py-2 text-[12px] font-medium text-txt hover:border-edge2">Open Optimizer</button>
         </div>
+      )}
+
+      {optimizeGame && (
+        <GameOptimizeModal game={optimizeGame} onClose={() => setOptimizeGame(null)} />
       )}
     </div>
   );

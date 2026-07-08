@@ -28,6 +28,20 @@ pub enum Op {
     /// Disable a Windows service (stop + set start type to disabled).
     DisableService { name: &'static str },
     FlushDns,
+    /// Write a DWORD to every network-interface subkey (per-NIC TCP tuning).
+    DwordAllInterfaces { name: &'static str, value: u32 },
+    /// Write an SZ to every network-interface subkey (e.g. a custom DNS server).
+    SzAllInterfaces { name: &'static str, value: &'static str },
+    /// Create + activate the hidden Ultimate Performance power plan.
+    UltimatePlan,
+    /// Toggle Windows memory (RAM) compression via MMAgent.
+    MemoryCompression { enable: bool },
+    /// Set the processor core-parking minimum-cores percent (100 = no parking).
+    CoreParking { min_percent: u32 },
+    /// Run a one-shot repair command, fire-and-forget (Fixes hub). No undo.
+    Command { program: &'static str, args: &'static [&'static str] },
+    /// Set a service's start type + running state, capturing prior for revert.
+    SetService { name: &'static str, start_type: &'static str, running: bool },
 }
 
 /// Captured before-state, enough to precisely reverse one Op.
@@ -39,6 +53,12 @@ pub enum UndoOp {
     Sz { hive: RegHive, path: String, name: String, prev: Option<String> },
     Service { name: String, prev: Option<ServiceState> },
     None,
+    /// Per-interface DWORD writes, each with its own captured prior value.
+    DwordMulti { hive: RegHive, name: String, entries: Vec<(String, Option<u32>)> },
+    /// Per-interface SZ writes, each with its own captured prior value.
+    SzMulti { hive: RegHive, name: String, entries: Vec<(String, Option<String>)> },
+    MemoryCompression { prev: Option<bool> },
+    CoreParking { prev: Option<u32> },
 }
 
 /// Capture + apply one Op. Returns the UndoOp needed to reverse it.
@@ -68,6 +88,53 @@ pub fn apply_op(m: &dyn SystemMutator, op: &Op) -> Result<UndoOp, String> {
             m.flush_dns()?;
             Ok(UndoOp::None) // transient cache; nothing to restore
         }
+        Op::DwordAllInterfaces { name, value } => {
+            let mut entries = Vec::new();
+            for sub in m.list_subkeys(Hklm, TCP_INTERFACES) {
+                let path = format!("{TCP_INTERFACES}\\{sub}");
+                let prev = m.get_dword(Hklm, &path, name);
+                m.set_dword(Hklm, &path, name, *value)?;
+                entries.push((path, prev));
+            }
+            Ok(UndoOp::DwordMulti { hive: Hklm, name: name.to_string(), entries })
+        }
+        Op::SzAllInterfaces { name, value } => {
+            let mut entries = Vec::new();
+            for sub in m.list_subkeys(Hklm, TCP_INTERFACES) {
+                let path = format!("{TCP_INTERFACES}\\{sub}");
+                let prev = m.get_sz(Hklm, &path, name);
+                m.set_sz(Hklm, &path, name, value)?;
+                entries.push((path, prev));
+            }
+            Ok(UndoOp::SzMulti { hive: Hklm, name: name.to_string(), entries })
+        }
+        Op::UltimatePlan => {
+            let prev = m.active_power_plan_guid().unwrap_or_default();
+            m.activate_ultimate_plan()?;
+            Ok(UndoOp::PowerPlan { guid: prev })
+        }
+        Op::MemoryCompression { enable } => {
+            let prev = m.get_memory_compression();
+            m.set_memory_compression(*enable)?;
+            Ok(UndoOp::MemoryCompression { prev })
+        }
+        Op::CoreParking { min_percent } => {
+            let prev = m.get_core_parking_min();
+            m.set_core_parking_min(*min_percent)?;
+            Ok(UndoOp::CoreParking { prev })
+        }
+        Op::Command { program, args } => {
+            m.run_command(program, args)?;
+            Ok(UndoOp::None)
+        }
+        Op::SetService { name, start_type, running } => {
+            let prev = m.get_service(name);
+            m.set_service(
+                name,
+                &ServiceState { start_type: start_type.to_string(), running: *running },
+            )?;
+            Ok(UndoOp::Service { name: name.to_string(), prev })
+        }
     }
 }
 
@@ -92,6 +159,32 @@ pub fn undo_op(m: &dyn SystemMutator, undo: &UndoOp) -> Result<(), String> {
             Some(s) => m.set_service(name, s),
             None => Ok(()),
         },
+        UndoOp::DwordMulti { hive, name, entries } => {
+            for (path, prev) in entries {
+                match prev {
+                    Some(v) => m.set_dword(*hive, path, name, *v)?,
+                    None => m.delete_value(*hive, path, name)?,
+                }
+            }
+            Ok(())
+        }
+        UndoOp::SzMulti { hive, name, entries } => {
+            for (path, prev) in entries {
+                match prev {
+                    Some(v) => m.set_sz(*hive, path, name, v)?,
+                    None => m.delete_value(*hive, path, name)?,
+                }
+            }
+            Ok(())
+        }
+        UndoOp::MemoryCompression { prev } => match prev {
+            Some(v) => m.set_memory_compression(*v),
+            None => Ok(()),
+        },
+        UndoOp::CoreParking { prev } => match prev {
+            Some(v) => m.set_core_parking_min(*v),
+            None => Ok(()),
+        },
         UndoOp::None => Ok(()),
     }
 }
@@ -107,6 +200,7 @@ fn sz(hive: RegHive, path: &'static str, name: &'static str, value: &'static str
 const MMCSS_GAMES: &str =
     r"SOFTWARE\Microsoft\Windows NT\CurrentVersion\Multimedia\SystemProfile\Tasks\Games";
 const MMCSS_PROFILE: &str = r"SOFTWARE\Microsoft\Windows NT\CurrentVersion\Multimedia\SystemProfile";
+const TCP_INTERFACES: &str = r"SYSTEM\CurrentControlSet\Services\Tcpip\Parameters\Interfaces";
 
 /// The concrete op list for a tweak id. Unknown ids return empty (nothing runs).
 /// Every op here is fully reversible via its captured UndoOp.
@@ -125,6 +219,10 @@ pub fn ops_for(tweak_id: &str) -> Vec<Op> {
         ],
         "gpu_priority" => vec![dw(Hklm, MMCSS_GAMES, "GPU Priority", 8)],
         "disable_tips" => vec![dw(Hkcu, r"Software\Microsoft\Windows\CurrentVersion\ContentDeliveryManager", "SubscribedContent-338389Enabled", 0)],
+        "disable_hibernation" => vec![dw(Hklm, r"SYSTEM\CurrentControlSet\Control\Power", "HibernateEnabled", 0)],
+        "power_ultimate" => vec![Op::UltimatePlan],
+        "disable_memory_compression" => vec![Op::MemoryCompression { enable: false }],
+        "disable_core_parking" => vec![Op::CoreParking { min_percent: 100 }],
 
         // ---- Services ----
         "disable_sysmain" => vec![Op::DisableService { name: "SysMain" }],
@@ -134,6 +232,12 @@ pub fn ops_for(tweak_id: &str) -> Vec<Op> {
         // ---- Network (registry) ----
         "network_throttling_index" => vec![dw(Hklm, MMCSS_PROFILE, "NetworkThrottlingIndex", 0xffff_ffff)],
         "flush_dns" => vec![Op::FlushDns],
+        "disable_nagle" => vec![Op::DwordAllInterfaces { name: "TCPNoDelay", value: 1 }],
+        "tcp_ack_frequency" => vec![Op::DwordAllInterfaces { name: "TcpAckFrequency", value: 1 }],
+        "network_qos" => vec![dw(Hklm, r"SOFTWARE\Policies\Microsoft\Windows\Psched", "NonBestEffortLimit", 0)],
+        "tcp_optimize" => vec![dw(Hklm, r"SYSTEM\CurrentControlSet\Services\Tcpip\Parameters", "Tcp1323Opts", 1)],
+        "dns_cloudflare" => vec![Op::SzAllInterfaces { name: "NameServer", value: "1.1.1.1,1.0.0.1" }],
+        "disable_teredo" => vec![dw(Hklm, r"SYSTEM\CurrentControlSet\Services\Tcpip6\Parameters", "DisabledComponents", 1)],
 
         // ---- Graphics ----
         "hags" => vec![dw(Hklm, r"SYSTEM\CurrentControlSet\Control\GraphicsDrivers", "HwSchMode", 2)],
@@ -152,7 +256,11 @@ pub fn ops_for(tweak_id: &str) -> Vec<Op> {
         ],
 
         // ---- Privacy ----
-        "disable_telemetry" => vec![dw(Hklm, r"SOFTWARE\Policies\Microsoft\Windows\DataCollection", "AllowTelemetry", 0)],
+        "disable_telemetry" => vec![
+            dw(Hklm, r"SOFTWARE\Policies\Microsoft\Windows\DataCollection", "AllowTelemetry", 0),
+            Op::DisableService { name: "DiagTrack" },
+            Op::DisableService { name: "dmwappushservice" },
+        ],
         "disable_cortana" => vec![dw(Hklm, r"SOFTWARE\Policies\Microsoft\Windows\Windows Search", "AllowCortana", 0)],
         "disable_ad_id" => vec![dw(Hkcu, r"Software\Microsoft\Windows\CurrentVersion\AdvertisingInfo", "Enabled", 0)],
         "disable_activity_history" => vec![
@@ -253,12 +361,82 @@ mod tests {
     }
 
     #[test]
+    fn per_interface_nagle_applies_to_all_nics_and_reverts() {
+        let base = r"SYSTEM\CurrentControlSet\Services\Tcpip\Parameters\Interfaces";
+        let m = MockMutator::new()
+            .with_dword(Hklm, &format!(r"{base}\IF-A"), "Seed", 1)
+            .with_dword(Hklm, &format!(r"{base}\IF-B"), "Seed", 1);
+        let undos = apply_all(&m, "disable_nagle");
+        assert_eq!(m.get_dword(Hklm, &format!(r"{base}\IF-A"), "TCPNoDelay"), Some(1));
+        assert_eq!(m.get_dword(Hklm, &format!(r"{base}\IF-B"), "TCPNoDelay"), Some(1));
+        undo_all(&m, &undos);
+        // Values didn't exist before → undo removes them from every interface.
+        assert_eq!(m.get_dword(Hklm, &format!(r"{base}\IF-A"), "TCPNoDelay"), None);
+        assert_eq!(m.get_dword(Hklm, &format!(r"{base}\IF-B"), "TCPNoDelay"), None);
+    }
+
+    #[test]
+    fn per_interface_dns_applies_and_restores_prior_value() {
+        let base = r"SYSTEM\CurrentControlSet\Services\Tcpip\Parameters\Interfaces";
+        let m = MockMutator::new().with_dword(Hklm, &format!(r"{base}\IF-A"), "Seed", 1);
+        m.set_sz(Hklm, &format!(r"{base}\IF-A"), "NameServer", "9.9.9.9").unwrap();
+        let undos = apply_all(&m, "dns_cloudflare");
+        assert_eq!(m.get_sz(Hklm, &format!(r"{base}\IF-A"), "NameServer").as_deref(), Some("1.1.1.1,1.0.0.1"));
+        undo_all(&m, &undos);
+        assert_eq!(m.get_sz(Hklm, &format!(r"{base}\IF-A"), "NameServer").as_deref(), Some("9.9.9.9"));
+    }
+
+    #[test]
+    fn ultimate_plan_activates_and_restores_prior() {
+        let m = MockMutator::new(); // starts at BALANCED-GUID
+        let undos = apply_all(&m, "power_ultimate");
+        assert_eq!(m.active_power_plan_guid().unwrap(), "ULTIMATE-GUID");
+        undo_all(&m, &undos);
+        assert_eq!(m.active_power_plan_guid().unwrap(), "BALANCED-GUID");
+    }
+
+    #[test]
+    fn memory_compression_disables_and_reverts() {
+        let m = MockMutator::new(); // compression defaults on
+        let undos = apply_all(&m, "disable_memory_compression");
+        assert_eq!(m.get_memory_compression(), Some(false));
+        undo_all(&m, &undos);
+        assert_eq!(m.get_memory_compression(), Some(true));
+    }
+
+    #[test]
+    fn core_parking_maxes_and_reverts_to_prior() {
+        let m = MockMutator::new(); // min-cores defaults to 5
+        let undos = apply_all(&m, "disable_core_parking");
+        assert_eq!(m.get_core_parking_min(), Some(100));
+        undo_all(&m, &undos);
+        assert_eq!(m.get_core_parking_min(), Some(5));
+    }
+
+    #[test]
+    fn telemetry_tweak_now_disables_tracking_services() {
+        let m = MockMutator::new()
+            .with_service("DiagTrack", "auto", true)
+            .with_service("dmwappushservice", "demand", true);
+        let undos = apply_all(&m, "disable_telemetry");
+        assert_eq!(m.get_service("DiagTrack").unwrap().start_type, "disabled");
+        assert_eq!(m.get_service("dmwappushservice").unwrap().start_type, "disabled");
+        undo_all(&m, &undos);
+        assert_eq!(m.get_service("DiagTrack").unwrap().start_type, "auto");
+        assert!(m.get_service("dmwappushservice").unwrap().running);
+    }
+
+    #[test]
     fn most_catalog_tweaks_are_now_appliable() {
         // Sanity: the effective tweaks resolved to real ops.
         for id in [
             "disable_telemetry", "hags", "disable_gamedvr", "disable_fso", "mmcss_gaming",
             "win32_priority", "network_throttling_index", "disable_power_throttling",
             "disable_sysmain", "keyboard_delay", "disable_location",
+            // newly wired this session:
+            "disable_hibernation", "power_ultimate", "disable_memory_compression",
+            "disable_core_parking", "disable_nagle", "tcp_ack_frequency", "network_qos",
+            "tcp_optimize", "dns_cloudflare", "disable_teredo",
         ] {
             assert!(is_appliable(id), "{id} should be appliable");
         }

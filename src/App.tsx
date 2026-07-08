@@ -9,6 +9,7 @@ import ProfileEditor from "./pages/ProfileEditor";
 import Diagnostics from "./pages/Diagnostics";
 import Network from "./pages/Network";
 import Tweaks from "./pages/Tweaks";
+import Fixes from "./pages/Fixes";
 import Tools from "./pages/Tools";
 import AIAssistant from "./pages/AIAssistant";
 import ChangeLogView from "./pages/ChangeLogView";
@@ -17,7 +18,9 @@ import History from "./pages/History";
 import DriverManager from "./pages/DriverManager";
 import StartupManager from "./pages/StartupManager";
 import Settings from "./pages/Settings";
-import { connectBackend, fetchHardware } from "./lib/backend";
+import Toaster from "./components/Toaster";
+import { checkResetTweaks, connectBackend, fetchHardware } from "./lib/backend";
+import { toast } from "./store/toastStore";
 import { initEventBridge, listenNavigate } from "./lib/events";
 import { NAV_ITEMS, type PageId } from "./lib/nav";
 
@@ -35,6 +38,16 @@ export default function App() {
     void connectBackend();
     void fetchHardware();
     void initEventBridge();
+    // Windows feature updates can silently reset tweaks — re-detect on launch
+    // and let the user re-apply the ones that drifted back to default.
+    void checkResetTweaks().then((ids) => {
+      if (ids.length > 0) {
+        toast.info(
+          `${ids.length} tweak${ids.length === 1 ? "" : "s"} were reset by Windows`,
+          "Re-apply them from the Tweaks tab.",
+        );
+      }
+    });
     // Tray deep-links (e.g. Quick Optimize) navigate the UI.
     let unlisten: (() => void) | undefined;
     listenNavigate((p) => {
@@ -68,6 +81,8 @@ export default function App() {
         return <Network />;
       case "tweaks":
         return <Tweaks />;
+      case "fixes":
+        return <Fixes />;
       case "tools":
         return <Tools />;
       case "ai":
@@ -99,6 +114,7 @@ export default function App() {
         </main>
         <GamesBar onNavigate={setPage} />
       </div>
+      <Toaster />
     </div>
   );
 }

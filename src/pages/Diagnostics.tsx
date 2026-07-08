@@ -17,6 +17,17 @@ import {
 } from "lucide-react";
 import { useSystemStore } from "../store/systemStore";
 import Sparkline from "../components/Sparkline";
+import DriverHealth from "../components/DriverHealth";
+import HealthScan from "../components/HealthScan";
+
+// Temps come from the LibreHardwareMonitor sidecar, which needs ring0 (admin)
+// to read the sensors. Unelevated (dev) builds get null; the installed UAC-
+// elevated app gets real °C. Show that honestly instead of a bare dash.
+function tempDisplay(temp: number | string | null | undefined): string {
+  if (temp == null || temp === "admin") return "Requires admin";
+  if (typeof temp === "number") return `${Math.round(temp)}°C`;
+  return temp;
+}
 
 function healthWord(score: number): { word: string; note: string } {
   if (score >= 85) return { word: "Excellent", note: "Your system is in great shape." };
@@ -153,6 +164,9 @@ export default function Diagnostics() {
         </p>
       )}
 
+      {/* Bottleneck / Health Scan — the diagnosis centerpiece */}
+      <HealthScan />
+
       {/* Summary row */}
       <div className="flex items-center divide-x divide-edge rounded-2xl border border-edge bg-panel py-4">
         {/* score ring */}
@@ -205,7 +219,7 @@ export default function Diagnostics() {
         <SummaryCard
           icon={Thermometer}
           label="Temperature"
-          value={stats?.cpuTempC != null ? `${Math.round(stats.cpuTempC)}°C` : "—"}
+          value={tempDisplay(stats?.cpuTempC)}
           sub={
             stats?.cpuTempC != null
               ? "Within safe limits."
@@ -231,8 +245,8 @@ export default function Diagnostics() {
           <MonitorRow icon={Monitor} label="GPU Usage" value={stats?.gpuUsagePercent != null ? `${Math.round(stats.gpuUsagePercent)}%` : "--"} percent={stats?.gpuUsagePercent ?? null} color="#2fd466" />
           <MonitorRow icon={MemoryStick} label="VRAM Usage" value={stats?.gpuVramUsedMb != null ? `${(stats.gpuVramUsedMb / 1024).toFixed(1)}GB` : "--"} percent={stats?.gpuVramUsedMb != null ? Math.min(100, (stats.gpuVramUsedMb / 1024 / 16) * 100) : null} color="#3e8bff" />
           <MonitorRow icon={MemoryStick} label="RAM Usage" value={stats ? `${Math.round(stats.ramUsagePercent)}%` : "--"} percent={stats?.ramUsagePercent ?? null} />
-          <MonitorRow icon={Thermometer} label="CPU Temp" value={stats?.cpuTempC != null ? `${Math.round(stats.cpuTempC)}°C` : "admin"} percent={stats?.cpuTempC != null ? stats.cpuTempC : null} />
-          <MonitorRow icon={Thermometer} label="GPU Temp" value={stats?.gpuTempC != null ? `${Math.round(stats.gpuTempC)}°C` : "admin"} percent={stats?.gpuTempC != null ? stats.gpuTempC : null} color="#2fd466" />
+          <MonitorRow icon={Thermometer} label="CPU Temp" value={tempDisplay(stats?.cpuTempC)} percent={stats?.cpuTempC != null ? stats.cpuTempC : null} />
+          <MonitorRow icon={Thermometer} label="GPU Temp" value={tempDisplay(stats?.gpuTempC)} percent={stats?.gpuTempC != null ? stats.gpuTempC : null} color="#2fd466" />
           <MonitorRow icon={HardDrive} label="Storage Activity" value={stats?.diskActivityPercent != null ? `${Math.round(stats.diskActivityPercent)}%` : "--"} percent={stats?.diskActivityPercent ?? null} color="#3e8bff" />
         </div>
 
@@ -348,6 +362,8 @@ export default function Diagnostics() {
           </div>
         </div>
       </div>
+
+      <DriverHealth />
     </div>
   );
 }

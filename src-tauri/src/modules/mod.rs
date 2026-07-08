@@ -6,18 +6,26 @@
 //! explicit per-action confirmation; the logic is proven by `cargo test` under
 //! MockMutator, which touches nothing.
 
+pub mod ai_backend;
 pub mod anti_cheat_guard;
 pub mod benchmark;
 pub mod change_log;
 pub mod config;
+pub mod driver_doctor;
+pub mod fix_catalog;
 pub mod frame_time_monitor;
 pub mod game_detector;
+pub mod game_profiler;
+pub mod game_profiles;
 pub mod games_db;
 pub mod hardware_profiler;
+pub mod health_scan;
 pub mod network_monitor;
 pub mod power_util;
 pub mod profile_store;
 pub mod rollback_engine;
+pub mod server_ping;
+pub mod speed_test;
 pub mod system_monitor;
 pub mod system_mutator;
 pub mod tweak_catalog;

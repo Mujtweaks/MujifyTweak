@@ -7,6 +7,7 @@ import {
   Rocket,
   Settings,
   SlidersHorizontal,
+  Wrench,
   type LucideIcon,
 } from "lucide-react";
 import type { PageId } from "../lib/nav";
@@ -32,6 +33,7 @@ const GROUP_1: Item[] = [
 const GROUP_2: Item[] = [
   { id: "optimizer", label: "Optimizer", icon: Rocket },
   { id: "tweaks", label: "Tweaks", icon: SlidersHorizontal },
+  { id: "fixes", label: "Fixes", icon: Wrench },
   { id: "network", label: "Network", icon: Globe },
   { id: "diagnostics", label: "Diagnostics", icon: Activity },
   { id: "ai", label: "AI Assistant", icon: Bot },

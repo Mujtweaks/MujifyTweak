@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { ArrowRight, LineChart, Play, Square } from "lucide-react";
+import { ArrowRight, Check, Gamepad2, LineChart, Play, Square } from "lucide-react";
 import { getLatestReport, runBenchmark } from "../lib/backend";
 import { useGameStore } from "../store/gameStore";
 import type { BenchmarkReport, MetricDelta } from "../lib/types";
@@ -66,6 +66,28 @@ export default function ReportView() {
         </p>
       </div>
 
+      {/* Guided flow — real FPS needs a game presenting during BOTH captures */}
+      <div
+        className={`flex items-start gap-2.5 rounded-2xl border px-4 py-3 text-[12px] ${
+          activeGame ? "border-success/25 bg-success/5" : "border-warning/25 bg-warning/5"
+        }`}
+      >
+        <Gamepad2 size={15} className={`mt-0.5 shrink-0 ${activeGame ? "text-success" : "text-warning"}`} />
+        {activeGame ? (
+          <p className="text-txt2">
+            <span className="font-semibold text-txt">{activeGame.name}</span> detected. Play it, capture a{" "}
+            <span className="font-semibold text-txt">60s baseline</span>, apply your tweaks, then capture a{" "}
+            <span className="font-semibold text-txt">60s post-run</span> — we compare real FPS.
+          </p>
+        ) : (
+          <p className="text-txt2">
+            <span className="font-semibold text-warning">Start your game first.</span> FPS is only measured while a
+            game is presenting during <span className="font-semibold text-txt">both</span> captures. Without one, we
+            measure CPU/RAM/ping only and will not claim an FPS gain.
+          </p>
+        )}
+      </div>
+
       {/* Capture controls */}
       <div className="flex items-center gap-3 rounded-2xl border border-edge bg-panel p-4">
         <button
@@ -74,7 +96,7 @@ export default function ReportView() {
           className="flex items-center gap-2 rounded-xl border border-edge bg-panel2 px-3.5 py-2 text-[12.5px] font-medium text-txt hover:border-edge2 disabled:opacity-60"
         >
           {phase === "baseline" ? <Square size={13} /> : <Play size={13} />}
-          {phase === "baseline" ? "Capturing baseline… (~20s)" : "1 · Capture Baseline"}
+          {phase === "baseline" ? "Capturing baseline… (~60s)" : "1 · Capture Baseline"}
         </button>
         <ArrowRight size={16} className="text-txt3" />
         <button
@@ -83,7 +105,7 @@ export default function ReportView() {
           className="flex items-center gap-2 rounded-xl border border-edge bg-panel2 px-3.5 py-2 text-[12.5px] font-medium text-txt hover:border-edge2 disabled:opacity-50"
         >
           {phase === "post" ? <Square size={13} /> : <Play size={13} />}
-          {phase === "post" ? "Capturing post… (~20s)" : "2 · Capture Post"}
+          {phase === "post" ? "Capturing post… (~60s)" : "2 · Capture Post"}
         </button>
         <span className="ml-auto text-[11px] text-txt3">Same method, same duration, both ways.</span>
       </div>
@@ -114,17 +136,35 @@ export default function ReportView() {
             <span>After</span>
             <span className="text-right">Δ</span>
           </div>
-          {report.metrics.map((m) => (
-            <DeltaRow key={m.label} m={m} />
-          ))}
+          {report.metrics
+            .filter((m) => m.measured || m.label !== "Avg FPS")
+            .map((m) => (
+              <DeltaRow key={m.label} m={m} />
+            ))}
 
+          {/* Tweaks applied between the two captures */}
           <div className="mt-4 rounded-xl border border-edge bg-panel2 px-4 py-3">
+            <p className="text-[11px] font-bold uppercase tracking-wider text-txt3">Tweaks Applied This Session</p>
+            {report.appliedTweaks.length === 0 ? (
+              <p className="mt-1 text-[12px] text-txt2">No tweaks were applied between the two captures.</p>
+            ) : (
+              <ul className="mt-1.5 flex flex-col gap-1">
+                {report.appliedTweaks.map((t, i) => (
+                  <li key={i} className="flex items-start gap-2 text-[12px] text-txt">
+                    <Check size={13} className="mt-0.5 shrink-0 text-good" /> {t}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+
+          <div className="mt-3 rounded-xl border border-edge bg-panel2 px-4 py-3">
             <p className="text-[11px] font-bold uppercase tracking-wider text-txt3">Verdict</p>
             <p className="mt-1 text-[13px] text-txt">{report.verdict}</p>
             {!report.fpsMeasured && (
               <p className="mt-1.5 text-[11px] text-txt2">
-                FPS and frame-time deltas will appear here once PresentMon is bundled — until then
-                they're honestly marked "not measured", never guessed.
+                No game was presenting during capture, so in-game FPS isn't shown (never guessed).
+                Launch a game and re-run to measure real FPS.
               </p>
             )}
           </div>

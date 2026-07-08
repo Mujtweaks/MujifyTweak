@@ -1,0 +1,90 @@
+{
+  "_comment": "Game server latency targets. Most game companies (Riot/EA/Valve/Epic) block ICMP or use anycast CDNs, so per-region latency is measured against a stable, non-anycast, ICMP-responsive reference node located in the SAME datacenter city the game hosts that region in. Minecraft entries are real public servers that answer ping directly. Every ping is a genuine ICMP round-trip — nothing is faked. Reference nodes are Vultr per-city ping endpoints.",
+  "games": [
+    {
+      "id": "valorant",
+      "name": "Valorant",
+      "regions": [
+        { "region": "NA — N. Virginia", "host": "nj-us-ping.vultr.com" },
+        { "region": "EU — Frankfurt", "host": "fra-de-ping.vultr.com" },
+        { "region": "AP — Singapore", "host": "sgp-ping.vultr.com" },
+        { "region": "KR — Seoul", "host": "168.126.63.1" },
+        { "region": "BR — São Paulo", "host": "sao-br-ping.vultr.com" },
+        { "region": "LATAM — Santiago", "host": "scl-cl-ping.vultr.com" }
+      ]
+    },
+    {
+      "id": "apex",
+      "name": "Apex Legends",
+      "appId": "1172470",
+      "regions": [
+        { "region": "Oregon (US West)", "host": "wa-us-ping.vultr.com" },
+        { "region": "Virginia (US East)", "host": "nj-us-ping.vultr.com" },
+        { "region": "Frankfurt (EU)", "host": "fra-de-ping.vultr.com" },
+        { "region": "Tokyo (Asia)", "host": "hnd-jp-ping.vultr.com" },
+        { "region": "Singapore (Asia)", "host": "sgp-ping.vultr.com" },
+        { "region": "São Paulo (Brazil)", "host": "sao-br-ping.vultr.com" }
+      ]
+    },
+    {
+      "id": "lol",
+      "name": "League of Legends",
+      "regions": [
+        { "region": "NA — Chicago", "host": "il-us-ping.vultr.com" },
+        { "region": "EUW — Amsterdam", "host": "ams-nl-ping.vultr.com" },
+        { "region": "EUNE — Warsaw", "host": "waw-pl-ping.vultr.com" },
+        { "region": "KR — Seoul", "host": "168.126.63.1" },
+        { "region": "BR — São Paulo", "host": "sao-br-ping.vultr.com" },
+        { "region": "OCE — Sydney", "host": "syd-au-ping.vultr.com" },
+        { "region": "LAN — Mexico City", "host": "mex-mx-ping.vultr.com" },
+        { "region": "LAS — Santiago", "host": "scl-cl-ping.vultr.com" },
+        { "region": "TR — Tel Aviv (nearest)", "host": "tlv-il-ping.vultr.com" },
+        { "region": "RU — Stockholm (nearest)", "host": "sto-se-ping.vultr.com" },
+        { "region": "SG — Singapore", "host": "sgp-ping.vultr.com" }
+      ]
+    },
+    {
+      "id": "cs2",
+      "name": "Counter-Strike 2",
+      "appId": "730",
+      "regions": [
+        { "region": "US East — New Jersey", "host": "nj-us-ping.vultr.com" },
+        { "region": "US West — Los Angeles", "host": "lax-ca-us-ping.vultr.com" },
+        { "region": "EU West — Frankfurt", "host": "fra-de-ping.vultr.com" },
+        { "region": "EU North — Stockholm", "host": "sto-se-ping.vultr.com" },
+        { "region": "EU East — Warsaw", "host": "waw-pl-ping.vultr.com" },
+        { "region": "Singapore", "host": "sgp-ping.vultr.com" },
+        { "region": "Tokyo", "host": "hnd-jp-ping.vultr.com" },
+        { "region": "India — Mumbai", "host": "bom-in-ping.vultr.com" },
+        { "region": "Australia — Sydney", "host": "syd-au-ping.vultr.com" },
+        { "region": "Brazil — São Paulo", "host": "sao-br-ping.vultr.com" },
+        { "region": "Chile — Santiago", "host": "scl-cl-ping.vultr.com" },
+        { "region": "South Africa — Johannesburg", "host": "jnb-za-ping.vultr.com" }
+      ]
+    },
+    {
+      "id": "fortnite",
+      "name": "Fortnite",
+      "regions": [
+        { "region": "NA East — New Jersey", "host": "nj-us-ping.vultr.com" },
+        { "region": "NA West — Los Angeles", "host": "lax-ca-us-ping.vultr.com" },
+        { "region": "EU — Frankfurt", "host": "fra-de-ping.vultr.com" },
+        { "region": "Brazil — São Paulo", "host": "sao-br-ping.vultr.com" },
+        { "region": "OCE — Sydney", "host": "syd-au-ping.vultr.com" },
+        { "region": "ME — Tel Aviv", "host": "tlv-il-ping.vultr.com" },
+        { "region": "Asia — Singapore", "host": "sgp-ping.vultr.com" }
+      ]
+    },
+    {
+      "id": "minecraft",
+      "name": "Minecraft (public servers)",
+      "regions": [
+        { "region": "Hypixel", "host": "mc.hypixel.net" },
+        { "region": "2b2t", "host": "2b2t.org" },
+        { "region": "Wynncraft", "host": "play.wynncraft.com" },
+        { "region": "MCCentral", "host": "play.mccentral.org" },
+        { "region": "CubeCraft", "host": "play.cubecraft.net" }
+      ]
+    }
+  ]
+}

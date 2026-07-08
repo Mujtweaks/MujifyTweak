@@ -1,8 +1,16 @@
+import { useState } from "react";
 import { Info, Plus, Sparkles, TrendingUp } from "lucide-react";
-import { CATEGORY_META, boostPct } from "../lib/categories";
+import { CATEGORY_META, impactTier } from "../lib/categories";
+import { ACTION_LABEL, RISK_DEF, RISK_WORD, TWEAK_DETAILS } from "../lib/tweakDetails";
 import RiskBadge from "./RiskBadge";
 import Toggle from "./Toggle";
 import type { TweakInfo } from "../lib/types";
+
+const RISK_TONE: Record<string, string> = {
+  safe: "bg-success/10 text-success",
+  moderate: "bg-warning/10 text-warning",
+  advanced: "bg-purple-500/10 text-purple-400",
+};
 
 interface TweakCardProps {
   tweak: TweakInfo;
@@ -21,14 +29,16 @@ export default function TweakCard({ tweak, selected, onToggle, onInfo }: TweakCa
   const meta = CATEGORY_META[tweak.category];
   const Icon = meta.icon;
   const advanced = tweak.risk === "advanced";
-  const boost = boostPct(tweak.impact);
+  const tier = impactTier(tweak.impact);
   const scanOnly = !tweak.appliable || !tweak.available;
+  const [expanded, setExpanded] = useState(false);
+  const detail = TWEAK_DETAILS[tweak.id];
 
   return (
     <div
-      className={`rounded-2xl border p-5 transition-colors ${
+      className={`rounded-2xl border p-5 transition-all duration-150 hover:-translate-y-px hover:scale-[1.005] ${
         advanced
-          ? "border-purple-800/40 bg-gradient-to-br from-purple-900/10 to-transparent hover:border-purple-700/50"
+          ? "border-purple-800/40 bg-gradient-to-br from-purple-900/10 to-transparent hover:border-purple-700/50 hover:shadow-[0_0_24px_rgba(168,85,247,0.18)]"
           : "border-edge bg-card hover:border-white/20"
       }`}
     >
@@ -43,9 +53,12 @@ export default function TweakCard({ tweak, selected, onToggle, onInfo }: TweakCa
           </span>
           <RiskBadge level={tweak.risk} />
         </div>
-        <span className={`flex items-center gap-1 text-[12px] font-bold ${advanced ? "text-purple-400" : "text-success"}`}>
+        <span
+          className={`flex items-center gap-1 text-[11px] font-bold uppercase tracking-wide ${advanced ? "text-purple-400" : tier === "High" ? "text-success" : tier === "Medium" ? "text-warning" : "text-txt2"}`}
+          title="Impact rating — not a measured gain. Real percentages appear only in the before/after report."
+        >
           {advanced ? <Sparkles size={13} /> : <TrendingUp size={13} />}
-          +{boost}% Boost
+          {tier} impact
         </span>
       </div>
 
@@ -57,11 +70,11 @@ export default function TweakCard({ tweak, selected, onToggle, onInfo }: TweakCa
       <div className="mt-4 flex items-center justify-between">
         <div className="flex items-center gap-2">
           <button
-            onClick={() => onInfo?.(tweak)}
-            title="Learn more"
-            className="grid h-7 w-7 place-items-center rounded-full border border-edge bg-bg text-txt2 transition-colors hover:text-txt"
+            onClick={() => setExpanded((v) => !v)}
+            title="Technical detail"
+            className={`grid h-7 w-7 place-items-center rounded-full border border-edge bg-bg transition-colors ${expanded ? "text-accent" : "text-txt2 hover:text-txt"}`}
           >
-            <Plus size={13} strokeWidth={2} />
+            <Plus size={13} strokeWidth={2} className={`transition-transform ${expanded ? "rotate-45" : ""}`} />
           </button>
           <button
             onClick={() => onInfo?.(tweak)}
@@ -88,6 +101,36 @@ export default function TweakCard({ tweak, selected, onToggle, onInfo }: TweakCa
           )}
         </div>
       </div>
+
+      {expanded && (
+        <div className="mt-3 space-y-2.5 rounded-chip border border-edge bg-bg px-3.5 py-3">
+          <div>
+            <p className="text-[10px] font-semibold uppercase tracking-wide text-txt3">What this does</p>
+            <p className="mt-0.5 text-[11.5px] leading-relaxed text-txt2">{detail?.what ?? tweak.description}</p>
+          </div>
+          <div className="flex flex-wrap gap-1.5">
+            <span className="rounded bg-panel2 px-2 py-0.5 text-[10px] font-semibold text-txt2">
+              {detail ? ACTION_LABEL[detail.action] : "Reads current state (scan-only)"}
+            </span>
+            <span className={`rounded px-2 py-0.5 text-[10px] font-semibold ${RISK_TONE[tweak.risk] ?? "text-txt2"}`}>
+              {RISK_WORD[tweak.risk] ?? tweak.risk}
+            </span>
+          </div>
+          <p className="text-[10.5px] leading-snug text-txt3">{RISK_DEF[tweak.risk]}</p>
+          {detail && (
+            <div>
+              <p className="text-[10px] font-semibold uppercase tracking-wide text-txt3">Exactly what changes</p>
+              <p className="mt-0.5 break-words font-mono text-[10.5px] leading-relaxed text-txt2">{detail.changes}</p>
+            </div>
+          )}
+          <p className="text-[10.5px] text-txt3">
+            Current state:{" "}
+            <span className={tweak.applied ? "font-semibold text-success" : "text-txt2"}>
+              {tweak.applied ? "Applied" : "Not applied"}
+            </span>
+          </p>
+        </div>
+      )}
     </div>
   );
 }

@@ -7,7 +7,7 @@ export default function Tools() {
       icon={Wrench}
       title="Tools"
       milestone="v3.5"
-      description="RAM cleaner, disk junk cleaner, hardware health monitor, in-game overlay and game server ping tester — the premium extras, all free."
+      description="RAM cleaner, disk junk cleaner, hardware health monitor, in-game overlay and game server ping tester — advanced extras, all free."
     />
   );
 }

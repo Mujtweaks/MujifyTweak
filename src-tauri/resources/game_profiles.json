@@ -1,0 +1,188 @@
+{
+  "_comment": "Per-game recommended tweak configurations. 'match' holds lowercase name substrings used to identify a detected/selected game. Every 'id' must be a real tweak in tweak_catalog (a test enforces this). Recommending a tweak never applies it — the UI only pre-selects it for the confirmation modal.",
+  "games": [
+    {
+      "match": ["valorant"],
+      "name": "Valorant",
+      "impact": "high",
+      "recommended": [
+        { "id": "disable_nagle", "why": "Sends each shot packet instantly instead of batching — cuts peeker's-advantage lag." },
+        { "id": "tcp_ack_frequency", "why": "Acknowledges packets immediately, pairing with Nagle-off for snappier netcode." },
+        { "id": "network_qos", "why": "Reserves bandwidth headroom so background apps can't spike your ping mid-round." },
+        { "id": "mouse_accel_off", "why": "Makes flick and micro-aim 1:1 and identical every session." },
+        { "id": "disable_fso", "why": "Forces true exclusive fullscreen for the lowest input lag." },
+        { "id": "disable_game_bar", "why": "Removes the Xbox capture overlay that silently costs frames." },
+        { "id": "win32_priority", "why": "Gives the game's threads more scheduler time under load." }
+      ],
+      "notRecommended": [
+        { "id": "power_ultimate", "why": "Overkill for a light esports title — High Performance runs cooler for the same result." }
+      ]
+    },
+    {
+      "match": ["league of legends", "league"],
+      "name": "League of Legends",
+      "impact": "high",
+      "recommended": [
+        { "id": "disable_nagle", "why": "Ability casts and clicks reach the server without batching delay." },
+        { "id": "tcp_ack_frequency", "why": "Immediate ACKs keep last-hit and trade timings responsive." },
+        { "id": "network_qos", "why": "Prioritizes game traffic so streams/downloads don't add lag." },
+        { "id": "flush_dns", "why": "Clears stale entries so you connect to the nearest server." },
+        { "id": "mouse_accel_off", "why": "Consistent cursor movement for precise skill-shots." },
+        { "id": "disable_game_bar", "why": "Drops the background capture overhead." }
+      ],
+      "notRecommended": []
+    },
+    {
+      "match": ["counter-strike", "counterstrike", "cs2", "cs:go"],
+      "name": "Counter-Strike 2",
+      "impact": "high",
+      "recommended": [
+        { "id": "disable_nagle", "why": "Instant packet send is critical for CS2's sub-tick netcode." },
+        { "id": "tcp_ack_frequency", "why": "Immediate ACKs reduce the delay between shot and register." },
+        { "id": "network_qos", "why": "Keeps your ping stable when the network is busy." },
+        { "id": "mouse_accel_off", "why": "1:1 aim is non-negotiable for spray control and flicks." },
+        { "id": "disable_fso", "why": "Exclusive fullscreen lowers input latency." },
+        { "id": "disable_gamedvr", "why": "Stops background DVR capture that costs FPS." },
+        { "id": "mmcss_gaming", "why": "Gives CS2 a larger CPU/GPU scheduling share." },
+        { "id": "disable_core_parking", "why": "Keeps all cores awake for steady frame pacing." }
+      ],
+      "notRecommended": []
+    },
+    {
+      "match": ["apex"],
+      "name": "Apex Legends",
+      "impact": "high",
+      "recommended": [
+        { "id": "disable_nagle", "why": "Reduces the delay on movement and fire inputs online." },
+        { "id": "network_qos", "why": "Protects your ping during busy team fights." },
+        { "id": "mmcss_gaming", "why": "Prioritizes Apex's threads on a demanding engine." },
+        { "id": "disable_core_parking", "why": "Prevents frame dips when cores wake from parking." },
+        { "id": "disable_fso", "why": "Lower input lag in true fullscreen." },
+        { "id": "disable_game_bar", "why": "Removes overlay capture overhead." },
+        { "id": "hags", "why": "Can smooth frame delivery on supported GPUs." },
+        { "id": "mouse_accel_off", "why": "Consistent recoil control and tracking." }
+      ],
+      "notRecommended": []
+    },
+    {
+      "match": ["fortnite"],
+      "name": "Fortnite",
+      "impact": "medium",
+      "recommended": [
+        { "id": "disable_nagle", "why": "Snappier building and edit inputs online." },
+        { "id": "network_qos", "why": "Steadier ping while streaming or downloading." },
+        { "id": "disable_fso", "why": "Lower input lag for edits and box fights." },
+        { "id": "disable_gamedvr", "why": "Reclaims the FPS lost to background capture." },
+        { "id": "mmcss_gaming", "why": "More scheduling share for the game." },
+        { "id": "hags", "why": "May improve frame pacing on supported GPUs." },
+        { "id": "mouse_accel_off", "why": "1:1 aim for consistent tracking." }
+      ],
+      "notRecommended": []
+    },
+    {
+      "match": ["call of duty", "warzone", "modern warfare"],
+      "name": "Call of Duty (Warzone / MW)",
+      "impact": "high",
+      "recommended": [
+        { "id": "disable_core_parking", "why": "Warzone is CPU-heavy — keep every core active." },
+        { "id": "disable_power_throttling", "why": "Stops Windows throttling the game to save power." },
+        { "id": "mmcss_gaming", "why": "Larger scheduling share for a demanding engine." },
+        { "id": "disable_memory_compression", "why": "Cuts CPU overhead on high-RAM systems." },
+        { "id": "disable_gamedvr", "why": "Removes background capture that costs FPS." },
+        { "id": "disable_fso", "why": "Lower input lag in fullscreen." },
+        { "id": "network_qos", "why": "Keeps ping steady in large lobbies." },
+        { "id": "disable_nagle", "why": "Instant input packets for gunfights." }
+      ],
+      "notRecommended": []
+    },
+    {
+      "match": ["overwatch"],
+      "name": "Overwatch 2",
+      "impact": "high",
+      "recommended": [
+        { "id": "disable_nagle", "why": "Reduces delay on abilities and fire online." },
+        { "id": "tcp_ack_frequency", "why": "Immediate ACKs for responsive netcode." },
+        { "id": "network_qos", "why": "Stable ping through busy networks." },
+        { "id": "mouse_accel_off", "why": "1:1 aim for hitscan heroes." },
+        { "id": "disable_fso", "why": "Lower input latency in fullscreen." },
+        { "id": "mmcss_gaming", "why": "More CPU/GPU scheduling share." },
+        { "id": "disable_game_bar", "why": "Drops the capture overlay overhead." }
+      ],
+      "notRecommended": []
+    },
+    {
+      "match": ["dota"],
+      "name": "Dota 2",
+      "impact": "high",
+      "recommended": [
+        { "id": "disable_nagle", "why": "Clicks and casts reach the server without batching delay." },
+        { "id": "tcp_ack_frequency", "why": "Keeps last-hit and micro timings responsive." },
+        { "id": "network_qos", "why": "Prioritizes game traffic over background apps." },
+        { "id": "flush_dns", "why": "Connect to the closest server before a match." },
+        { "id": "mouse_accel_off", "why": "Precise cursor control for micro." },
+        { "id": "disable_game_bar", "why": "Removes background capture overhead." }
+      ],
+      "notRecommended": []
+    },
+    {
+      "match": ["pubg", "playerunknown", "battlegrounds"],
+      "name": "PUBG",
+      "impact": "high",
+      "recommended": [
+        { "id": "disable_core_parking", "why": "Keeps cores active for a CPU-heavy shooter." },
+        { "id": "mmcss_gaming", "why": "Prioritizes the game's threads." },
+        { "id": "disable_memory_compression", "why": "Reduces CPU overhead on high-RAM systems." },
+        { "id": "disable_power_throttling", "why": "Prevents power-saving throttling mid-match." },
+        { "id": "disable_gamedvr", "why": "Removes background capture that costs FPS." },
+        { "id": "disable_fso", "why": "Lower input lag in fullscreen." },
+        { "id": "network_qos", "why": "Steadier ping in big lobbies." },
+        { "id": "disable_nagle", "why": "Instant fire and movement packets." }
+      ],
+      "notRecommended": []
+    },
+    {
+      "match": ["minecraft"],
+      "name": "Minecraft",
+      "impact": "medium",
+      "recommended": [
+        { "id": "disable_memory_compression", "why": "Frees CPU for the Java engine on high-RAM PCs." },
+        { "id": "disable_core_parking", "why": "Keeps cores active for steadier chunk-loading FPS." },
+        { "id": "disable_power_throttling", "why": "Stops the game being throttled to save power." },
+        { "id": "mmcss_gaming", "why": "Gives the game a larger scheduling share." },
+        { "id": "disable_game_bar", "why": "Drops capture overlay overhead." }
+      ],
+      "notRecommended": [
+        { "id": "disable_nagle", "why": "Minecraft isn't twitch-latency sensitive — TCP tweaks add little here." }
+      ]
+    },
+    {
+      "match": ["roblox"],
+      "name": "Roblox",
+      "impact": "medium",
+      "recommended": [
+        { "id": "disable_game_bar", "why": "Removes the Xbox overlay capture overhead." },
+        { "id": "disable_gamedvr", "why": "Stops background frame capture." },
+        { "id": "disable_fso", "why": "Lower input lag for action experiences." },
+        { "id": "mouse_accel_off", "why": "Consistent 1:1 aim across games." },
+        { "id": "network_qos", "why": "Keeps ping steady on busy networks." }
+      ],
+      "notRecommended": []
+    },
+    {
+      "match": ["rust"],
+      "name": "Rust",
+      "impact": "high",
+      "recommended": [
+        { "id": "disable_core_parking", "why": "Rust is CPU-hungry — keep all cores awake." },
+        { "id": "mmcss_gaming", "why": "Prioritizes the game's threads under load." },
+        { "id": "disable_memory_compression", "why": "Cuts CPU overhead on high-RAM systems." },
+        { "id": "disable_power_throttling", "why": "Prevents power-saving throttling on long wipes." },
+        { "id": "disable_fso", "why": "Lower input lag in fullscreen." },
+        { "id": "disable_game_bar", "why": "Removes capture overlay overhead." },
+        { "id": "network_qos", "why": "Steadier ping on populated servers." },
+        { "id": "disable_nagle", "why": "Instant input packets for raids and fights." }
+      ],
+      "notRecommended": []
+    }
+  ]
+}

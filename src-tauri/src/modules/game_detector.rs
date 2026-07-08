@@ -33,6 +33,18 @@ pub struct GameInfo {
 
 static RUNNING: AtomicBool = AtomicBool::new(false);
 
+/// Steam appids that are tools/runtimes/redistributables, not games — hidden
+/// from the library so they don't show as art-less tiles. (Read-only filter.)
+const NON_GAME_APPIDS: &[&str] = &[
+    "228980",  // Steamworks Common Redistributables
+    "1070560", // Steam Linux Runtime 1.0 (scout)
+    "1391110", // Steam Linux Runtime 2.0 (soldier)
+    "1628350", // Steam Linux Runtime 3.0 (sniper)
+    "1493710", // Proton Experimental
+    "1826330", // Proton EasyAntiCheat Runtime
+    "2180100", // Proton Hotfix
+];
+
 fn stem_of(process_name: &str) -> String {
     process_name
         .to_lowercase()
@@ -149,19 +161,31 @@ fn scan_steam(games: &mut Vec<GameInfo>) {
                 .trim_start_matches("appmanifest_")
                 .trim_end_matches(".acf")
                 .to_string();
+            if NON_GAME_APPIDS.contains(&app_id.as_str()) {
+                continue; // skip runtimes / redistributables
+            }
             if let Ok(text) = std::fs::read_to_string(entry.path()) {
-                let title = text
-                    .lines()
-                    .find(|l| l.trim_start().starts_with("\"name\""))
-                    .and_then(|l| l.split('"').nth(3))
-                    .map(|s| s.to_string());
+                let field = |key: &str| {
+                    text.lines()
+                        .find(|l| l.trim_start().starts_with(&format!("\"{key}\"")))
+                        .and_then(|l| l.split('"').nth(3))
+                        .map(|s| s.to_string())
+                };
+                let title = field("name");
+                let installdir = field("installdir");
                 if let Some(title) = title {
                     if !games.iter().any(|g| g.name == title) {
+                        // Precise per-game folder (…\common\<installdir>) so the
+                        // engine profiler can scan the right directory, not all of common.
+                        let install_path = match &installdir {
+                            Some(d) => steamapps.join("common").join(d),
+                            None => steamapps.join("common"),
+                        };
                         games.push(GameInfo {
                             name: title,
                             exe: String::new(),
                             launcher: Some("Steam".into()),
-                            install_path: Some(steamapps.join("common").to_string_lossy().into()),
+                            install_path: Some(install_path.to_string_lossy().into()),
                             app_id: if app_id.is_empty() { None } else { Some(app_id) },
                         });
                     }
@@ -221,4 +245,17 @@ pub fn get_installed_games() -> Vec<GameInfo> {
     games.sort_by(|a, b| a.name.to_lowercase().cmp(&b.name.to_lowercase()));
     games.truncate(200);
     games
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn redistributables_are_filtered_but_real_games_are_not() {
+        // The known Steamworks redistributable must be hidden from the library…
+        assert!(NON_GAME_APPIDS.contains(&"228980"));
+        // …while real games (e.g. Wallpaper Engine 431960) must not be.
+        assert!(!NON_GAME_APPIDS.contains(&"431960"));
+    }
 }
