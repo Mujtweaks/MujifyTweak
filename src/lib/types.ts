@@ -210,6 +210,45 @@ export interface SystemHealthReport {
   problems: number;
 }
 
+/** Hardware tier classification driving the Game Settings Advisor. */
+export interface HardwareTier {
+  gpuTier: string; // integrated | entry | mid | high | ultra | unknown
+  gpuModel: string;
+  gpuVendor: string;
+  gpuKnown: boolean;
+  vramGb: number | null;
+  cpuTier: string; // entry | mid | high | unknown
+  cpuName: string;
+  cpuCores: number;
+  ramGb: number;
+  upscalers: string[]; // best-first subset of dlss/xess/fsr
+}
+
+/** One in-game setting recommendation, resolved for this machine's GPU tier. */
+export interface ResolvedRec {
+  setting: string;
+  value: string;
+  impact: string; // low | medium | high (never a fabricated %)
+  visualCost: string; // none | minor | noticeable
+  why: string;
+}
+
+export interface UpscalerAdvice {
+  upscaler: string; // DLSS | XeSS | FSR | TSR
+  quality: string;
+  impact: string;
+  why: string;
+}
+
+export interface SettingsAdvice {
+  source: string; // preset | engine | universal
+  reason: string;
+  gameName: string;
+  hardware: HardwareTier;
+  recommendations: ResolvedRec[];
+  upscaler: UpscalerAdvice | null;
+}
+
 /** A device/driver reporting a problem (Device Manager ConfigManagerErrorCode). */
 export interface DeviceIssue {
   name: string;

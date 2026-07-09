@@ -45,6 +45,11 @@ pub enum Op {
     /// Raise the primary display to its highest refresh at the current
     /// resolution, capturing the prior mode for an exact revert.
     MaxRefreshRate,
+    /// Byte-for-byte replace a file's contents, capturing the exact prior bytes
+    /// (or absence) for a perfect revert. FOUNDATION ONLY — the future
+    /// auto-apply-game-settings phase will use this; no tweak/fix references it
+    /// yet, so `ops_for`/`fix_ops` never produce it.
+    FileEdit { path: String, content: Vec<u8> },
 }
 
 /// Captured before-state, enough to precisely reverse one Op.
@@ -64,6 +69,8 @@ pub enum UndoOp {
     CoreParking { prev: Option<u32> },
     /// Prior display mode, restored exactly on undo (None → leave as-is).
     DisplayMode { prev: Option<DisplayMode> },
+    /// Prior file bytes (None → the file didn't exist, so undo deletes it).
+    File { path: String, prev: Option<Vec<u8>> },
 }
 
 /// Capture + apply one Op. Returns the UndoOp needed to reverse it.
@@ -151,6 +158,11 @@ pub fn apply_op(m: &dyn SystemMutator, op: &Op) -> Result<UndoOp, String> {
             }
             Ok(UndoOp::DisplayMode { prev })
         }
+        Op::FileEdit { path, content } => {
+            let prev = m.read_file(path);
+            m.write_file(path, content)?;
+            Ok(UndoOp::File { path: path.clone(), prev })
+        }
     }
 }
 
@@ -204,6 +216,10 @@ pub fn undo_op(m: &dyn SystemMutator, undo: &UndoOp) -> Result<(), String> {
         UndoOp::DisplayMode { prev } => match prev {
             Some(mode) => m.set_display_mode(*mode),
             None => Ok(()),
+        },
+        UndoOp::File { path, prev } => match prev {
+            Some(bytes) => m.write_file(path, bytes),
+            None => m.delete_file(path),
         },
         UndoOp::None => Ok(()),
     }
@@ -485,6 +501,39 @@ mod tests {
         assert_eq!(m.get_dword(Hklm, path, "Enabled"), Some(0));
         undo_all(&m, &undos);
         assert_eq!(m.get_dword(Hklm, path, "Enabled"), Some(1));
+    }
+
+    #[test]
+    fn file_edit_restores_exact_prior_bytes() {
+        // A file that existed → apply overwrites → undo restores byte-identical.
+        let m = MockMutator::new().with_file("cfg.ini", b"Shadows=Epic\r\n");
+        let op = Op::FileEdit { path: "cfg.ini".into(), content: b"Shadows=Low\r\n".to_vec() };
+        let undo = apply_op(&m, &op).unwrap();
+        assert_eq!(m.read_file("cfg.ini").unwrap(), b"Shadows=Low\r\n");
+        undo_op(&m, &undo).unwrap();
+        assert_eq!(m.read_file("cfg.ini").unwrap(), b"Shadows=Epic\r\n"); // exact bytes
+    }
+
+    #[test]
+    fn file_edit_undo_deletes_a_file_that_did_not_exist() {
+        // No prior file → apply creates it → undo removes it entirely.
+        let m = MockMutator::new();
+        let op = Op::FileEdit { path: "new.cfg".into(), content: b"x=1".to_vec() };
+        let undo = apply_op(&m, &op).unwrap();
+        assert_eq!(m.read_file("new.cfg").unwrap(), b"x=1");
+        undo_op(&m, &undo).unwrap();
+        assert!(m.read_file("new.cfg").is_none());
+    }
+
+    #[test]
+    fn no_catalog_tweak_or_fix_uses_file_edit_yet() {
+        // FOUNDATION ONLY: nothing may wire FileEdit until the auto-apply phase.
+        for id in super::super::tweak_catalog::all_ids() {
+            assert!(
+                !ops_for(id).iter().any(|o| matches!(o, Op::FileEdit { .. })),
+                "tweak '{id}' must not use FileEdit yet"
+            );
+        }
     }
 
     #[test]

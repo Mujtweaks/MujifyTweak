@@ -1,0 +1,178 @@
+{
+  "_comment": "Per-game in-game GRAPHICS settings advice. recommended_by_tier maps GPU tier -> value. impact = low|medium|high (never a fabricated %). visualCost = none|minor|noticeable so users trade FPS vs looks honestly. The real gain is proven by the app's before/after benchmark, not claimed here.",
+  "games": [
+    {
+      "match": ["fortnite"],
+      "name": "Fortnite",
+      "engine": "unreal",
+      "upscalers": ["dlss", "xess", "fsr", "tsr"],
+      "recommendations": [
+        { "setting": "Rendering Mode", "byTier": { "integrated": "Performance (DX11)", "entry": "Performance (DX11)", "mid": "DirectX 12", "high": "DirectX 12", "ultra": "DirectX 12" }, "impact": "high", "visualCost": "noticeable", "why": "Performance Mode strips lighting/effects for a massive FPS jump on weak GPUs; DX12 looks better and runs well on mid and up." },
+        { "setting": "Shadows", "byTier": { "integrated": "Off", "entry": "Off", "mid": "Medium", "high": "High", "ultra": "Epic" }, "impact": "high", "visualCost": "noticeable", "why": "Shadows are the single most expensive setting here; most competitive players run them Off." },
+        { "setting": "Anti-Aliasing", "byTier": { "integrated": "Off", "entry": "TSR Low", "mid": "TSR Medium", "high": "TSR High", "ultra": "TSR Epic" }, "impact": "medium", "visualCost": "minor", "why": "TSR doubles as an upscaler; drop it a notch for a clean FPS win." },
+        { "setting": "View Distance", "byTier": { "integrated": "Medium", "entry": "Far", "mid": "Far", "high": "Epic", "ultra": "Epic" }, "impact": "medium", "visualCost": "minor", "why": "Keep this up — it lets you spot players and builds sooner; the FPS cost is worth the gameplay edge." },
+        { "setting": "Effects", "byTier": { "integrated": "Low", "entry": "Low", "mid": "Medium", "high": "High", "ultra": "Epic" }, "impact": "medium", "visualCost": "minor", "why": "Effects/post-processing eat frames in late-game storm fights for little competitive value." }
+      ]
+    },
+    {
+      "match": ["valorant"],
+      "name": "Valorant",
+      "engine": "unreal",
+      "upscalers": [],
+      "recommendations": [
+        { "setting": "Material Quality", "byTier": { "integrated": "Low", "entry": "Low", "mid": "Medium", "high": "High", "ultra": "High" }, "impact": "medium", "visualCost": "minor", "why": "Valorant runs on almost anything; on weak GPUs Low frees the most frames without hurting visibility." },
+        { "setting": "Anti-Aliasing", "byTier": { "integrated": "None", "entry": "MSAA 2x", "mid": "MSAA 4x", "high": "MSAA 4x", "ultra": "MSAA 4x" }, "impact": "medium", "visualCost": "minor", "why": "MSAA is the biggest cost in an otherwise light engine; drop it on integrated graphics for a smoother feel." },
+        { "setting": "Detail Quality", "byTier": { "integrated": "Low", "entry": "Low", "mid": "Medium", "high": "High", "ultra": "High" }, "impact": "low", "visualCost": "minor", "why": "Minor FPS on modern GPUs, but a real help on integrated graphics." },
+        { "setting": "Improve Clarity / Bloom", "byTier": { "integrated": "Off", "entry": "Off", "mid": "Off", "high": "Personal", "ultra": "Personal" }, "impact": "low", "visualCost": "none", "why": "Turning Bloom off is nearly free and many players prefer the cleaner look." }
+      ]
+    },
+    {
+      "match": ["counter-strike", "cs2", "cs 2"],
+      "name": "Counter-Strike 2",
+      "engine": "source",
+      "upscalers": ["fsr"],
+      "recommendations": [
+        { "setting": "Shadow Quality", "byTier": { "integrated": "Low", "entry": "Low", "mid": "Medium", "high": "High", "ultra": "High" }, "impact": "high", "visualCost": "minor", "why": "Shadows are the heaviest setting in CS2 — but keep them at least Low, since enemy shadows are a real info source." },
+        { "setting": "Anti-Aliasing (MSAA)", "byTier": { "integrated": "None", "entry": "2x MSAA", "mid": "4x MSAA", "high": "4x MSAA", "ultra": "8x MSAA" }, "impact": "high", "visualCost": "minor", "why": "MSAA scales expensively; 4x is the sweet spot, drop lower only if you're GPU-bound." },
+        { "setting": "Model / Texture Detail", "byTier": { "integrated": "Low", "entry": "Medium", "mid": "High", "high": "High", "ultra": "High" }, "impact": "medium", "visualCost": "minor", "why": "Cheap on VRAM-healthy GPUs; lower it only on integrated graphics." },
+        { "setting": "Global Shadow Quality", "byTier": { "integrated": "Low", "entry": "Medium", "mid": "High", "high": "High", "ultra": "High" }, "impact": "medium", "visualCost": "minor", "why": "Separate from dynamic shadows; medium is a good balance mid-range." }
+      ]
+    },
+    {
+      "match": ["apex"],
+      "name": "Apex Legends",
+      "engine": "source",
+      "upscalers": [],
+      "recommendations": [
+        { "setting": "Shadow Detail / Volumetric Lighting", "byTier": { "integrated": "Disabled", "entry": "Low", "mid": "High", "high": "High", "ultra": "High" }, "impact": "high", "visualCost": "noticeable", "why": "Volumetric lighting + shadows are Apex's biggest hogs; disabling them is a large, well-known FPS win." },
+        { "setting": "Spot Shadow Detail", "byTier": { "integrated": "Disabled", "entry": "Low", "mid": "High", "high": "High", "ultra": "High" }, "impact": "medium", "visualCost": "minor", "why": "Dynamic spot shadows cost frames in fights for little gameplay value." },
+        { "setting": "Model Detail", "byTier": { "integrated": "Low", "entry": "Medium", "mid": "High", "high": "High", "ultra": "High" }, "impact": "medium", "visualCost": "minor", "why": "Lower on weak GPUs; barely matters on mid and up." },
+        { "setting": "Ambient Occlusion Quality", "byTier": { "integrated": "Disabled", "entry": "Disabled", "mid": "Low", "high": "High", "ultra": "High" }, "impact": "medium", "visualCost": "minor", "why": "AO is a soft-shadow effect you can disable for a clean win when GPU-bound." }
+      ]
+    },
+    {
+      "match": ["warzone", "call of duty", "modern warfare", "black ops"],
+      "name": "Call of Duty: Warzone",
+      "engine": "iw",
+      "upscalers": ["dlss", "fsr", "xess"],
+      "recommendations": [
+        { "setting": "Shadow Quality / Map", "byTier": { "integrated": "Low", "entry": "Low", "mid": "Normal", "high": "High", "ultra": "High" }, "impact": "high", "visualCost": "minor", "why": "Shadow map resolution is one of the heaviest CoD settings; Low is barely noticeable in motion." },
+        { "setting": "Volumetric Quality", "byTier": { "integrated": "Low", "entry": "Low", "mid": "Medium", "high": "High", "ultra": "High" }, "impact": "high", "visualCost": "minor", "why": "Volumetric fog/lighting is very GPU-heavy; lowering it is a big, low-visual-cost win." },
+        { "setting": "Screen Space Reflections", "byTier": { "integrated": "Off", "entry": "Off", "mid": "Low", "high": "High", "ultra": "High" }, "impact": "medium", "visualCost": "minor", "why": "SSR is expensive and easy to miss in a fast shooter." },
+        { "setting": "Particle Quality", "byTier": { "integrated": "Low", "entry": "Low", "mid": "Medium", "high": "High", "ultra": "High" }, "impact": "medium", "visualCost": "minor", "why": "Particles spike frames during heavy gunfire and explosions." }
+      ]
+    },
+    {
+      "match": ["grand theft auto", "gta v", "gta5", "gtav"],
+      "name": "Grand Theft Auto V",
+      "engine": "rage",
+      "upscalers": [],
+      "recommendations": [
+        { "setting": "MSAA", "byTier": { "integrated": "Off", "entry": "Off", "mid": "2x", "high": "2x", "ultra": "4x" }, "impact": "high", "visualCost": "minor", "why": "MSAA is by far the most expensive setting in GTA V; use FXAA or 2x instead of 4x/8x." },
+        { "setting": "Grass Quality", "byTier": { "integrated": "Normal", "entry": "Normal", "mid": "High", "high": "Very High", "ultra": "Ultra" }, "impact": "high", "visualCost": "noticeable", "why": "Grass detail is a huge GPU cost in the countryside; drop it a tier for a big win." },
+        { "setting": "Shadow Quality", "byTier": { "integrated": "Normal", "entry": "High", "mid": "High", "high": "Very High", "ultra": "Very High" }, "impact": "medium", "visualCost": "minor", "why": "Shadows are costly but 'High' looks nearly identical to 'Very High' in motion." },
+        { "setting": "Extended Distance Scaling", "byTier": { "integrated": "0%", "entry": "0%", "mid": "25%", "high": "50%", "ultra": "75%" }, "impact": "medium", "visualCost": "minor", "why": "This slider heavily loads the CPU; keep it low unless you have headroom." }
+      ]
+    },
+    {
+      "match": ["rust"],
+      "name": "Rust",
+      "engine": "unity",
+      "upscalers": ["fsr"],
+      "recommendations": [
+        { "setting": "Object / Tree / Grass Quality", "byTier": { "integrated": "Low", "entry": "Low", "mid": "Medium", "high": "High", "ultra": "High" }, "impact": "high", "visualCost": "noticeable", "why": "Rust is very demanding; world-detail sliders are the biggest FPS lever." },
+        { "setting": "Shadow Quality / Cascades", "byTier": { "integrated": "Off", "entry": "Low", "mid": "Medium", "high": "High", "ultra": "High" }, "impact": "high", "visualCost": "minor", "why": "Shadow cascades are expensive; lower them for a large win with little competitive downside." },
+        { "setting": "Water Quality", "byTier": { "integrated": "Low", "entry": "Low", "mid": "Medium", "high": "High", "ultra": "High" }, "impact": "medium", "visualCost": "minor", "why": "Water reflections/refraction cost frames near the coast." },
+        { "setting": "Draw Distance", "byTier": { "integrated": "1000", "entry": "1500", "mid": "2000", "high": "2500", "ultra": "3000" }, "impact": "medium", "visualCost": "minor", "why": "Higher draw distance loads both CPU and GPU; balance it to your rig." }
+      ]
+    },
+    {
+      "match": ["minecraft"],
+      "name": "Minecraft",
+      "engine": "custom",
+      "upscalers": [],
+      "recommendations": [
+        { "setting": "Render Distance", "byTier": { "integrated": "8 chunks", "entry": "12 chunks", "mid": "16 chunks", "high": "24 chunks", "ultra": "32 chunks" }, "impact": "high", "visualCost": "noticeable", "why": "Render distance is the dominant cost in Minecraft and hits the CPU hard — the #1 dial for FPS." },
+        { "setting": "Graphics", "byTier": { "integrated": "Fast", "entry": "Fast", "mid": "Fancy", "high": "Fancy", "ultra": "Fabulous" }, "impact": "medium", "visualCost": "minor", "why": "Fast disables transparency layering for a solid win on weak hardware." },
+        { "setting": "Smooth Lighting", "byTier": { "integrated": "Off", "entry": "Minimum", "mid": "Maximum", "high": "Maximum", "ultra": "Maximum" }, "impact": "low", "visualCost": "minor", "why": "Cheap to turn down on integrated graphics." },
+        { "setting": "Use a performance mod (Sodium/OptiFine)", "byTier": { "integrated": "Yes", "entry": "Yes", "mid": "Yes", "high": "Optional", "ultra": "Optional" }, "impact": "high", "visualCost": "none", "why": "On Java, Sodium/OptiFine often doubles FPS for free — the single best change you can make." }
+      ]
+    },
+    {
+      "match": ["cyberpunk"],
+      "name": "Cyberpunk 2077",
+      "engine": "redengine",
+      "upscalers": ["dlss", "fsr", "xess"],
+      "recommendations": [
+        { "setting": "Ray Tracing / Path Tracing", "byTier": { "integrated": "Off", "entry": "Off", "mid": "Off", "high": "Ray Tracing: Medium", "ultra": "Path Tracing" }, "impact": "high", "visualCost": "noticeable", "why": "RT/PT is the most expensive thing in any game today — keep it Off below a high-end GPU." },
+        { "setting": "Screen Space Reflections", "byTier": { "integrated": "Low", "entry": "Low", "mid": "Medium", "high": "High", "ultra": "Ultra" }, "impact": "high", "visualCost": "minor", "why": "SSR quality scales expensively for reflections you rarely study." },
+        { "setting": "Volumetric Fog / Clouds", "byTier": { "integrated": "Low", "entry": "Low", "mid": "Medium", "high": "High", "ultra": "Ultra" }, "impact": "medium", "visualCost": "minor", "why": "Volumetrics are heavy; Medium looks great and runs far better." },
+        { "setting": "Crowd Density", "byTier": { "integrated": "Low", "entry": "Low", "mid": "Medium", "high": "High", "ultra": "High" }, "impact": "medium", "visualCost": "minor", "why": "Crowd density is CPU-bound and tanks frames in Night City markets." }
+      ]
+    },
+    {
+      "match": ["elden ring", "eldenring"],
+      "name": "Elden Ring",
+      "engine": "fromsoft",
+      "upscalers": [],
+      "recommendations": [
+        { "setting": "Shadow Quality / Lighting Quality", "byTier": { "integrated": "Low", "entry": "Medium", "mid": "High", "high": "Maximum", "ultra": "Maximum" }, "impact": "high", "visualCost": "minor", "why": "Shadows/lighting are the biggest cost; the game is capped at 60 FPS, so target a stable 60 rather than max settings." },
+        { "setting": "Motion Blur", "byTier": { "integrated": "Off", "entry": "Off", "mid": "Off", "high": "Personal", "ultra": "Personal" }, "impact": "low", "visualCost": "none", "why": "Off is free and many players prefer the clarity." },
+        { "setting": "SSAO / Depth of Field", "byTier": { "integrated": "Low", "entry": "Medium", "mid": "High", "high": "High", "ultra": "Maximum" }, "impact": "medium", "visualCost": "minor", "why": "Effects quality helps hold a locked 60 in dense areas like Leyndell." },
+        { "setting": "Grass Quality", "byTier": { "integrated": "Low", "entry": "Medium", "mid": "High", "high": "High", "ultra": "Maximum" }, "impact": "medium", "visualCost": "minor", "why": "Grass is costly in open fields; lower it to keep frametimes smooth." }
+      ]
+    },
+    {
+      "match": ["roblox"],
+      "name": "Roblox",
+      "engine": "custom",
+      "upscalers": [],
+      "recommendations": [
+        { "setting": "Graphics Mode", "byTier": { "integrated": "Manual", "entry": "Manual", "mid": "Manual", "high": "Automatic", "ultra": "Automatic" }, "impact": "medium", "visualCost": "none", "why": "Switch to Manual so you control the quality level instead of letting Roblox push it too high." },
+        { "setting": "Graphics Quality Level", "byTier": { "integrated": "1-2", "entry": "3-4", "mid": "6", "high": "8", "ultra": "10" }, "impact": "high", "visualCost": "noticeable", "why": "The single quality slider drives almost all of Roblox's GPU load — lower it on weak hardware for a big win." },
+        { "setting": "Full Screen (exclusive)", "byTier": { "integrated": "On", "entry": "On", "mid": "On", "high": "On", "ultra": "On" }, "impact": "low", "visualCost": "none", "why": "Fullscreen gives slightly better frame pacing than windowed." }
+      ]
+    },
+    {
+      "match": ["rocket league"],
+      "name": "Rocket League",
+      "engine": "unreal",
+      "upscalers": [],
+      "recommendations": [
+        { "setting": "Render Quality", "byTier": { "integrated": "Low", "entry": "Medium", "mid": "High Quality", "high": "High Quality", "ultra": "High Quality" }, "impact": "high", "visualCost": "minor", "why": "This is a built-in resolution scale — the biggest single FPS lever in Rocket League." },
+        { "setting": "Dynamic Shadows", "byTier": { "integrated": "Off", "entry": "Off", "mid": "On", "high": "On", "ultra": "On" }, "impact": "medium", "visualCost": "minor", "why": "Dynamic shadows cost frames for little gameplay value in a fast game." },
+        { "setting": "Effects / Particle Detail", "byTier": { "integrated": "Low", "entry": "Low", "mid": "High", "high": "High", "ultra": "High" }, "impact": "medium", "visualCost": "minor", "why": "Explosion/boost effects can drop frames in busy moments." },
+        { "setting": "Weather Effects", "byTier": { "integrated": "Off", "entry": "Off", "mid": "Off", "high": "On", "ultra": "On" }, "impact": "low", "visualCost": "minor", "why": "Rain/snow is pure GPU cost you can disable." }
+      ]
+    }
+  ],
+  "engines": {
+    "unreal": [
+      { "setting": "Shadows", "byTier": { "integrated": "Low", "entry": "Low", "mid": "Medium", "high": "High", "ultra": "Epic" }, "impact": "high", "visualCost": "noticeable", "why": "Shadows are consistently the most expensive setting in Unreal Engine titles." },
+      { "setting": "Post-Processing", "byTier": { "integrated": "Low", "entry": "Low", "mid": "Medium", "high": "High", "ultra": "Epic" }, "impact": "medium", "visualCost": "minor", "why": "Bloom/AO/motion blur stack up for little competitive value." },
+      { "setting": "Effects", "byTier": { "integrated": "Low", "entry": "Low", "mid": "Medium", "high": "High", "ultra": "Epic" }, "impact": "medium", "visualCost": "minor", "why": "Particle-heavy effects cost frames in busy scenes." },
+      { "setting": "View Distance", "byTier": { "integrated": "Medium", "entry": "High", "mid": "High", "high": "Epic", "ultra": "Epic" }, "impact": "medium", "visualCost": "minor", "why": "Streaming distant detail is CPU+GPU heavy; keep it up in competitive shooters for visibility." },
+      { "setting": "Foliage", "byTier": { "integrated": "Low", "entry": "Low", "mid": "Medium", "high": "High", "ultra": "Epic" }, "impact": "medium", "visualCost": "minor", "why": "Grass/foliage density is a big open-world GPU cost." }
+    ],
+    "unity": [
+      { "setting": "Shadow Quality", "byTier": { "integrated": "Low", "entry": "Low", "mid": "Medium", "high": "High", "ultra": "Very High" }, "impact": "high", "visualCost": "noticeable", "why": "Shadow resolution/cascades are usually the heaviest Unity setting." },
+      { "setting": "Anti-Aliasing", "byTier": { "integrated": "Off", "entry": "FXAA", "mid": "SMAA", "high": "SMAA", "ultra": "TAA" }, "impact": "medium", "visualCost": "minor", "why": "Post-process AA is cheaper than MSAA in most Unity games." },
+      { "setting": "Texture Quality", "byTier": { "integrated": "Medium", "entry": "High", "mid": "High", "high": "Very High", "ultra": "Very High" }, "impact": "low", "visualCost": "noticeable", "why": "Cheap on FPS if you have enough VRAM — keep textures high and lower elsewhere." },
+      { "setting": "Draw Distance / LOD", "byTier": { "integrated": "Low", "entry": "Medium", "mid": "High", "high": "High", "ultra": "Ultra" }, "impact": "medium", "visualCost": "minor", "why": "Object/detail draw distance loads the CPU." },
+      { "setting": "Effects Quality", "byTier": { "integrated": "Low", "entry": "Low", "mid": "Medium", "high": "High", "ultra": "High" }, "impact": "medium", "visualCost": "minor", "why": "Particles and post effects spike frames in busy scenes." }
+    ],
+    "source": [
+      { "setting": "Shadow Detail", "byTier": { "integrated": "Low", "entry": "Low", "mid": "Medium", "high": "High", "ultra": "High" }, "impact": "high", "visualCost": "minor", "why": "Dynamic shadows are the heaviest Source setting." },
+      { "setting": "Model / Texture Detail", "byTier": { "integrated": "Low", "entry": "Medium", "mid": "High", "high": "High", "ultra": "High" }, "impact": "medium", "visualCost": "minor", "why": "Cheap on healthy VRAM; lower only on integrated graphics." },
+      { "setting": "Anti-Aliasing (MSAA)", "byTier": { "integrated": "None", "entry": "2x", "mid": "4x", "high": "4x", "ultra": "8x" }, "impact": "high", "visualCost": "minor", "why": "MSAA scales expensively — the biggest single dial in Source games." },
+      { "setting": "Effect / Shader Detail", "byTier": { "integrated": "Low", "entry": "Medium", "mid": "High", "high": "High", "ultra": "High" }, "impact": "medium", "visualCost": "minor", "why": "Shader/effect detail costs frames in explosions and smoke." }
+    ]
+  },
+  "universal": [
+    { "setting": "Resolution Scale / Render Scale", "byTier": { "integrated": "70-80%", "entry": "85%", "mid": "100%", "high": "100%", "ultra": "100%" }, "impact": "high", "visualCost": "noticeable", "why": "Rendering below native is the single biggest FPS lever on a weak GPU — prefer a real upscaler (below) if the game has one." },
+    { "setting": "Shadow Quality", "byTier": { "integrated": "Low", "entry": "Low", "mid": "Medium", "high": "High", "ultra": "High" }, "impact": "high", "visualCost": "noticeable", "why": "Shadows are the most expensive setting in almost every 3D game." },
+    { "setting": "Anti-Aliasing", "byTier": { "integrated": "Off/FXAA", "entry": "FXAA", "mid": "TAA", "high": "TAA", "ultra": "TAA" }, "impact": "medium", "visualCost": "minor", "why": "Prefer cheap post-process AA (FXAA/TAA) over MSAA when GPU-bound." },
+    { "setting": "Texture Quality", "byTier": { "integrated": "Medium", "entry": "High", "mid": "High", "high": "Ultra", "ultra": "Ultra" }, "impact": "low", "visualCost": "noticeable", "why": "Textures barely cost FPS if you have enough VRAM — keep them high and cut shadows/effects instead." },
+    { "setting": "Effects / Post-Processing", "byTier": { "integrated": "Low", "entry": "Low", "mid": "Medium", "high": "High", "ultra": "High" }, "impact": "medium", "visualCost": "minor", "why": "Bloom, motion blur and particles add up for little gameplay value." }
+  ]
+}

@@ -25,8 +25,9 @@ use tauri::{
 
 use modules::{
     ai_backend, benchmark, change_log, config, driver_doctor, fix_catalog, game_detector,
-    game_profiler, game_profiles, hardware_profiler, health_scan, network_monitor, profile_store,
-    rollback_engine, server_ping, speed_test, system_monitor, tweak_catalog, tweaks_engine,
+    game_profiler, game_profiles, game_settings, hardware_profiler, hardware_tier, health_scan,
+    network_monitor, profile_store, rollback_engine, server_ping, speed_test, system_monitor,
+    tweak_catalog, tweaks_engine,
 };
 
 fn show_main(app: &tauri::AppHandle) {
@@ -133,9 +134,11 @@ pub fn run() {
             ping,
             check_for_updates,
             hardware_profiler::get_hardware_profile,
+            hardware_tier::get_hardware_tier,
             game_detector::get_installed_games,
             game_profiles::get_recommended_tweaks,
             game_profiler::get_game_profile,
+            game_settings::get_settings_advice,
             network_monitor::get_network_info,
             server_ping::ping_game_servers,
             server_ping::list_game_catalog,

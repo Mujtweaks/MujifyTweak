@@ -20,6 +20,7 @@ import type {
   PingResponse,
   Profile,
   ScanResult,
+  SettingsAdvice,
 } from "./types";
 
 /**
@@ -92,6 +93,21 @@ export async function getGameProfile(
     return await invoke<GameProfileResult>("get_game_profile", { gameName, installPath });
   } catch (err) {
     console.error("get_game_profile failed:", err);
+    return null;
+  }
+}
+
+/** Game Settings Advisor — exact in-game graphics settings for this machine's
+ *  hardware tier, plus an upscaler pick. Recommendations only; read-only. */
+export async function getSettingsAdvice(
+  gameName: string,
+  installPath: string | null,
+): Promise<SettingsAdvice | null> {
+  if (!isTauri) return null;
+  try {
+    return await invoke<SettingsAdvice>("get_settings_advice", { gameName, installPath });
+  } catch (err) {
+    console.error("get_settings_advice failed:", err);
     return null;
   }
 }

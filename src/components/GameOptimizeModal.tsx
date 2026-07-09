@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
-import { Bookmark, Sparkles, ThumbsDown, X, Zap } from "lucide-react";
+import { Bookmark, MonitorCog, Sparkles, ThumbsDown, X, Zap } from "lucide-react";
 import GameArt from "./GameArt";
 import RiskBadge from "./RiskBadge";
 import ApplyConfirmModal from "./ApplyConfirmModal";
+import SettingsAdvisor from "./SettingsAdvisor";
 import { getGameProfile, saveProfile, scanTweaks } from "../lib/backend";
 import { useSystemStore } from "../store/systemStore";
 import { useTweakStore } from "../store/tweakStore";
@@ -164,6 +165,13 @@ export default function GameOptimizeModal({ game, onClose }: { game: GameInfo; o
                   </ul>
                 </>
               )}
+              {/* Game Settings Advisor — the real FPS engine (in-game graphics) */}
+              <div className="mt-5 border-t border-edge pt-4">
+                <p className="mb-2.5 flex items-center gap-2 text-[11px] font-semibold uppercase tracking-widest text-txt3">
+                  <MonitorCog size={13} /> Game Settings · The Real FPS Engine
+                </p>
+                <SettingsAdvisor game={game} onMeasure={onClose} />
+              </div>
             </>
           )}
         </div>

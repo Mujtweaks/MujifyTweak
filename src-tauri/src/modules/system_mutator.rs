@@ -90,6 +90,14 @@ pub trait SystemMutator {
     /// Set the primary display to an exact mode — used to raise the refresh rate
     /// and to restore the prior mode on undo.
     fn set_display_mode(&self, mode: DisplayMode) -> Result<(), String>;
+    /// Read a file's full bytes (None if it doesn't exist). Foundation for the
+    /// future auto-apply-game-settings phase; the capture side of a FileEdit.
+    fn read_file(&self, path: &str) -> Option<Vec<u8>>;
+    /// Write bytes to a file, creating or overwriting it.
+    fn write_file(&self, path: &str, bytes: &[u8]) -> Result<(), String>;
+    /// Delete a file (used to undo a FileEdit that created a new file). Missing
+    /// file is treated as success.
+    fn delete_file(&self, path: &str) -> Result<(), String>;
 }
 
 // ---- RealMutator ------------------------------------------------------------
@@ -444,6 +452,20 @@ impl SystemMutator for RealMutator {
             Err(format!("ChangeDisplaySettingsEx failed (code {})", res.0))
         }
     }
+
+    fn read_file(&self, path: &str) -> Option<Vec<u8>> {
+        std::fs::read(path).ok()
+    }
+    fn write_file(&self, path: &str, bytes: &[u8]) -> Result<(), String> {
+        std::fs::write(path, bytes).map_err(|e| format!("write {path}: {e}"))
+    }
+    fn delete_file(&self, path: &str) -> Result<(), String> {
+        match std::fs::remove_file(path) {
+            Ok(()) => Ok(()),
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(()),
+            Err(e) => Err(format!("delete {path}: {e}")),
+        }
+    }
 }
 
 // ---- MockMutator (tests only — touches nothing real) ------------------------
@@ -457,6 +479,7 @@ pub struct MockMutator {
     core_parking_min: RefCell<Option<u32>>,
     display: RefCell<Option<DisplayMode>>,
     display_max_refresh: RefCell<Option<u32>>,
+    files: RefCell<HashMap<String, Vec<u8>>>,
     pub calls: RefCell<Vec<String>>,
 }
 
@@ -471,8 +494,15 @@ impl MockMutator {
             core_parking_min: RefCell::new(Some(5)),
             display: RefCell::new(None),
             display_max_refresh: RefCell::new(None),
+            files: RefCell::new(HashMap::new()),
             calls: RefCell::new(Vec::new()),
         }
+    }
+
+    /// Seed the in-memory filesystem with a file (for FileEdit tests).
+    pub fn with_file(self, path: &str, bytes: &[u8]) -> Self {
+        self.files.borrow_mut().insert(path.to_string(), bytes.to_vec());
+        self
     }
 
     /// Seed a display: current resolution + current refresh + the panel's max.
@@ -615,6 +645,20 @@ impl SystemMutator for MockMutator {
     fn set_display_mode(&self, mode: DisplayMode) -> Result<(), String> {
         self.record(format!("set_display_mode {}x{}@{}", mode.width, mode.height, mode.refresh_hz));
         *self.display.borrow_mut() = Some(mode);
+        Ok(())
+    }
+
+    fn read_file(&self, path: &str) -> Option<Vec<u8>> {
+        self.files.borrow().get(path).cloned()
+    }
+    fn write_file(&self, path: &str, bytes: &[u8]) -> Result<(), String> {
+        self.record(format!("write_file {path} ({} bytes)", bytes.len()));
+        self.files.borrow_mut().insert(path.to_string(), bytes.to_vec());
+        Ok(())
+    }
+    fn delete_file(&self, path: &str) -> Result<(), String> {
+        self.record(format!("delete_file {path}"));
+        self.files.borrow_mut().remove(path);
         Ok(())
     }
 }
