@@ -27,6 +27,7 @@ export type PageId =
   | "history"
   | "drivers"
   | "startup"
+  | "support"
   | "settings";
 
 export interface NavItem {
@@ -52,6 +53,7 @@ export const PAGE_TITLES: Record<PageId, string> = {
   history: "History",
   drivers: "Drivers",
   startup: "Startup",
+  support: "Support",
   settings: "Settings",
 };
 

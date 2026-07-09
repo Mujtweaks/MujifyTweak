@@ -8,8 +8,17 @@ import {
   toggleMaximizeWindow,
 } from "../lib/tauri";
 import { useGameStore } from "../store/gameStore";
+import { useSettingsStore, displayName } from "../store/settingsStore";
+import { DISCORD_INVITE, openExternal } from "../lib/links";
+import DiscordIcon from "./DiscordIcon";
 import BoostButton from "./BoostButton";
 import { PAGE_TITLES, type PageId } from "../lib/nav";
+
+function greeting(name: string): string {
+  const h = new Date().getHours();
+  const tod = h < 12 ? "morning" : h < 18 ? "afternoon" : "evening";
+  return `Good ${tod}, ${displayName(name)}`;
+}
 
 interface TopBarProps {
   page: PageId;
@@ -18,6 +27,7 @@ interface TopBarProps {
 
 export default function TopBar({ page, onNavigate }: TopBarProps) {
   const activeGame = useGameStore((s) => s.activeGame);
+  const userName = useSettingsStore((s) => s.userName);
   const gameModeEnabled = useGameStore((s) => s.gameModeEnabled);
   const toggleGameMode = useGameStore((s) => s.toggleGameMode);
   const [maximized, setMaximized] = useState(false);
@@ -30,8 +40,8 @@ export default function TopBar({ page, onNavigate }: TopBarProps) {
 
   return (
     <header data-tauri-drag-region className="flex h-[56px] shrink-0 items-center gap-3 border-b border-edge bg-[#0d0d0d] pl-5">
-      <span data-tauri-drag-region className="text-xl font-bold uppercase tracking-tight text-txt">
-        {PAGE_TITLES[page]}
+      <span data-tauri-drag-region className={`text-xl font-bold tracking-tight text-txt ${page === "home" ? "" : "uppercase"}`}>
+        {page === "home" ? greeting(userName) : PAGE_TITLES[page]}
       </span>
 
       <div data-tauri-drag-region className="flex flex-1 justify-center">
@@ -60,6 +70,9 @@ export default function TopBar({ page, onNavigate }: TopBarProps) {
       </div>
 
       <div className="flex items-center gap-0.5 pl-1">
+        <button onClick={() => void openExternal(DISCORD_INVITE)} title="Free live support" className="grid h-9 w-9 place-items-center rounded-btn text-txt3 transition-colors hover:bg-white/5 hover:text-txt">
+          <DiscordIcon className="h-4 w-4 [&_path]:fill-current" />
+        </button>
         <button onClick={() => onNavigate("changelog")} title="Recent changes" className="grid h-9 w-9 place-items-center rounded-btn text-txt3 transition-colors hover:bg-white/5 hover:text-txt">
           <Bell size={16} strokeWidth={1.75} />
         </button>

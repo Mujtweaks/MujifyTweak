@@ -35,6 +35,17 @@ export default function Toaster() {
               {t.description && (
                 <p className="mt-0.5 text-[11.5px] leading-snug text-txt2">{t.description}</p>
               )}
+              {t.action && (
+                <button
+                  onClick={() => {
+                    window.location.hash = t.action!.navigateTo;
+                    dismiss(t.id);
+                  }}
+                  className="mt-1.5 text-[11.5px] font-semibold text-accent hover:text-accent-hi"
+                >
+                  {t.action.label} →
+                </button>
+              )}
             </div>
             <button
               onClick={() => dismiss(t.id)}

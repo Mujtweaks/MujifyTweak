@@ -21,6 +21,8 @@ import type {
   Profile,
   ScanResult,
   SettingsAdvice,
+  GameSession,
+  DetectiveReport,
 } from "./types";
 
 /**
@@ -126,6 +128,47 @@ export async function getSettingsAdvice(
   }
 }
 
+/** FPS Drop Detective — per-game session history (oldest→newest). Read-only. */
+export async function getGameSessions(game: string): Promise<GameSession[]> {
+  if (!isTauri) return [];
+  try {
+    return await invoke<GameSession[]>("get_game_sessions", { game });
+  } catch {
+    return [];
+  }
+}
+
+/** The latest Detective report, if a game regressed below its baseline. */
+export async function getDetectiveReport(): Promise<DetectiveReport | null> {
+  if (!isTauri) return null;
+  try {
+    return await invoke<DetectiveReport | null>("get_detective_report");
+  } catch {
+    return null;
+  }
+}
+
+/** Dismiss the current Detective report (user acknowledged it). */
+export async function dismissDetectiveReport(): Promise<void> {
+  if (!isTauri) return;
+  try {
+    await invoke("dismiss_detective_report");
+  } catch {
+    /* ignore */
+  }
+}
+
+/** Build the plain-text system report for the Support hub (no keys, no name). */
+export async function getSupportReport(activeGame: string | null): Promise<string> {
+  if (!isTauri) return "";
+  try {
+    return await invoke<string>("get_support_report", { activeGame });
+  } catch (err) {
+    console.error("get_support_report failed:", err);
+    return "";
+  }
+}
+
 /** Bottleneck / Health Scan — detects real misconfigurations. Read-only, fixes nothing. */
 export async function scanSystemHealth(
   gameName: string | null,
@@ -161,7 +204,7 @@ export async function repairDrivers(): Promise<string | null> {
     return msg;
   } catch (err) {
     console.error("repair_drivers failed:", err);
-    toast.error("Driver repair failed", String(err));
+    toast.errorHelp("Driver repair failed", String(err));
     return null;
   }
 }
@@ -194,7 +237,7 @@ export async function applyFix(id: string): Promise<boolean> {
     return true;
   } catch (err) {
     console.error("apply_fix failed:", err);
-    toast.error("Fix failed", String(err));
+    toast.errorHelp("Fix failed", String(err));
     return false;
   }
 }
@@ -335,7 +378,7 @@ export async function applyTweaks(
     return outcome;
   } catch (err) {
     console.error("apply_tweaks failed:", err);
-    toast.error("Apply failed", String(err));
+    toast.errorHelp("Apply failed", String(err));
     return null;
   }
 }
@@ -347,7 +390,7 @@ export async function revertSingle(entryId: string): Promise<void> {
     toast.success("Tweak reverted", "Restored to its previous value.");
   } catch (err) {
     console.error("revert_single failed:", err);
-    toast.error("Revert failed", String(err));
+    toast.errorHelp("Revert failed", String(err));
   }
 }
 
@@ -359,7 +402,7 @@ export async function revertAll(): Promise<number> {
     return n;
   } catch (err) {
     console.error("revert_all failed:", err);
-    toast.error("Revert failed", String(err));
+    toast.errorHelp("Revert failed", String(err));
     return 0;
   }
 }

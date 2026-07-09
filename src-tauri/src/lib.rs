@@ -24,10 +24,10 @@ use tauri::{
 };
 
 use modules::{
-    ai_backend, benchmark, change_log, config, driver_doctor, fix_catalog, game_detector,
-    game_profiler, game_profiles, game_settings, hardware_profiler, hardware_tier, health_scan,
-    logger, network_monitor, profile_store, rollback_engine, server_ping, speed_test,
-    system_monitor, tweak_catalog, tweaks_engine,
+    ai_backend, benchmark, change_journal, change_log, config, driver_doctor, fix_catalog,
+    game_detector, game_profiler, game_profiles, game_settings, hardware_profiler, hardware_tier,
+    health_scan, logger, network_monitor, profile_store, rollback_engine, server_ping, sessions,
+    speed_test, support, system_monitor, tweak_catalog, tweaks_engine,
 };
 
 fn show_main(app: &tauri::AppHandle) {
@@ -180,6 +180,9 @@ pub fn run() {
             system_monitor::start(handle.clone());
             network_monitor::start(handle.clone());
             game_detector::start(handle.clone());
+            // FPS Drop Detective: snapshot system facts at launch + once a day,
+            // journaling what changed (read-only, local).
+            change_journal::start();
             build_tray(&handle)?;
             Ok(())
         })
@@ -221,6 +224,11 @@ pub fn run() {
             benchmark::run_benchmark,
             benchmark::get_latest_report,
             logger::open_logs_folder,
+            sessions::get_game_sessions,
+            sessions::get_detective_report,
+            sessions::dismiss_detective_report,
+            change_journal::get_change_journal,
+            support::get_support_report,
             config::get_api_key,
             config::set_api_key,
             ai_backend::ai_chat,

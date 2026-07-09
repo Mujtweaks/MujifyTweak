@@ -1,0 +1,30 @@
+// Single source of truth for external links. Every one of these opens in the
+// SYSTEM default browser (never inside the app window), via the opener plugin's
+// strict allowlist capability. Keep this list tight — only what the allowlist
+// permits belongs here. The website is a one-line swap when the final domain
+// is chosen.
+export const DISCORD_INVITE = "https://discord.gg/zg4WXbJ9uw";
+export const WEBSITE = "https://mujifytweaks.site.je";
+export const GITHUB_REPO = "https://github.com/Mujtweaks/MujifyTweak";
+export const GITHUB_RELEASES = "https://github.com/Mujtweaks/MujifyTweak/releases";
+
+// The only URLs the app may open externally (defense-in-depth on top of the
+// Tauri opener capability allowlist). NOTE: if the website domain changes, update
+// it here AND in src-tauri/capabilities/default.json.
+const ALLOWED = [DISCORD_INVITE, WEBSITE, GITHUB_RELEASES];
+
+/** Open an external link in the SYSTEM browser — never inside the app window.
+ *  Refuses anything not in the allowlist. */
+export async function openExternal(url: string): Promise<void> {
+  const ok = ALLOWED.some((a) => url === a || url.startsWith(a));
+  if (!ok) {
+    console.warn("blocked non-allowlisted external url:", url);
+    return;
+  }
+  try {
+    const { openUrl } = await import("@tauri-apps/plugin-opener");
+    await openUrl(url);
+  } catch (e) {
+    console.error("openUrl failed:", e);
+  }
+}

@@ -249,6 +249,39 @@ export interface SettingsAdvice {
   upscaler: UpscalerAdvice | null;
 }
 
+/** FPS Drop Detective — one recorded gaming session (real measured data only). */
+export interface GameSession {
+  schemaVersion: number;
+  game: string;
+  date: number;
+  durationSecs: number;
+  avgFps: number | null;
+  onePercentLow: number | null;
+  stabilityMs: number | null;
+  bottleneck: string | null;
+  avgCpuTempC: number | null;
+  avgGpuTempC: number | null;
+  activeTweaks: string[];
+}
+
+/** One entry in the system change journal ("here's what changed"). */
+export interface JournalEntry {
+  timestamp: number;
+  kind: string;
+  summary: string;
+  action: string | null; // driver_rollback | health_scan | power_high_perf | max_refresh_rate
+}
+
+/** The Detective's report card when a game regresses below its baseline. */
+export interface DetectiveReport {
+  game: string;
+  dropPct: number;
+  baselineFps: number;
+  currentFps: number;
+  changes: JournalEntry[];
+  generatedAt: number;
+}
+
 /** A device/driver reporting a problem (Device Manager ConfigManagerErrorCode). */
 export interface DeviceIssue {
   name: string;

@@ -6,6 +6,7 @@ import StatGauges from "../components/StatGauges";
 import PerformanceChart from "../components/PerformanceChart";
 import RecentActivity from "../components/RecentActivity";
 import PingOptimizer from "../components/PingOptimizer";
+import DetectiveCard from "../components/DetectiveCard";
 import { useSystemStore } from "../store/systemStore";
 import type { PageId } from "../lib/nav";
 
@@ -50,6 +51,9 @@ export default function Dashboard({ onNavigate }: { onNavigate: (page: PageId) =
 
   return (
     <div className="flex h-full flex-col gap-4">
+      {/* FPS Drop Detective — only renders when a game regressed below baseline */}
+      <DetectiveCard onNavigate={onNavigate} />
+
       <div className="grid min-h-0 flex-1 grid-cols-[1.62fr_1fr] gap-4">
         <section className="flex min-h-0 flex-col gap-4">
           <ScoreGauge />

@@ -101,6 +101,15 @@ pub fn start(app: AppHandle) {
             let ac = anti_cheat_guard::evaluate(&stems);
             let _ = app.emit("anti_cheat_status", &ac);
 
+            // FPS Drop Detective: accumulate this game's live session; on exit it
+            // records the session and, if the run regressed vs. the game's
+            // baseline, returns a report we surface on the Dashboard.
+            if let Some(report) =
+                super::sessions::on_tick(last_active.as_ref().map(|g| g.name.as_str()))
+            {
+                let _ = app.emit("detective_report", &report);
+            }
+
             thread::sleep(Duration::from_secs(2));
         }
     });

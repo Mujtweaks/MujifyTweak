@@ -27,8 +27,11 @@ dist-ssr
 src-tauri/target
 src-tauri/gen/schemas
 
-# Local secrets — AI API keys + updater signing key, never committed
+# Local secrets — never committed. The real dev secrets live OUTSIDE this repo;
+# these patterns keep any stray copy from ever being tracked.
 .env
 .env.*
 *.key
 *.key.pub
+mx.dev.cfg
+*.dev.cfg

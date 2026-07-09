@@ -9,6 +9,7 @@
 pub mod ai_backend;
 pub mod anti_cheat_guard;
 pub mod benchmark;
+pub mod change_journal;
 pub mod change_log;
 pub mod config;
 pub mod driver_doctor;
@@ -28,7 +29,9 @@ pub mod power_util;
 pub mod profile_store;
 pub mod rollback_engine;
 pub mod server_ping;
+pub mod sessions;
 pub mod speed_test;
+pub mod support;
 pub mod system_monitor;
 pub mod system_mutator;
 pub mod tweak_catalog;

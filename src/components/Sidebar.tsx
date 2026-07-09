@@ -1,9 +1,11 @@
+import { useLayoutEffect, useRef, useState } from "react";
 import {
   Activity,
   Bot,
   Gamepad2,
   Globe,
   LayoutDashboard,
+  LifeBuoy,
   Rocket,
   Settings,
   SlidersHorizontal,
@@ -13,6 +15,7 @@ import {
 import type { PageId } from "../lib/nav";
 import { useSystemStore } from "../store/systemStore";
 import { useGameStore } from "../store/gameStore";
+import { displayName, useSettingsStore } from "../store/settingsStore";
 import logo from "../assets/logo.png";
 
 interface SidebarProps {
@@ -40,26 +43,41 @@ const GROUP_2: Item[] = [
 ];
 const GROUP_3: Item[] = [{ id: "settings", label: "Settings", icon: Settings }];
 
-function IconButton({ item, active, onClick }: { item: Item; active: boolean; onClick: () => void }) {
-  const Icon = item.icon;
-  return (
-    <button
-      onClick={onClick}
-      title={item.label}
-      className={`grid h-11 w-11 place-items-center rounded-xl transition-colors ${
-        active ? "bg-accent text-white" : "text-txt3 hover:bg-white/8 hover:text-txt2"
-      }`}
-    >
-      <Icon size={19} strokeWidth={1.75} />
-    </button>
-  );
-}
-
 export default function Sidebar({ page, onNavigate }: SidebarProps) {
   const backendConnected = useSystemStore((s) => s.backendConnected);
   const stats = useSystemStore((s) => s.stats);
   const antiCheatActive = useGameStore((s) => s.antiCheatActive);
+  const userName = useSettingsStore((s) => s.userName);
   const live = !!stats;
+
+  // Sliding active indicator — measure the active item and let CSS transition it.
+  const itemRefs = useRef<Record<string, HTMLButtonElement | null>>({});
+  const [ind, setInd] = useState({ top: 0, height: 44, visible: false });
+  useLayoutEffect(() => {
+    const el = itemRefs.current[page];
+    if (el) setInd({ top: el.offsetTop, height: el.offsetHeight, visible: true });
+    else setInd((p) => ({ ...p, visible: false })); // page not in the rail
+  }, [page]);
+
+  const renderItem = (it: Item) => {
+    const Icon = it.icon;
+    const active = page === it.id;
+    return (
+      <button
+        key={it.id}
+        ref={(el) => {
+          itemRefs.current[it.id] = el;
+        }}
+        onClick={() => onNavigate(it.id)}
+        title={it.label}
+        className={`group relative z-10 grid h-11 w-11 place-items-center rounded-xl transition-colors ${
+          active ? "text-white" : "text-txt3 hover:text-txt2"
+        }`}
+      >
+        <Icon size={19} strokeWidth={1.75} className="transition-transform duration-[120ms] ease-out group-hover:scale-110" />
+      </button>
+    );
+  };
 
   return (
     <aside className="flex w-[64px] shrink-0 flex-col items-center border-r border-edge bg-[#0d0d0d] py-4">
@@ -68,22 +86,39 @@ export default function Sidebar({ page, onNavigate }: SidebarProps) {
         <img src={logo} alt="Mujify" className="h-9 w-[120px] max-w-none object-cover object-left mix-blend-screen brightness-125" draggable={false} />
       </div>
 
-      <nav className="flex flex-1 flex-col items-center gap-1.5">
-        {GROUP_1.map((it) => <IconButton key={it.id} item={it} active={page === it.id} onClick={() => onNavigate(it.id)} />)}
+      <nav className="relative flex flex-1 flex-col items-center gap-1.5">
+        {/* The single red indicator that slides between nav items */}
+        <span
+          className={`slide-indicator pointer-events-none absolute left-1/2 top-0 z-0 w-11 rounded-xl bg-accent ${ind.visible ? "opacity-100" : "opacity-0"}`}
+          style={{ height: ind.height, transform: `translate(-50%, ${ind.top}px)` }}
+        />
+        {GROUP_1.map(renderItem)}
         <span className="my-1.5 h-px w-8 bg-edge" />
-        {GROUP_2.map((it) => <IconButton key={it.id} item={it} active={page === it.id} onClick={() => onNavigate(it.id)} />)}
+        {GROUP_2.map(renderItem)}
         <span className="my-1.5 h-px w-8 bg-edge" />
-        {GROUP_3.map((it) => <IconButton key={it.id} item={it} active={page === it.id} onClick={() => onNavigate(it.id)} />)}
+        {GROUP_3.map(renderItem)}
       </nav>
 
-      {/* Guard dot + avatar */}
+      {/* Footer — Get Help, guard dot, and the personalized avatar */}
       <div className="flex flex-col items-center gap-3">
+        <button
+          onClick={() => onNavigate("support")}
+          title="Get help — free live support"
+          className={`grid h-9 w-9 place-items-center rounded-xl transition-colors ${
+            page === "support" ? "bg-accent text-white" : "text-txt3 hover:bg-white/8 hover:text-txt2"
+          }`}
+        >
+          <LifeBuoy size={18} strokeWidth={1.75} />
+        </button>
         <span
           title={antiCheatActive ? "System Guard — protected game active" : backendConnected ? "System Guard — Protected" : "Connecting…"}
           className={`live-dot h-2 w-2 rounded-full ${antiCheatActive ? "bg-warning text-warning" : live ? "bg-success text-success" : "bg-txt3"}`}
         />
-        <span title="GAMER · Free" className="grid h-9 w-9 place-items-center rounded-full border border-edge bg-card text-[13px] font-bold text-txt2">
-          G
+        <span
+          title={`${displayName(userName)} · Free`}
+          className="grid h-9 w-9 place-items-center rounded-full border border-edge bg-card text-[13px] font-bold text-txt2"
+        >
+          {displayName(userName).charAt(0).toUpperCase()}
         </span>
       </div>
     </aside>

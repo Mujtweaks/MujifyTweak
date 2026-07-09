@@ -8,18 +8,25 @@ import { create } from "zustand";
 
 export type ToastType = "success" | "warning" | "error" | "info";
 
+/** Optional action link on a toast — navigates to a page via the hash router. */
+export interface ToastAction {
+  label: string;
+  navigateTo: string;
+}
+
 export interface Toast {
   id: number;
   type: ToastType;
   title: string;
   description?: string;
+  action?: ToastAction;
   /** Set briefly before removal so the Toaster can play the exit animation. */
   leaving?: boolean;
 }
 
 interface ToastState {
   toasts: Toast[];
-  push: (t: { type: ToastType; title: string; description?: string }) => void;
+  push: (t: { type: ToastType; title: string; description?: string; action?: ToastAction }) => void;
   dismiss: (id: number) => void;
 }
 
@@ -31,9 +38,9 @@ let nextId = 1;
 export const useToastStore = create<ToastState>((set, get) => ({
   toasts: [],
 
-  push: ({ type, title, description }) => {
+  push: ({ type, title, description, action }) => {
     const id = nextId++;
-    set((s) => ({ toasts: [...s.toasts, { id, type, title, description }] }));
+    set((s) => ({ toasts: [...s.toasts, { id, type, title, description, action }] }));
     setTimeout(() => get().dismiss(id), VISIBLE_MS);
   },
 
@@ -55,8 +62,13 @@ export const toast = {
     useToastStore.getState().push({ type: "success", title, description }),
   warning: (title: string, description?: string) =>
     useToastStore.getState().push({ type: "warning", title, description }),
-  error: (title: string, description?: string) =>
-    useToastStore.getState().push({ type: "error", title, description }),
+  error: (title: string, description?: string, action?: ToastAction) =>
+    useToastStore.getState().push({ type: "error", title, description, action }),
   info: (title: string, description?: string) =>
     useToastStore.getState().push({ type: "info", title, description }),
+  /** An error toast that offers free human help (opens the Support hub). */
+  errorHelp: (title: string, description?: string) =>
+    useToastStore
+      .getState()
+      .push({ type: "error", title, description, action: { label: "Get free help", navigateTo: "support" } }),
 };

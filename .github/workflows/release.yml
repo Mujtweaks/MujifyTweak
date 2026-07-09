@@ -3,15 +3,14 @@ name: Release
 # Builds, signs, and publishes the Windows installer + updater manifest.
 # Triggers on a version tag (recommended) or manual dispatch.
 #
-# Required repo secrets (Settings → Secrets and variables → Actions):
-#   TAURI_SIGNING_PRIVATE_KEY           full contents of mujify-updater.key
+# The signing key + password are provided via GitHub Actions secrets (Settings →
+# Secrets and variables → Actions) — they never live in the repo:
+#   TAURI_SIGNING_PRIVATE_KEY           the updater signing private key
 #   TAURI_SIGNING_PRIVATE_KEY_PASSWORD  the key password
 #
-# NOTE: the updater endpoint in tauri.conf.json points at
-# github.com/REPLACE_WITH_GITHUB_OWNER/... — set the real owner there (see the
-# "Release configuration" section of README.md for every spot to update). The
-# repo must be PUBLIC (or the assets hosted somewhere publicly reachable) or the
-# auto-updater's unauthenticated fetch will 404. Building/signing works regardless.
+# The updater endpoint (tauri.conf.json) points at the public repo
+# github.com/Mujtweaks/MujifyTweak. Until a release with a latest.json asset
+# exists, the app's update check simply finds nothing and skips gracefully.
 
 on:
   push:

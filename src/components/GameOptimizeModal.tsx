@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
-import { Bookmark, MonitorCog, Sparkles, ThumbsDown, X, Zap } from "lucide-react";
+import { Bookmark, History, MonitorCog, Sparkles, ThumbsDown, X, Zap } from "lucide-react";
 import GameArt from "./GameArt";
 import RiskBadge from "./RiskBadge";
 import ApplyConfirmModal from "./ApplyConfirmModal";
 import SettingsAdvisor from "./SettingsAdvisor";
+import GameHistory from "./GameHistory";
 import { getGameProfile, saveProfile, scanTweaks } from "../lib/backend";
 import { useSystemStore } from "../store/systemStore";
 import { useTweakStore } from "../store/tweakStore";
@@ -171,6 +172,14 @@ export default function GameOptimizeModal({ game, onClose }: { game: GameInfo; o
                   <MonitorCog size={13} /> Game Settings · The Real FPS Engine
                 </p>
                 <SettingsAdvisor game={game} onMeasure={onClose} />
+              </div>
+
+              {/* FPS history — the Detective's memory for this game */}
+              <div className="mt-5 border-t border-edge pt-4">
+                <p className="mb-2.5 flex items-center gap-2 text-[11px] font-semibold uppercase tracking-widest text-txt3">
+                  <History size={13} /> History · Your FPS Over Time
+                </p>
+                <GameHistory game={game.name} />
               </div>
             </>
           )}

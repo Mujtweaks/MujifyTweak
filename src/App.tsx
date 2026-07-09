@@ -17,6 +17,7 @@ import ReportView from "./pages/ReportView";
 import History from "./pages/History";
 import DriverManager from "./pages/DriverManager";
 import StartupManager from "./pages/StartupManager";
+import Support from "./pages/Support";
 import Settings from "./pages/Settings";
 import Toaster from "./components/Toaster";
 import WelcomeModal from "./components/WelcomeModal";
@@ -25,7 +26,7 @@ import { toast } from "./store/toastStore";
 import { initEventBridge, listenNavigate } from "./lib/events";
 import { NAV_ITEMS, type PageId } from "./lib/nav";
 
-const VALID_PAGES = new Set<string>([...NAV_ITEMS.map((n) => n.id), "changelog", "report"]);
+const VALID_PAGES = new Set<string>([...NAV_ITEMS.map((n) => n.id), "changelog", "report", "support"]);
 
 function pageFromHash(): PageId | null {
   const h = window.location.hash.replace(/^#/, "");
@@ -114,6 +115,8 @@ export default function App() {
         return <DriverManager />;
       case "startup":
         return <StartupManager />;
+      case "support":
+        return <Support onNavigate={setPage} />;
       case "settings":
         return <Settings />;
     }

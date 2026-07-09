@@ -70,6 +70,20 @@ pub fn install_panic_hook() {
     }));
 }
 
+/// The last `n` WARN/ERROR lines from the log — for the Copy System Report so a
+/// user can share what went wrong. Never contains keys or PII (callers sanitize).
+pub fn last_errors(n: usize) -> Vec<String> {
+    let content = std::fs::read_to_string(logs_dir().join("mujify.log")).unwrap_or_default();
+    let mut lines: Vec<String> = content
+        .lines()
+        .filter(|l| l.contains("ERROR") || l.contains("WARN"))
+        .map(|s| s.to_string())
+        .collect();
+    let start = lines.len().saturating_sub(n);
+    lines.drain(0..start);
+    lines
+}
+
 /// Tauri command — open the logs folder in the OS file manager (Settings → About).
 #[tauri::command]
 pub fn open_logs_folder() -> Result<(), String> {
