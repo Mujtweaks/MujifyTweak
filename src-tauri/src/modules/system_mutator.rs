@@ -21,6 +21,21 @@ use serde::{Deserialize, Serialize};
 
 const CREATE_NO_WINDOW: u32 = 0x0800_0000;
 
+/// Interpret an `sc start` / `sc stop` exit code for our intent. `sc.exe` returns
+/// the Win32 error as its exit code, and two of them mean "already in the state
+/// we wanted", which is success for us, not failure:
+///   1056 = ERROR_SERVICE_ALREADY_RUNNING (a `start` that was a no-op)
+///   1062 = ERROR_SERVICE_NOT_ACTIVE      (a `stop` that was a no-op)
+/// Every other non-zero code is a real failure (e.g. 5 = access denied).
+fn sc_state_change_ok(exit_code: i32, want_running: bool) -> bool {
+    match exit_code {
+        0 => true,
+        1056 if want_running => true,  // already running
+        1062 if !want_running => true, // already stopped
+        _ => false,
+    }
+}
+
 #[derive(Serialize, Deserialize, Clone, Copy, PartialEq, Debug)]
 pub enum RegHive {
     Hkcu,
@@ -33,6 +48,15 @@ pub struct ServiceState {
     /// "boot" | "system" | "auto" | "demand" | "disabled"
     pub start_type: String,
     pub running: bool,
+}
+
+/// Primary-display mode — enough to raise the refresh rate at the current
+/// resolution and to restore the exact prior mode on undo.
+#[derive(Serialize, Deserialize, Clone, Copy, PartialEq, Debug)]
+pub struct DisplayMode {
+    pub width: u32,
+    pub height: u32,
+    pub refresh_hz: u32,
 }
 
 pub trait SystemMutator {
@@ -59,6 +83,13 @@ pub trait SystemMutator {
     fn set_core_parking_min(&self, percent: u32) -> Result<(), String>;
     /// Fire-and-forget a one-shot repair command (used by the Fixes hub).
     fn run_command(&self, program: &str, args: &[&str]) -> Result<(), String>;
+    /// Current primary-display mode (width/height/refresh).
+    fn current_display_mode(&self) -> Option<DisplayMode>;
+    /// Highest refresh available at the current resolution.
+    fn max_refresh_for_current_mode(&self) -> Option<u32>;
+    /// Set the primary display to an exact mode — used to raise the refresh rate
+    /// and to restore the prior mode on undo.
+    fn set_display_mode(&self, mode: DisplayMode) -> Result<(), String>;
 }
 
 // ---- RealMutator ------------------------------------------------------------
@@ -192,17 +223,34 @@ impl SystemMutator for RealMutator {
     }
 
     fn set_service(&self, name: &str, state: &ServiceState) -> Result<(), String> {
-        // Set start type first, then reconcile the running state.
-        let _ = Command::new("sc")
+        // Set start type first — a real failure here (e.g. access denied) must
+        // surface, not be logged as a successful apply.
+        let cfg = Command::new("sc")
             .args(["config", name, "start=", &state.start_type])
             .creation_flags(CREATE_NO_WINDOW)
-            .status();
+            .status()
+            .map_err(|e| format!("sc config {name}: {e}"))?;
+        if !cfg.success() {
+            return Err(format!(
+                "Couldn't set '{name}' start type (sc config exited {}). It likely needs admin rights.",
+                cfg.code().unwrap_or(-1)
+            ));
+        }
+        // Reconcile the running state, tolerating "already in that state".
         let action = if state.running { "start" } else { "stop" };
-        let _ = Command::new("sc")
+        let st = Command::new("sc")
             .args([action, name])
             .creation_flags(CREATE_NO_WINDOW)
-            .status();
-        Ok(())
+            .status()
+            .map_err(|e| format!("sc {action} {name}: {e}"))?;
+        if sc_state_change_ok(st.code().unwrap_or(-1), state.running) {
+            Ok(())
+        } else {
+            Err(format!(
+                "Couldn't {action} service '{name}' (sc exited {}). It likely needs admin rights or is controlled by Windows.",
+                st.code().unwrap_or(-1)
+            ))
+        }
     }
 
     fn list_subkeys(&self, hive: RegHive, path: &str) -> Vec<String> {
@@ -291,14 +339,21 @@ impl SystemMutator for RealMutator {
     fn set_core_parking_min(&self, percent: u32) -> Result<(), String> {
         const SUB: &str = "0cc5b647-c1df-4637-891a-dec35c318583";
         let p = percent.to_string();
-        let _ = Command::new("powercfg")
-            .args(["-setacvalueindex", "SCHEME_CURRENT", "SUB_PROCESSOR", SUB, &p])
-            .creation_flags(CREATE_NO_WINDOW)
-            .status();
-        let _ = Command::new("powercfg")
-            .args(["-setdcvalueindex", "SCHEME_CURRENT", "SUB_PROCESSOR", SUB, &p])
-            .creation_flags(CREATE_NO_WINDOW)
-            .status();
+        // Write the AC and DC value indices — a failure here means the change
+        // never took, so it must not be reported as applied.
+        for flag in ["-setacvalueindex", "-setdcvalueindex"] {
+            let s = Command::new("powercfg")
+                .args([flag, "SCHEME_CURRENT", "SUB_PROCESSOR", SUB, &p])
+                .creation_flags(CREATE_NO_WINDOW)
+                .status()
+                .map_err(|e| format!("powercfg {flag}: {e}"))?;
+            if !s.success() {
+                return Err(format!(
+                    "powercfg {flag} failed (exit {}). Core parking needs admin rights.",
+                    s.code().unwrap_or(-1)
+                ));
+            }
+        }
         let status = Command::new("powercfg")
             .args(["-setactive", "SCHEME_CURRENT"])
             .creation_flags(CREATE_NO_WINDOW)
@@ -321,6 +376,74 @@ impl SystemMutator for RealMutator {
             .map(|_child| ())
             .map_err(|e| format!("failed to start {program}: {e}"))
     }
+
+    fn current_display_mode(&self) -> Option<DisplayMode> {
+        use windows::core::PCWSTR;
+        use windows::Win32::Graphics::Gdi::{EnumDisplaySettingsW, DEVMODEW, ENUM_CURRENT_SETTINGS};
+        let mut dm = DEVMODEW {
+            dmSize: std::mem::size_of::<DEVMODEW>() as u16,
+            ..Default::default()
+        };
+        let ok = unsafe { EnumDisplaySettingsW(PCWSTR::null(), ENUM_CURRENT_SETTINGS, &mut dm) };
+        if ok.as_bool() {
+            Some(DisplayMode {
+                width: dm.dmPelsWidth,
+                height: dm.dmPelsHeight,
+                refresh_hz: dm.dmDisplayFrequency,
+            })
+        } else {
+            None
+        }
+    }
+
+    fn max_refresh_for_current_mode(&self) -> Option<u32> {
+        use windows::core::PCWSTR;
+        use windows::Win32::Graphics::Gdi::{EnumDisplaySettingsW, DEVMODEW, ENUM_DISPLAY_SETTINGS_MODE};
+        let cur = self.current_display_mode()?;
+        let mut best = cur.refresh_hz;
+        let mut i = 0u32;
+        loop {
+            let mut dm = DEVMODEW {
+                dmSize: std::mem::size_of::<DEVMODEW>() as u16,
+                ..Default::default()
+            };
+            let ok = unsafe {
+                EnumDisplaySettingsW(PCWSTR::null(), ENUM_DISPLAY_SETTINGS_MODE(i), &mut dm)
+            };
+            if !ok.as_bool() {
+                break;
+            }
+            if dm.dmPelsWidth == cur.width && dm.dmPelsHeight == cur.height {
+                best = best.max(dm.dmDisplayFrequency);
+            }
+            i += 1;
+        }
+        Some(best)
+    }
+
+    fn set_display_mode(&self, mode: DisplayMode) -> Result<(), String> {
+        use windows::core::PCWSTR;
+        use windows::Win32::Graphics::Gdi::{
+            ChangeDisplaySettingsExW, CDS_UPDATEREGISTRY, DEVMODEW, DISP_CHANGE_SUCCESSFUL,
+            DM_DISPLAYFREQUENCY, DM_PELSHEIGHT, DM_PELSWIDTH,
+        };
+        let mut dm = DEVMODEW {
+            dmSize: std::mem::size_of::<DEVMODEW>() as u16,
+            ..Default::default()
+        };
+        dm.dmPelsWidth = mode.width;
+        dm.dmPelsHeight = mode.height;
+        dm.dmDisplayFrequency = mode.refresh_hz;
+        dm.dmFields = DM_PELSWIDTH | DM_PELSHEIGHT | DM_DISPLAYFREQUENCY;
+        let res = unsafe {
+            ChangeDisplaySettingsExW(PCWSTR::null(), Some(&dm), None, CDS_UPDATEREGISTRY, None)
+        };
+        if res == DISP_CHANGE_SUCCESSFUL {
+            Ok(())
+        } else {
+            Err(format!("ChangeDisplaySettingsEx failed (code {})", res.0))
+        }
+    }
 }
 
 // ---- MockMutator (tests only — touches nothing real) ------------------------
@@ -332,6 +455,8 @@ pub struct MockMutator {
     services: RefCell<HashMap<String, ServiceState>>,
     mem_compression: RefCell<Option<bool>>,
     core_parking_min: RefCell<Option<u32>>,
+    display: RefCell<Option<DisplayMode>>,
+    display_max_refresh: RefCell<Option<u32>>,
     pub calls: RefCell<Vec<String>>,
 }
 
@@ -344,8 +469,17 @@ impl MockMutator {
             services: RefCell::new(HashMap::new()),
             mem_compression: RefCell::new(Some(true)),
             core_parking_min: RefCell::new(Some(5)),
+            display: RefCell::new(None),
+            display_max_refresh: RefCell::new(None),
             calls: RefCell::new(Vec::new()),
         }
+    }
+
+    /// Seed a display: current resolution + current refresh + the panel's max.
+    pub fn with_display(self, width: u32, height: u32, cur_hz: u32, max_hz: u32) -> Self {
+        *self.display.borrow_mut() = Some(DisplayMode { width, height, refresh_hz: cur_hz });
+        *self.display_max_refresh.borrow_mut() = Some(max_hz);
+        self
     }
 
     pub fn with_dword(self, hive: RegHive, path: &str, name: &str, val: u32) -> Self {
@@ -470,5 +604,51 @@ impl SystemMutator for MockMutator {
     fn run_command(&self, program: &str, args: &[&str]) -> Result<(), String> {
         self.record(format!("run_command {program} {}", args.join(" ")));
         Ok(())
+    }
+
+    fn current_display_mode(&self) -> Option<DisplayMode> {
+        *self.display.borrow()
+    }
+    fn max_refresh_for_current_mode(&self) -> Option<u32> {
+        *self.display_max_refresh.borrow()
+    }
+    fn set_display_mode(&self, mode: DisplayMode) -> Result<(), String> {
+        self.record(format!("set_display_mode {}x{}@{}", mode.width, mode.height, mode.refresh_hz));
+        *self.display.borrow_mut() = Some(mode);
+        Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::sc_state_change_ok;
+
+    #[test]
+    fn clean_exit_is_success_either_direction() {
+        assert!(sc_state_change_ok(0, true));
+        assert!(sc_state_change_ok(0, false));
+    }
+
+    #[test]
+    fn already_in_desired_state_counts_as_success() {
+        // Wanted running, service was already running (1056) → success.
+        assert!(sc_state_change_ok(1056, true));
+        // Wanted stopped, service was already stopped (1062) → success.
+        assert!(sc_state_change_ok(1062, false));
+    }
+
+    #[test]
+    fn already_state_code_for_the_wrong_direction_is_a_failure() {
+        // 1056 (already running) while we asked to STOP is not a clean stop.
+        assert!(!sc_state_change_ok(1056, false));
+        // 1062 (not active) while we asked to START is not a clean start.
+        assert!(!sc_state_change_ok(1062, true));
+    }
+
+    #[test]
+    fn real_errors_are_failures() {
+        assert!(!sc_state_change_ok(5, true)); // access denied
+        assert!(!sc_state_change_ok(5, false));
+        assert!(!sc_state_change_ok(1060, false)); // service does not exist
     }
 }

@@ -1,8 +1,9 @@
 import { useState } from "react";
-import { AlertOctagon, AlertTriangle, CheckCircle2, Info, RefreshCw, Stethoscope, type LucideIcon } from "lucide-react";
-import { scanSystemHealth } from "../lib/backend";
+import { AlertOctagon, AlertTriangle, CheckCircle2, Info, RefreshCw, Stethoscope, Wrench, type LucideIcon } from "lucide-react";
+import { scanSystemHealth, scanTweaks } from "../lib/backend";
 import { useGameStore } from "../store/gameStore";
-import type { SystemHealthReport } from "../lib/types";
+import ApplyConfirmModal from "./ApplyConfirmModal";
+import type { SystemHealthReport, TweakInfo } from "../lib/types";
 
 const SEV: Record<string, { tone: string; ring: string; icon: LucideIcon }> = {
   critical: { tone: "text-accent", ring: "border-accent/30 bg-accent/5", icon: AlertOctagon },
@@ -17,21 +18,50 @@ const FIX_LABEL: Record<string, string> = {
 };
 const SEV_ORDER: Record<string, number> = { critical: 0, warning: 1, info: 2 };
 
+// Health-finding id → the real tweak our engine applies to fix it. ONLY findings
+// listed here get a one-click "Fix" button; BIOS/advisory findings stay
+// advice-only (never a fake button for something we can't actually change).
+const FIX_MAP: Record<string, { tweakId: string; notice?: string }> = {
+  power_plan: { tweakId: "power_high_perf" },
+  refresh_rate: { tweakId: "max_refresh_rate" },
+  hvci: {
+    tweakId: "disable_hvci",
+    notice:
+      "This turns OFF a Windows security protection (Core Isolation / Memory Integrity) and needs a restart to take effect. It's a performance-vs-security tradeoff — only do it if you accept that.",
+  },
+};
+
 /**
  * Bottleneck / Health Scan — the diagnosis layer. Finds the ONE misconfiguration
  * actually costing this machine performance, with an honest ranged estimate and
- * whether it's one-click / BIOS / manual. Read-only: it detects and reports only
- * — no fixes are applied here (those arrive later, each behind the confirm modal).
+ * whether it's one-click / BIOS / manual. Detection is read-only; the few
+ * one-click fixes route through the SAME confirm → ChangeLog → rollback pipeline
+ * as every other tweak, and never apply without the confirmation modal.
  */
 export default function HealthScan() {
   const activeGame = useGameStore((s) => s.activeGame);
   const [report, setReport] = useState<SystemHealthReport | null>(null);
   const [scanning, setScanning] = useState(false);
+  const [catalog, setCatalog] = useState<TweakInfo[]>([]);
+  const [fix, setFix] = useState<{ tweaks: TweakInfo[]; title: string; notice?: string } | null>(null);
 
   const scan = async () => {
     setScanning(true);
-    setReport(await scanSystemHealth(activeGame?.name ?? null, activeGame?.installPath ?? null));
+    const [health, tweaks] = await Promise.all([
+      scanSystemHealth(activeGame?.name ?? null, activeGame?.installPath ?? null),
+      scanTweaks(null),
+    ]);
+    setReport(health);
+    if (tweaks) setCatalog(tweaks.tweaks);
     setScanning(false);
+  };
+
+  const openFix = (findingId: string) => {
+    const map = FIX_MAP[findingId];
+    if (!map) return;
+    const tweak = catalog.find((t) => t.id === map.tweakId);
+    if (!tweak) return;
+    setFix({ tweaks: [tweak], title: "Apply fix", notice: map.notice });
   };
 
   const findings = report
@@ -47,7 +77,7 @@ export default function HealthScan() {
           </p>
           <p className="mt-1 text-[11.5px] leading-relaxed text-txt3">
             Finds the misconfiguration actually costing you performance — not another registry tweak.
-            Detection only; nothing is changed.
+            One-click fixes go through the confirm modal; nothing else is touched.
           </p>
         </div>
         <button
@@ -82,6 +112,7 @@ export default function HealthScan() {
             {findings.map((f) => {
               const s = SEV[f.severity] ?? SEV.info;
               const Icon = s.icon;
+              const fixable = FIX_MAP[f.id];
               return (
                 <div key={f.id} className={`flex items-start gap-3 rounded-chip border px-3.5 py-3 ${s.ring}`}>
                   <Icon size={16} strokeWidth={2} className={`mt-0.5 shrink-0 ${s.tone}`} />
@@ -97,16 +128,35 @@ export default function HealthScan() {
                     </div>
                     <p className="mt-0.5 text-[11px] leading-snug text-txt2">{f.detail}</p>
                   </div>
+                  {fixable && (
+                    <button
+                      onClick={() => openFix(f.id)}
+                      className="flex shrink-0 items-center gap-1.5 self-center rounded-btn border border-accent/40 bg-accent/10 px-2.5 py-1.5 text-[11px] font-semibold text-accent transition-colors hover:bg-accent hover:text-white"
+                    >
+                      <Wrench size={12} strokeWidth={2.25} /> Fix
+                    </button>
+                  )}
                 </div>
               );
             })}
           </div>
 
           <p className="mt-3 text-[10.5px] leading-snug text-txt3">
-            Detection only — one-click fixes for these arrive one at a time, each behind the confirmation modal.
-            Estimates are honest ranges; the only measured number lives in the before/after report.
+            One-click fixes apply only through the confirmation modal and are logged for one-click revert.
+            BIOS and advisory items stay advice-only. Estimates are honest ranges; the only measured number
+            lives in the before/after report.
           </p>
         </>
+      )}
+
+      {fix && (
+        <ApplyConfirmModal
+          tweaks={fix.tweaks}
+          title={fix.title}
+          notice={fix.notice}
+          onClose={() => setFix(null)}
+          onApplied={() => void scan()}
+        />
       )}
     </div>
   );

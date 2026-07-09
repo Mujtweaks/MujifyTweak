@@ -69,3 +69,21 @@ pub fn evaluate(process_stems: &[String]) -> AntiCheatStatus {
 pub fn is_blocked(operation: &str) -> bool {
     ALWAYS_BLOCKED.contains(&operation)
 }
+
+/// Take a FRESH process snapshot and report anti-cheat presence server-side.
+/// TweaksEngine calls this so an apply never trusts the frontend's flag alone —
+/// the pure `evaluate` above is the tested core; this just feeds it live data.
+pub fn detect_active() -> bool {
+    use sysinfo::{ProcessesToUpdate, System};
+    let mut sys = System::new();
+    sys.refresh_processes(ProcessesToUpdate::All, true);
+    let stems: Vec<String> = sys
+        .processes()
+        .values()
+        .map(|p| {
+            let n = p.name().to_string_lossy().to_lowercase();
+            n.strip_suffix(".exe").unwrap_or(&n).to_string()
+        })
+        .collect();
+    evaluate(&stems).active
+}

@@ -98,6 +98,8 @@ const CATALOG: &[TweakDef] = &[
     TweakDef { id: "disable_hibernation", title: "Disable Hibernation", description: "Frees several GB of disk (hiberfil.sys) and removes hybrid-sleep overhead.", category: System, risk: Safe, impact: 2 },
     TweakDef { id: "clear_standby", title: "Clear Standby Memory", description: "Flushes the standby memory list back to the game when RAM runs low.", category: System, risk: Safe, impact: 3 },
     TweakDef { id: "disable_memory_compression", title: "Disable Memory Compression", description: "Reduces CPU overhead from compressing RAM pages on high-memory systems.", category: System, risk: Moderate, impact: 3 },
+    TweakDef { id: "disable_hvci", title: "Disable Memory Integrity (Core Isolation)", description: "Turns off HVCI/VBS Memory Integrity to reclaim its gaming performance cost. This LOWERS a security protection and needs a restart to take effect — a deliberate tradeoff, not a blanket recommendation.", category: System, risk: Advanced, impact: 3 },
+    TweakDef { id: "max_refresh_rate", title: "Set Monitor to Max Refresh Rate", description: "Raises your display to its highest refresh rate at the current resolution — a 60Hz-stuck 144Hz panel is night-and-day. Instantly reversible.", category: Graphics, risk: Moderate, impact: 4 },
 
     // ---------- Performance ----------
     TweakDef { id: "disable_core_parking", title: "Disable CPU Core Parking", description: "Keeps all CPU cores active instead of parking idle ones — smoother frame pacing.", category: Performance, risk: Moderate, impact: 5 },

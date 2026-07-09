@@ -28,6 +28,9 @@ pub struct Averages {
     pub system_score: f32,
     // FPS/frame-time intentionally absent until PresentMon lands.
     pub avg_fps: Option<f32>,
+    /// Std-dev of the per-second FPS readings across the window — our measure of
+    /// run-to-run noise, so the verdict can tell a real change from jitter.
+    pub fps_stddev: Option<f32>,
     pub ping_ms: Option<f32>,
 }
 
@@ -67,8 +70,7 @@ async fn collect(count: u32, interval: Duration) -> Averages {
     let mut gpu_n = 0u32;
     let mut ram = 0.0f32;
     let mut score = 0.0f32;
-    let mut fps_sum = 0.0f32;
-    let mut fps_n = 0u32;
+    let mut fps_samples: Vec<f32> = Vec::new();
     let mut ping_sum = 0.0f32;
     let mut ping_n = 0u32;
     let mut got = 0u32;
@@ -86,8 +88,7 @@ async fn collect(count: u32, interval: Duration) -> Averages {
         }
         // Real FPS if a game is being captured by PresentMon; absent otherwise.
         if let Some(f) = frame_time_monitor::latest_frame() {
-            fps_sum += f.avg_fps;
-            fps_n += 1;
+            fps_samples.push(f.avg_fps);
         }
         if let Some(pg) = super::network_monitor::latest_ping() {
             ping_sum += pg;
@@ -97,6 +98,7 @@ async fn collect(count: u32, interval: Duration) -> Averages {
     }
 
     let n = got.max(1) as f32;
+    let (avg_fps, fps_stddev) = mean_and_stddev(&fps_samples);
     Averages {
         samples: got,
         cpu_usage: cpu / n,
@@ -104,9 +106,24 @@ async fn collect(count: u32, interval: Duration) -> Averages {
         ram_usage: ram / n,
         system_score: score / n,
         // Measured only when a game was actually presenting during the window.
-        avg_fps: if fps_n > 0 { Some(fps_sum / fps_n as f32) } else { None },
+        avg_fps,
+        fps_stddev,
         ping_ms: if ping_n > 0 { Some(ping_sum / ping_n as f32) } else { None },
     }
+}
+
+/// Mean and (sample) standard deviation of a set of readings. Returns
+/// (None, None) when empty; stddev is None with a single reading (undefined).
+fn mean_and_stddev(xs: &[f32]) -> (Option<f32>, Option<f32>) {
+    if xs.is_empty() {
+        return (None, None);
+    }
+    let mean = xs.iter().sum::<f32>() / xs.len() as f32;
+    if xs.len() < 2 {
+        return (Some(mean), None);
+    }
+    let var = xs.iter().map(|x| (x - mean).powi(2)).sum::<f32>() / (xs.len() as f32 - 1.0);
+    (Some(mean), Some(var.sqrt()))
 }
 
 fn pct(before: f32, after: f32) -> Option<f32> {
@@ -180,23 +197,62 @@ fn build_metrics(b: &Averages, p: &Averages) -> Vec<MetricDelta> {
     ]
 }
 
-/// Honest verdict. Without FPS we can only speak to system-load/score movement,
-/// and we say exactly that — never "meaningful FPS gain" from load numbers.
-fn verdict(metrics: &[MetricDelta], fps_measured: bool) -> String {
-    if fps_measured {
-        let fps = metrics
-            .iter()
-            .find(|m| m.label == "Avg FPS")
-            .and_then(|m| m.delta_pct)
-            .unwrap_or(0.0);
-        return if fps > 5.0 {
-            format!("Meaningful improvement — average FPS rose {:.0}%. Tweaks confirmed effective.", fps)
-        } else if fps > 2.0 {
-            format!("Marginal improvement — average FPS rose {:.0}%.", fps)
-        } else if fps < -2.0 {
-            format!("Performance dropped {:.0}% — recommend Revert All.", fps.abs())
-        } else {
-            "No significant FPS change measured.".into()
+/// Noise-aware FPS classification: is the change real, or within run-to-run
+/// jitter? `sd_*` are the per-window FPS standard deviations (measured noise).
+#[derive(PartialEq, Debug)]
+enum FpsVerdict {
+    Improved { delta_pct: f32, noise_pct: f32 },
+    Regressed { delta_pct: f32, noise_pct: f32 },
+    Noise { delta_pct: f32, noise_pct: f32 },
+    Inconclusive,
+}
+
+/// A change counts as real only when it clearly exceeds the pooled measurement
+/// noise (~2× the combined std-dev, expressed as a % of baseline, with a 1%
+/// floor). This is the engineering form of "never claim a gain we can't prove".
+fn classify_fps_change(mean_b: f32, sd_b: f32, mean_p: f32, sd_p: f32) -> FpsVerdict {
+    if mean_b <= f32::EPSILON {
+        return FpsVerdict::Inconclusive;
+    }
+    let delta_pct = (mean_p - mean_b) / mean_b * 100.0;
+    // Pooled run-to-run noise as a percentage of the baseline mean.
+    let pooled_sd = (sd_b * sd_b + sd_p * sd_p).sqrt();
+    let noise_pct = pooled_sd / mean_b * 100.0;
+    let threshold = (2.0 * noise_pct).max(1.0);
+    if delta_pct.abs() <= threshold {
+        FpsVerdict::Noise { delta_pct, noise_pct }
+    } else if delta_pct > 0.0 {
+        FpsVerdict::Improved { delta_pct, noise_pct }
+    } else {
+        FpsVerdict::Regressed { delta_pct, noise_pct }
+    }
+}
+
+/// Honest verdict. With FPS we gate the claim on measurement noise; without it we
+/// can only speak to system-load/score movement, and we say exactly that.
+fn verdict(metrics: &[MetricDelta], baseline: &Averages, post: &Averages) -> String {
+    if let (Some(mb), Some(mp)) = (baseline.avg_fps, post.avg_fps) {
+        return match classify_fps_change(
+            mb,
+            baseline.fps_stddev.unwrap_or(0.0),
+            mp,
+            post.fps_stddev.unwrap_or(0.0),
+        ) {
+            FpsVerdict::Improved { delta_pct, .. } => format!(
+                "Meaningful improvement — average FPS rose {:.0}%, clearly beyond run-to-run noise. Tweaks confirmed effective.",
+                delta_pct
+            ),
+            FpsVerdict::Regressed { delta_pct, .. } => format!(
+                "Performance dropped {:.0}% (beyond measurement noise) — recommend Revert All.",
+                delta_pct.abs()
+            ),
+            FpsVerdict::Noise { delta_pct, noise_pct } => format!(
+                "Within measurement noise — the {:+.0}% FPS change is smaller than the run-to-run variability (±{:.0}%), so no confirmed change.",
+                delta_pct, noise_pct
+            ),
+            FpsVerdict::Inconclusive => {
+                "FPS was captured but the baseline was too low to compare. Re-run.".into()
+            }
         };
     }
     // No game was presenting → we only measured system load, and say exactly that.
@@ -245,7 +301,7 @@ pub async fn run_benchmark(
             report.metrics = build_metrics(&report.baseline, &report.post);
             report.fps_measured =
                 report.baseline.avg_fps.is_some() && report.post.avg_fps.is_some();
-            report.verdict = verdict(&report.metrics, report.fps_measured);
+            report.verdict = verdict(&report.metrics, &report.baseline, &report.post);
             // Tweaks applied between the baseline capture and now, still active.
             report.applied_tweaks = super::change_log::all()
                 .into_iter()
@@ -276,6 +332,7 @@ mod tests {
             ram_usage: 60.0,
             system_score: 90.0,
             avg_fps: fps,
+            fps_stddev: None,
             ping_ms: Some(30.0),
         }
     }
@@ -308,8 +365,41 @@ mod tests {
 
     #[test]
     fn verdict_speaks_to_fps_when_measured() {
-        let m = build_metrics(&avg(50.0, Some(100.0)), &avg(45.0, Some(115.0)));
-        let v = verdict(&m, true);
+        let b = avg(50.0, Some(100.0));
+        let p = avg(45.0, Some(115.0));
+        let m = build_metrics(&b, &p);
+        let v = verdict(&m, &b, &p);
         assert!(v.to_lowercase().contains("fps"));
+    }
+
+    #[test]
+    fn small_delta_with_high_variance_is_noise() {
+        // +4% but jittery windows (sd 5 on a ~100 fps mean) → not a real change.
+        let v = classify_fps_change(100.0, 5.0, 104.0, 5.0);
+        assert!(matches!(v, FpsVerdict::Noise { .. }), "got {v:?}");
+    }
+
+    #[test]
+    fn large_delta_with_low_variance_is_meaningful() {
+        // +15% with steady windows (sd 1) → clearly beyond noise.
+        let v = classify_fps_change(100.0, 1.0, 115.0, 1.0);
+        assert!(matches!(v, FpsVerdict::Improved { .. }), "got {v:?}");
+    }
+
+    #[test]
+    fn verdict_calls_out_noise_when_jittery() {
+        let b = Averages { avg_fps: Some(100.0), fps_stddev: Some(5.0), ..avg(50.0, Some(100.0)) };
+        let p = Averages { avg_fps: Some(104.0), fps_stddev: Some(5.0), ..avg(45.0, Some(104.0)) };
+        let m = build_metrics(&b, &p);
+        assert!(verdict(&m, &b, &p).to_lowercase().contains("noise"));
+    }
+
+    #[test]
+    fn stddev_is_none_below_two_samples_but_real_above() {
+        assert_eq!(mean_and_stddev(&[]), (None, None));
+        assert_eq!(mean_and_stddev(&[100.0]), (Some(100.0), None));
+        let (m, sd) = mean_and_stddev(&[90.0, 100.0, 110.0]);
+        assert_eq!(m, Some(100.0));
+        assert!((sd.unwrap() - 10.0).abs() < 0.001);
     }
 }

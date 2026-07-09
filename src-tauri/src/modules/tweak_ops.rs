@@ -13,7 +13,7 @@
 
 use serde::{Deserialize, Serialize};
 
-use super::system_mutator::{RegHive, ServiceState, SystemMutator};
+use super::system_mutator::{DisplayMode, RegHive, ServiceState, SystemMutator};
 
 /// Windows "High performance" power scheme — a well-known fixed GUID.
 pub const HIGH_PERF_GUID: &str = "8c5e7fda-e8bf-4a96-9a85-a6e23a8c635c";
@@ -42,6 +42,9 @@ pub enum Op {
     Command { program: &'static str, args: &'static [&'static str] },
     /// Set a service's start type + running state, capturing prior for revert.
     SetService { name: &'static str, start_type: &'static str, running: bool },
+    /// Raise the primary display to its highest refresh at the current
+    /// resolution, capturing the prior mode for an exact revert.
+    MaxRefreshRate,
 }
 
 /// Captured before-state, enough to precisely reverse one Op.
@@ -59,6 +62,8 @@ pub enum UndoOp {
     SzMulti { hive: RegHive, name: String, entries: Vec<(String, Option<String>)> },
     MemoryCompression { prev: Option<bool> },
     CoreParking { prev: Option<u32> },
+    /// Prior display mode, restored exactly on undo (None → leave as-is).
+    DisplayMode { prev: Option<DisplayMode> },
 }
 
 /// Capture + apply one Op. Returns the UndoOp needed to reverse it.
@@ -135,6 +140,17 @@ pub fn apply_op(m: &dyn SystemMutator, op: &Op) -> Result<UndoOp, String> {
             )?;
             Ok(UndoOp::Service { name: name.to_string(), prev })
         }
+        Op::MaxRefreshRate => {
+            let prev = m.current_display_mode();
+            // Only change the mode if a higher refresh is actually available at
+            // the current resolution — otherwise it's a captured no-op.
+            if let (Some(cur), Some(max_hz)) = (prev, m.max_refresh_for_current_mode()) {
+                if max_hz > cur.refresh_hz {
+                    m.set_display_mode(DisplayMode { refresh_hz: max_hz, ..cur })?;
+                }
+            }
+            Ok(UndoOp::DisplayMode { prev })
+        }
     }
 }
 
@@ -185,6 +201,10 @@ pub fn undo_op(m: &dyn SystemMutator, undo: &UndoOp) -> Result<(), String> {
             Some(v) => m.set_core_parking_min(*v),
             None => Ok(()),
         },
+        UndoOp::DisplayMode { prev } => match prev {
+            Some(mode) => m.set_display_mode(*mode),
+            None => Ok(()),
+        },
         UndoOp::None => Ok(()),
     }
 }
@@ -223,6 +243,14 @@ pub fn ops_for(tweak_id: &str) -> Vec<Op> {
         "power_ultimate" => vec![Op::UltimatePlan],
         "disable_memory_compression" => vec![Op::MemoryCompression { enable: false }],
         "disable_core_parking" => vec![Op::CoreParking { min_percent: 100 }],
+        // Health-scan one-click fixes (also selectable as tweaks):
+        "max_refresh_rate" => vec![Op::MaxRefreshRate],
+        "disable_hvci" => vec![dw(
+            Hklm,
+            r"SYSTEM\CurrentControlSet\Control\DeviceGuard\Scenarios\HypervisorEnforcedCodeIntegrity",
+            "Enabled",
+            0,
+        )],
 
         // ---- Services ----
         "disable_sysmain" => vec![Op::DisableService { name: "SysMain" }],
@@ -424,6 +452,39 @@ mod tests {
         undo_all(&m, &undos);
         assert_eq!(m.get_service("DiagTrack").unwrap().start_type, "auto");
         assert!(m.get_service("dmwappushservice").unwrap().running);
+    }
+
+    #[test]
+    fn max_refresh_maxes_and_reverts_exactly() {
+        // 1440p panel stuck at 60 Hz but capable of 144 → apply raises it, undo
+        // restores the exact prior mode.
+        let m = MockMutator::new().with_display(2560, 1440, 60, 144);
+        let undos = apply_all(&m, "max_refresh_rate");
+        let now = m.current_display_mode().unwrap();
+        assert_eq!(now.refresh_hz, 144);
+        assert_eq!((now.width, now.height), (2560, 1440));
+        undo_all(&m, &undos);
+        assert_eq!(m.current_display_mode().unwrap().refresh_hz, 60);
+    }
+
+    #[test]
+    fn max_refresh_is_a_noop_when_already_maxed() {
+        // Already at the panel max → nothing is written, nothing to restore.
+        let m = MockMutator::new().with_display(1920, 1080, 144, 144);
+        let undos = apply_all(&m, "max_refresh_rate");
+        assert!(m.calls.borrow().iter().all(|c| !c.starts_with("set_display_mode")));
+        undo_all(&m, &undos);
+        assert_eq!(m.current_display_mode().unwrap().refresh_hz, 144);
+    }
+
+    #[test]
+    fn hvci_disables_and_reverts_to_prior() {
+        let path = r"SYSTEM\CurrentControlSet\Control\DeviceGuard\Scenarios\HypervisorEnforcedCodeIntegrity";
+        let m = MockMutator::new().with_dword(Hklm, path, "Enabled", 1);
+        let undos = apply_all(&m, "disable_hvci");
+        assert_eq!(m.get_dword(Hklm, path, "Enabled"), Some(0));
+        undo_all(&m, &undos);
+        assert_eq!(m.get_dword(Hklm, path, "Enabled"), Some(1));
     }
 
     #[test]

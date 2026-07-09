@@ -12,6 +12,7 @@ export type TweakAction =
   | "command"
   | "cache-clear"
   | "power-plan"
+  | "display"
   | "permanent";
 
 export interface TweakDetail {
@@ -33,6 +34,7 @@ export const ACTION_LABEL: Record<TweakAction, string> = {
   command: "Runs a repair command (reversible)",
   "cache-clear": "Clears a cache folder (rebuilds automatically)",
   "power-plan": "Switches the power plan (reversible)",
+  display: "Changes the display mode (reversible)",
   permanent: "Permanent change (not auto-reversible)",
 };
 
@@ -54,6 +56,18 @@ export const TWEAK_DETAILS: Record<string, TweakDetail> = {
     what: "Switches Windows to the High Performance power plan so the CPU/GPU don't down-clock to save power.",
     action: "power-plan",
     changes: "Sets the active power scheme to High Performance. Your original plan is restored on revert.",
+  },
+  disable_hvci: {
+    what: "Turns off Core Isolation / Memory Integrity (HVCI/VBS), which virtualizes the kernel for security at a real gaming performance cost. This is a security-vs-performance tradeoff and needs a restart.",
+    action: "registry",
+    changes:
+      "Sets DeviceGuard\\Scenarios\\HypervisorEnforcedCodeIntegrity\\Enabled to 0. Your prior value is captured and restored on revert. Requires a restart to take effect.",
+  },
+  max_refresh_rate: {
+    what: "Raises your monitor to its highest refresh rate at the current resolution — many panels ship stuck at 60Hz when they support 120/144/165Hz.",
+    action: "display",
+    changes:
+      "Sets the primary display to its max refresh at the same resolution via the display driver. Your exact prior mode is captured and restored on revert.",
   },
   power_ultimate: {
     what: "Enables the hidden Ultimate Performance plan, which removes more idle power savings than High Performance.",

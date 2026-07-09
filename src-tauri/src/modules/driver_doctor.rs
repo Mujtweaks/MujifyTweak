@@ -93,31 +93,113 @@ pub fn scan_device_health() -> Vec<DeviceIssue> {
     out
 }
 
-/// Safe driver repair: create a restore point, then ask Windows to re-scan and
-/// match signed drivers. `confirm` MUST be true (from the confirmation modal).
-/// Never downloads a third-party driver. Fire-and-forget (both run in the
-/// background); the restore point may no-op if one was created in the last 24h.
+/// Honest outcome of the pre-repair System Restore checkpoint. We never claim a
+/// restore point we didn't verify.
+#[derive(PartialEq, Debug, Clone, Copy)]
+pub enum RestorePointOutcome {
+    /// A brand-new restore point was verified to exist after the attempt.
+    Created,
+    /// System Restore is ON, but Windows didn't make a new point — it throttles
+    /// to one per 24h, so a recent point is still protecting the user.
+    SkippedRecent,
+    /// System Restore is turned off entirely — there is NO safety net.
+    Disabled,
+}
+
+/// Decide the honest restore-point outcome from observed facts. Pure + tested.
+/// `newest_before`/`newest_after` are the newest restore point's creation time
+/// (any stable string) sampled before and after the checkpoint attempt: a value
+/// that newly appears or changes means a new point was actually created.
+pub fn classify_restore_point(
+    sr_enabled: bool,
+    newest_before: Option<&str>,
+    newest_after: Option<&str>,
+) -> RestorePointOutcome {
+    if !sr_enabled {
+        RestorePointOutcome::Disabled
+    } else if newest_after.is_some() && newest_after != newest_before {
+        RestorePointOutcome::Created
+    } else {
+        RestorePointOutcome::SkippedRecent
+    }
+}
+
+/// One PowerShell round-trip (via `.output()`, not fire-and-forget): the newest
+/// restore point before the attempt, the checkpoint itself, the newest after,
+/// and whether SR is enabled. Returns (sr_enabled, newest_before, newest_after).
+/// Real I/O — tests never run this; they drive `classify_restore_point` directly.
+fn attempt_restore_point() -> (bool, Option<String>, Option<String>) {
+    let script = r#"
+$ErrorActionPreference='SilentlyContinue'
+$before = (Get-ComputerRestorePoint | Sort-Object CreationTime | Select-Object -Last 1).CreationTime
+$rp = (Get-ItemProperty 'HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\SystemRestore' -Name RPSessionInterval).RPSessionInterval
+Checkpoint-Computer -Description 'Mujify driver repair' -RestorePointType MODIFY_SETTINGS
+$after = (Get-ComputerRestorePoint | Sort-Object CreationTime | Select-Object -Last 1).CreationTime
+Write-Output ("BEFORE=" + $before)
+Write-Output ("AFTER=" + $after)
+Write-Output ("RP=" + $rp)
+"#;
+    let text = Command::new("powershell")
+        .args(["-NoProfile", "-Command", script])
+        .creation_flags(CREATE_NO_WINDOW)
+        .output()
+        .map(|o| String::from_utf8_lossy(&o.stdout).to_string())
+        .unwrap_or_default();
+    let field = |k: &str| -> Option<String> {
+        text.lines()
+            .find_map(|l| l.trim().strip_prefix(k))
+            .map(|v| v.trim().to_string())
+            .filter(|v| !v.is_empty())
+    };
+    let before = field("BEFORE=");
+    let after = field("AFTER=");
+    // Authoritative when RPSessionInterval reads (>=1 on, 0 off); otherwise infer
+    // enablement from whether any restore points exist at all.
+    let sr_enabled = match field("RP=").and_then(|v| v.parse::<i64>().ok()) {
+        Some(interval) => interval >= 1,
+        None => before.is_some() || after.is_some(),
+    };
+    (sr_enabled, before, after)
+}
+
+/// Safe driver repair: create AND VERIFY a restore point, then ask Windows to
+/// re-scan and match signed drivers. `confirm` MUST be true (from the modal).
+/// Never downloads a third-party driver. If System Restore is off we refuse and
+/// say so — a driver change with no rollback safety net is not something we do
+/// silently.
 #[tauri::command]
 pub fn repair_drivers(confirm: bool) -> Result<String, String> {
     if !confirm {
         return Err("Refused: driver repair requires explicit confirmation.".into());
     }
-    // 1. System Restore point FIRST — before any driver change, no exceptions.
-    let _ = Command::new("powershell")
-        .args([
-            "-NoProfile",
-            "-Command",
-            "Checkpoint-Computer -Description 'Mujify driver repair' -RestorePointType MODIFY_SETTINGS -ErrorAction SilentlyContinue",
-        ])
-        .creation_flags(CREATE_NO_WINDOW)
-        .spawn();
-    // 2. Trigger Windows' own driver search — re-enumerate so signed in-box /
-    //    Windows Update drivers get matched by hardware ID.
-    let _ = Command::new("pnputil")
+    // 1. System Restore point FIRST — and we VERIFY it happened, never assume.
+    let (sr_enabled, before, after) = attempt_restore_point();
+    let outcome = classify_restore_point(sr_enabled, before.as_deref(), after.as_deref());
+
+    // No safety net → refuse to touch drivers and tell the user exactly why.
+    if outcome == RestorePointOutcome::Disabled {
+        return Err("System Restore is turned OFF, so there would be no safety net to undo a driver change. Turn on System Protection (System Properties → System Protection → Configure), then try again. No changes were made.".into());
+    }
+
+    // 2. Only now trigger Windows' own signed-driver re-scan.
+    if let Err(e) = Command::new("pnputil")
         .args(["/scan-devices"])
         .creation_flags(CREATE_NO_WINDOW)
-        .spawn();
-    Ok("Created a System Restore point and asked Windows to re-scan and match signed drivers. Check Device Manager after it finishes; use Roll Back Driver if a device behaves worse.".into())
+        .status()
+    {
+        return Err(format!("Restore point handled, but the driver re-scan failed to start: {e}"));
+    }
+
+    let restore_note = match outcome {
+        RestorePointOutcome::Created => "Created and verified a fresh System Restore point",
+        RestorePointOutcome::SkippedRecent => {
+            "Windows kept its existing restore point (it makes at most one per 24h) — you're still protected"
+        }
+        RestorePointOutcome::Disabled => unreachable!(),
+    };
+    Ok(format!(
+        "{restore_note}, then asked Windows to re-scan and match signed drivers. This runs in the background; check Device Manager after it finishes, and use Roll Back Driver if a device behaves worse."
+    ))
 }
 
 #[cfg(test)]
@@ -131,5 +213,37 @@ mod tests {
         assert!(error_text(22).to_lowercase().contains("disabled"));
         // Unknown codes still return a sane message, never panic.
         assert!(!error_text(9999).is_empty());
+    }
+
+    #[test]
+    fn restore_point_disabled_when_sr_off() {
+        // SR off → Disabled no matter what points exist.
+        assert_eq!(
+            classify_restore_point(false, None, Some("20260101120000")),
+            RestorePointOutcome::Disabled
+        );
+    }
+
+    #[test]
+    fn restore_point_created_when_newest_changes() {
+        // A new point appears where there was none...
+        assert_eq!(
+            classify_restore_point(true, None, Some("20260708090000")),
+            RestorePointOutcome::Created
+        );
+        // ...or the newest timestamp advances.
+        assert_eq!(
+            classify_restore_point(true, Some("20260708080000"), Some("20260708090000")),
+            RestorePointOutcome::Created
+        );
+    }
+
+    #[test]
+    fn restore_point_skipped_when_newest_unchanged() {
+        // SR on but Windows made no new point (24h throttle) → still protected.
+        assert_eq!(
+            classify_restore_point(true, Some("20260708080000"), Some("20260708080000")),
+            RestorePointOutcome::SkippedRecent
+        );
     }
 }

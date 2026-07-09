@@ -88,6 +88,13 @@ pub struct ApplyOutcome {
     pub blocked: Vec<String>,
 }
 
+/// The effective protection flag is the OR of the frontend's live indicator and
+/// a fresh backend process check. We never apply under *less* protection than
+/// either source reports — the backend can only make the gate stricter.
+pub fn effective_protection(frontend: bool, backend: bool) -> bool {
+    frontend || backend
+}
+
 /// Tauri command — apply a set of tweaks. `confirm` MUST be true (set by the
 /// user's explicit per-action confirmation). Uses the RealMutator. Every result
 /// is logged; nothing here runs without the user's click.
@@ -102,11 +109,14 @@ pub fn apply_tweaks(
         return Err("Refused: apply requires explicit confirmation.".into());
     }
     let mutator = RealMutator;
+    // Never trust the frontend flag alone — re-check on the backend with a fresh
+    // process snapshot and take the stricter of the two.
+    let protected = effective_protection(anti_cheat_active, anti_cheat_guard::detect_active());
     let mut applied = Vec::new();
     let mut blocked = Vec::new();
 
     for id in ids {
-        match apply_one(&mutator, &id, anti_cheat_active) {
+        match apply_one(&mutator, &id, protected) {
             Ok(entry) => {
                 change_log::push(entry.clone());
                 let _ = app.emit("change_log_update", &entry);
@@ -162,6 +172,14 @@ pub fn check_reset_tweaks() -> Vec<String> {
 mod tests {
     use super::*;
     use crate::modules::system_mutator::{MockMutator, RegHive};
+
+    #[test]
+    fn effective_protection_takes_the_stricter_or() {
+        assert!(effective_protection(true, false)); // frontend saw anti-cheat
+        assert!(effective_protection(false, true)); // only the backend saw it
+        assert!(effective_protection(true, true));
+        assert!(!effective_protection(false, false)); // neither → not protected
+    }
 
     #[test]
     fn apply_one_logs_and_is_reversible() {

@@ -152,8 +152,15 @@ export async function scanFixes(): Promise<FixInfo[]> {
 export async function applyFix(id: string): Promise<boolean> {
   if (!isTauri) return false;
   try {
-    await invoke("apply_fix", { id, confirm: true });
-    toast.success("Fix applied", "Logged in the Change Log — revert there if it's reversible.");
+    const entry = await invoke<{ description: string }>("apply_fix", { id, confirm: true });
+    // Long-running / reboot-dependent fixes report honestly as "started", not
+    // "done" — the backend stamps that note into the entry's description.
+    const started = /started\b|runs in the background|restart is required/i.test(entry.description);
+    if (started) {
+      toast.info("Fix started", entry.description.replace(/^Fix:\s*[^.]*\.\s*/, ""));
+    } else {
+      toast.success("Fix applied", "Logged in the Change Log — revert there if it's reversible.");
+    }
     return true;
   } catch (err) {
     console.error("apply_fix failed:", err);

@@ -128,6 +128,30 @@ fn fix_ops(id: &str) -> Vec<Op> {
     }
 }
 
+/// Long-running or reboot-dependent command fixes: an honest note appended to
+/// the ChangeLog entry (and surfaced in the toast) so we never imply "done" when
+/// the repair is still working (SFC/DISM) or needs a restart to take effect.
+fn background_note(id: &str) -> Option<&'static str> {
+    match id {
+        "system_file_repair" => Some(
+            "Started — SFC then DISM run in the background and can take up to ~30 minutes. Restart when they finish.",
+        ),
+        "windows_update_repair" => Some(
+            "Started — Windows Update components are resetting in the background; give it a minute, then check for updates.",
+        ),
+        "network_stack_reset" => Some(
+            "Started — Winsock and the TCP/IP stack were reset. A restart is required for this to fully take effect.",
+        ),
+        "print_spooler_reset" => {
+            Some("Started — the print spooler was restarted and its queue cleared.")
+        }
+        "windows_store_repair" => Some(
+            "Started — the Store cache reset (wsreset) runs in the background and may open the Store when done.",
+        ),
+        _ => None,
+    }
+}
+
 fn fix_meta(id: &str) -> Option<(String, String, bool)> {
     serde_json::from_str::<FixDb>(FIXES_JSON)
         .ok()?
@@ -157,11 +181,17 @@ pub fn apply_fix_one(m: &dyn SystemMutator, id: &str) -> Result<ChangeLogEntry, 
     for op in &ops {
         undo_ops.push(apply_op(m, op)?);
     }
+    // Long-running / reboot-dependent fixes say so — "applied" here means we
+    // kicked it off, not that a 30-minute SFC pass already finished.
+    let description = match background_note(id) {
+        Some(note) => format!("Fix: {title}. {note}"),
+        None => format!("Fix: {title}"),
+    };
     Ok(ChangeLogEntry {
         id: uuid::Uuid::new_v4().to_string(),
         timestamp: chrono::Utc::now().timestamp_millis(),
         tweak_id: format!("fix:{id}"),
-        description: format!("Fix: {title}"),
+        description,
         risk_level: risk,
         reversible,
         undone: false,
@@ -228,5 +258,23 @@ mod tests {
         assert!(m.calls.borrow().iter().any(|c| c.contains("run_command sfc")));
         // A pure command fix has nothing to undo.
         assert!(entry.undo_ops.iter().all(|u| matches!(u, super::super::tweak_ops::UndoOp::None)));
+    }
+
+    #[test]
+    fn long_running_fixes_say_started_not_done() {
+        // SFC/DISM, update, and network-stack fixes must carry the honest
+        // "started / runs in the background / restart" copy in the log entry.
+        for id in ["system_file_repair", "windows_update_repair", "network_stack_reset"] {
+            assert!(background_note(id).is_some(), "{id} needs a background note");
+            let entry = apply_fix_one(&MockMutator::new(), id).unwrap();
+            let d = entry.description.to_lowercase();
+            assert!(
+                d.contains("started") || d.contains("background") || d.contains("restart"),
+                "fix '{id}' description should say it started/runs in background: {}",
+                entry.description
+            );
+        }
+        // A fast, self-contained fix carries no background note.
+        assert!(background_note("gamedvr_repair").is_none());
     }
 }

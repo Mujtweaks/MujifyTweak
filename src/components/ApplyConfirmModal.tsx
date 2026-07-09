@@ -8,6 +8,8 @@ import type { ApplyOutcome, TweakInfo } from "../lib/types";
 interface ApplyConfirmModalProps {
   tweaks: TweakInfo[];
   title?: string;
+  /** Optional prominent caveat (e.g. a security tradeoff) shown before applying. */
+  notice?: string;
   onClose: () => void;
   onApplied: (outcome: ApplyOutcome) => void;
 }
@@ -17,7 +19,7 @@ interface ApplyConfirmModalProps {
  * clicking through this. Lists the EXACT tweaks + risk, then calls apply_tweaks
  * with confirm:true. No premium tier, no lock, no upsell — every tweak is free.
  */
-export default function ApplyConfirmModal({ tweaks, title = "Apply optimizations", onClose, onApplied }: ApplyConfirmModalProps) {
+export default function ApplyConfirmModal({ tweaks, title = "Apply optimizations", notice, onClose, onApplied }: ApplyConfirmModalProps) {
   const antiCheatActive = useGameStore((s) => s.antiCheatActive);
   const [applying, setApplying] = useState(false);
 
@@ -75,6 +77,13 @@ export default function ApplyConfirmModal({ tweaks, title = "Apply optimizations
                 );
               })}
             </ul>
+          )}
+
+          {notice && (
+            <p className="mt-3 flex items-start gap-2 rounded-chip border border-accent/30 bg-accent/10 px-3 py-2 text-[11px] text-txt">
+              <AlertTriangle size={14} strokeWidth={2} className="mt-0.5 shrink-0 text-accent" />
+              {notice}
+            </p>
           )}
 
           {antiCheatActive && (
