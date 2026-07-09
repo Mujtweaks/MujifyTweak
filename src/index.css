@@ -183,9 +183,10 @@ textarea {
 .slide-indicator {
   transition:
     transform 0.2s cubic-bezier(0.34, 1.2, 0.64, 1),
-    height 0.2s cubic-bezier(0.34, 1.2, 0.64, 1),
+    height 0.16s cubic-bezier(0.34, 1.2, 0.64, 1),
     width 0.16s cubic-bezier(0.34, 1.2, 0.64, 1),
-    left 0.16s cubic-bezier(0.34, 1.2, 0.64, 1);
+    left 0.16s cubic-bezier(0.34, 1.2, 0.64, 1),
+    top 0.16s cubic-bezier(0.34, 1.2, 0.64, 1);
 }
 
 /* Respect the OS "reduce motion" setting — kill motion everywhere. */

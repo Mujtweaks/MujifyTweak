@@ -21,8 +21,9 @@ import Support from "./pages/Support";
 import Settings from "./pages/Settings";
 import Toaster from "./components/Toaster";
 import WelcomeModal from "./components/WelcomeModal";
+import WhatsNewModal from "./components/WhatsNewModal";
 import ReadyCheck from "./components/ReadyCheck";
-import { checkResetTweaks, connectBackend, fetchHardware } from "./lib/backend";
+import { checkResetTweaks, connectBackend, fetchHardware, fetchReleaseNotes, getAppVersion } from "./lib/backend";
 import { toast } from "./store/toastStore";
 import { startHeartbeat } from "./lib/heartbeat";
 import { initEventBridge, listenNavigate } from "./lib/events";
@@ -53,6 +54,8 @@ export default function App() {
     }
     setShowWelcome(false);
   };
+  // "What's new" — shown once after the first launch on a new version.
+  const [whatsNew, setWhatsNew] = useState<{ version: string; notes: string } | null>(null);
 
   useEffect(() => {
     void connectBackend();
@@ -60,6 +63,21 @@ export default function App() {
     void initEventBridge();
     // Opt-in anonymous online ping (no-ops unless enabled + endpoint configured).
     startHeartbeat();
+    // "What's new" popup once per new version (graceful no-op if notes 404).
+    void (async () => {
+      const current = await getAppVersion();
+      if (!current) return;
+      try {
+        const last = localStorage.getItem("mujify.lastVersion");
+        if (last && last !== current) {
+          const notes = await fetchReleaseNotes(current);
+          if (notes) setWhatsNew({ version: current, notes });
+        }
+        localStorage.setItem("mujify.lastVersion", current);
+      } catch {
+        /* ignore storage errors */
+      }
+    })();
     // Windows feature updates can silently reset tweaks — re-detect on launch
     // and let the user re-apply the ones that drifted back to default.
     void checkResetTweaks().then((ids) => {
@@ -141,6 +159,9 @@ export default function App() {
       <Toaster />
       <ReadyCheck onNavigate={setPage} />
       {showWelcome && <WelcomeModal onClose={dismissWelcome} />}
+      {whatsNew && (
+        <WhatsNewModal version={whatsNew.version} notes={whatsNew.notes} onClose={() => setWhatsNew(null)} />
+      )}
     </div>
   );
 }

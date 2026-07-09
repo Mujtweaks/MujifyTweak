@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
-import { ArrowRight, Check, Gamepad2, LineChart, Play, Square } from "lucide-react";
+import { ArrowRight, Check, Download, Gamepad2, LineChart, Play, Share2, Square } from "lucide-react";
 import { getLatestReport, runBenchmark } from "../lib/backend";
+import { copyShareImage, saveShareImage } from "../lib/shareCard";
+import { toast } from "../store/toastStore";
 import { useGameStore } from "../store/gameStore";
 import type { BenchmarkReport, MetricDelta } from "../lib/types";
 
@@ -51,6 +53,21 @@ export default function ReportView() {
     await runBenchmark(which, activeGame?.name ?? null);
     await refresh();
     setPhase("idle");
+  };
+
+  const share = async (mode: "copy" | "save") => {
+    if (!report) return;
+    try {
+      if (mode === "copy") {
+        await copyShareImage(report);
+        toast.success("Image copied", "Paste it into Discord or anywhere to share your proof.");
+      } else {
+        await saveShareImage(report);
+        toast.success("Image saved", "Your before/after card was downloaded as a PNG.");
+      }
+    } catch (e) {
+      toast.error("Couldn't create the image", String(e));
+    }
   };
 
   return (
@@ -123,12 +140,27 @@ export default function ReportView() {
         </div>
       ) : (
         <div className="rounded-2xl border border-edge bg-panel p-5">
-          <div className="mb-3 flex items-center justify-between">
+          <div className="mb-1 flex items-center justify-between gap-3">
             <p className="text-[13px] font-semibold text-txt">
               {report.gameName ? `Results — ${report.gameName}` : "System Results"}
             </p>
-            <p className="text-[10.5px] text-txt3">{new Date(report.createdAt).toLocaleString()}</p>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => void share("copy")}
+                className="flex items-center gap-1.5 rounded-btn border border-edge bg-panel2 px-3 py-1.5 text-[11.5px] font-medium text-txt transition-colors hover:border-edge2"
+              >
+                <Share2 size={13} /> Share as image
+              </button>
+              <button
+                onClick={() => void share("save")}
+                title="Save PNG"
+                className="grid h-[30px] w-[30px] place-items-center rounded-btn border border-edge bg-panel2 text-txt2 transition-colors hover:text-txt"
+              >
+                <Download size={14} />
+              </button>
+            </div>
           </div>
+          <p className="mb-3 text-[10.5px] text-txt3">{new Date(report.createdAt).toLocaleString()}</p>
 
           <div className="grid grid-cols-[1.4fr_1fr_1fr_1fr] gap-2 text-[10px] font-bold uppercase tracking-wider text-txt3">
             <span>Metric</span>

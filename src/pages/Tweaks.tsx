@@ -6,6 +6,7 @@ import { useTweakStore } from "../store/tweakStore";
 import { CATEGORY_META, CATEGORY_ORDER } from "../lib/categories";
 import TweakCard from "../components/TweakCard";
 import ApplyConfirmModal from "../components/ApplyConfirmModal";
+import SlidingPills from "../components/SlidingPills";
 import type { TweakCategory, TweakInfo } from "../lib/types";
 
 function Stat({ icon, label, value, sub }: { icon: React.ReactNode; label: string; value: string; sub: string }) {
@@ -86,14 +87,15 @@ export default function Tweaks() {
         <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search tweaks..." className="flex-1 bg-transparent text-[13px] text-txt placeholder:text-txt3 focus:outline-none" />
       </div>
 
-      {/* Filter pills */}
-      <div className="flex flex-wrap gap-2">
-        {(["all", ...CATEGORY_ORDER] as const).map((c) => (
-          <button key={c} onClick={() => setFilter(c)} className={`rounded-full border px-4 py-1.5 text-[12px] font-medium transition-colors ${filter === c ? "border-accent bg-accent text-white" : "border-edge bg-transparent text-txt2 hover:text-txt"}`}>
-            {c === "all" ? "All" : CATEGORY_META[c].label}
-          </button>
-        ))}
-      </div>
+      {/* Filter pills — the active red pill slides between categories */}
+      <SlidingPills
+        pills={(["all", ...CATEGORY_ORDER] as const).map((c) => ({
+          id: c,
+          label: c === "all" ? "All" : CATEGORY_META[c].label,
+        }))}
+        active={filter}
+        onChange={(id) => setFilter(id as "all" | TweakCategory)}
+      />
 
       {/* Grouped tweak cards */}
       {filtered.length === 0 && <p className="py-10 text-center text-[13px] text-txt3">{scanning ? "Scanning your system…" : "No tweaks match."}</p>}

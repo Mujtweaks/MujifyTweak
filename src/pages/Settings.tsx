@@ -12,18 +12,15 @@ import {
   ShieldCheck,
   Wifi,
 } from "lucide-react";
-import { openUrl } from "@tauri-apps/plugin-opener";
 import { useSystemStore } from "../store/systemStore";
 import { useSettingsStore } from "../store/settingsStore";
 import { useAiStore } from "../store/aiStore";
-import { checkForUpdates, openLogsFolder } from "../lib/backend";
+import { getUpdateInfo, openLogsFolder } from "../lib/backend";
+import { GITHUB_RELEASES, openExternal } from "../lib/links";
 import { toast } from "../store/toastStore";
-import { isTauri } from "../lib/tauri";
 import Toggle from "../components/Toggle";
-
-// PLACEHOLDER repo slug — swap in the real one when the repo goes public. The
-// Tauri updater endpoint (tauri.conf.json) uses the SAME slug, so update both.
-const REPO_URL = "https://github.com/mujify/mujify-tweaks";
+import UpdateModal from "../components/UpdateModal";
+import type { UpdateInfo } from "../lib/types";
 
 function Section({ icon: Icon, title, children }: { icon: typeof Info; title: string; children: React.ReactNode }) {
   return (
@@ -62,16 +59,23 @@ export default function Settings() {
   const [updateStatus, setUpdateStatus] = useState<string | null>(null);
   const [lastChecked, setLastChecked] = useState<number | null>(null);
   const [checking, setChecking] = useState(false);
+  const [updateInfo, setUpdateInfo] = useState<UpdateInfo | null>(null);
+  const [showUpdate, setShowUpdate] = useState(false);
 
   const checkUpdates = async () => {
     setChecking(true);
     setUpdateStatus(null);
-    const res = await checkForUpdates();
+    const info = await getUpdateInfo();
     setChecking(false);
     setLastChecked(Date.now());
-    setUpdateStatus(res.message);
-    if (res.ok) toast.success("Update check complete", res.message);
-    else toast.warning("Update check", res.message);
+    setUpdateInfo(info);
+    if (info?.available) {
+      setUpdateStatus(`Update available: v${info.version}`);
+      toast.success("Update available", `Version ${info.version} is ready to install in-app.`);
+    } else {
+      setUpdateStatus("You're on the latest version.");
+      toast.success("Up to date", "You're on the latest version.");
+    }
   };
 
   const toggleAi = () => {
@@ -84,10 +88,7 @@ export default function Settings() {
     );
   };
 
-  const openRepo = () => {
-    if (isTauri) void openUrl(REPO_URL).catch(() => toast.error("Couldn't open link"));
-    else window.open(REPO_URL, "_blank");
-  };
+  const openRepo = () => void openExternal(GITHUB_RELEASES);
 
   return (
     <div className="mx-auto flex max-w-2xl flex-col gap-4">
@@ -102,15 +103,29 @@ export default function Settings() {
       <Section icon={Download} title="Auto-Update">
         <Row label="Current version" value={backendVersion ? `v${backendVersion}` : "—"} />
         <Row label="Last checked" value={lastChecked ? new Date(lastChecked).toLocaleString() : "Never"} />
-        <div className="mt-3 flex items-center gap-3">
+        <div className="mt-3 flex flex-wrap items-center gap-3">
           <button onClick={() => void checkUpdates()} disabled={checking} className="flex items-center gap-2 rounded-btn border border-edge bg-bg px-4 py-2 text-[12.5px] font-medium text-txt hover:border-edge2 disabled:opacity-60">
             <RefreshCw size={14} className={checking ? "animate-spin" : ""} />
             {checking ? "Checking…" : "Check for Updates"}
           </button>
+          {updateInfo?.available && (
+            <button
+              onClick={() => setShowUpdate(true)}
+              className="glint flex items-center gap-2 rounded-btn bg-accent px-4 py-2 text-[12.5px] font-semibold text-white shadow-[0_4px_20px_rgba(227,0,14,0.3)] hover:bg-accent-hi"
+            >
+              <Download size={14} /> Update to v{updateInfo.version}
+            </button>
+          )}
           {updateStatus && <span className="text-[12px] text-txt2">{updateStatus}</span>}
         </div>
-        <p className="mt-2 text-[10.5px] text-txt3">Signed updates install in the background once public releases are published.</p>
+        <p className="mt-2 text-[10.5px] text-txt3">
+          Updates download and install in-app with a progress bar — nothing ever opens in your browser.
+        </p>
       </Section>
+
+      {showUpdate && updateInfo && (
+        <UpdateModal version={updateInfo.version} onClose={() => setShowUpdate(false)} />
+      )}
 
       {/* Advanced */}
       <Section icon={Cpu} title="Advanced">

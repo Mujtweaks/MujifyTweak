@@ -272,6 +272,13 @@ export interface JournalEntry {
   action: string | null; // driver_rollback | health_scan | power_high_perf | max_refresh_rate
 }
 
+/** In-app updater status for the update banner/modal. */
+export interface UpdateInfo {
+  available: boolean;
+  version: string;
+  current: string;
+}
+
 /** One pre-game Ready Check line (read-only pre-flight). */
 export interface ReadyCheckItem {
   label: string;

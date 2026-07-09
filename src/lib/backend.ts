@@ -24,6 +24,7 @@ import type {
   GameSession,
   DetectiveReport,
   ReadyCheckItem,
+  UpdateInfo,
 } from "./types";
 
 /**
@@ -52,6 +53,47 @@ export async function checkForUpdates(): Promise<{ ok: boolean; message: string 
     // Never surface a raw error or block the app; you're not missing anything.
     console.warn("update check failed:", err);
     return { ok: false, message: "Couldn't check for updates right now — try again later." };
+  }
+}
+
+/** Non-throwing update check for the in-app banner (never a browser page). */
+export async function getUpdateInfo(): Promise<UpdateInfo | null> {
+  if (!isTauri) return null;
+  try {
+    return await invoke<UpdateInfo>("get_update_info");
+  } catch {
+    return null;
+  }
+}
+
+/** Download + install the update in-app (progress via events), then relaunch. */
+export async function installUpdate(): Promise<void> {
+  if (!isTauri) return;
+  await invoke("install_update");
+}
+
+/** Current app version (fast, from the Rust ping). */
+export async function getAppVersion(): Promise<string | null> {
+  if (!isTauri) return null;
+  try {
+    const p = await invoke<{ appVersion: string }>("ping");
+    return p.appVersion;
+  } catch {
+    return null;
+  }
+}
+
+/** GitHub release notes for a version tag, or null (graceful — none yet = no-op). */
+export async function fetchReleaseNotes(version: string): Promise<string | null> {
+  try {
+    const tag = version.startsWith("v") ? version : `v${version}`;
+    const r = await fetch(`https://api.github.com/repos/Mujtweaks/MujifyTweak/releases/tags/${tag}`);
+    if (!r.ok) return null;
+    const j = (await r.json()) as { body?: string };
+    const body = (j.body ?? "").trim();
+    return body || null;
+  } catch {
+    return null;
   }
 }
 

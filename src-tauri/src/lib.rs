@@ -108,6 +108,65 @@ async fn check_for_updates(app: tauri::AppHandle) -> Result<String, String> {
     }
 }
 
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct UpdateInfo {
+    available: bool,
+    version: String,
+    current: String,
+}
+
+/// Non-throwing update check for the in-app banner. Any failure (no release
+/// channel yet, offline) resolves to `available: false` — never an error the UI
+/// has to handle, never a browser page.
+#[tauri::command]
+async fn get_update_info(app: tauri::AppHandle) -> UpdateInfo {
+    use tauri_plugin_updater::UpdaterExt;
+    let current = app.package_info().version.to_string();
+    let checked = match app.updater() {
+        Ok(updater) => updater.check().await.ok().flatten(),
+        Err(_) => None,
+    };
+    match checked {
+        Some(u) => UpdateInfo { available: true, version: u.version.clone(), current },
+        None => UpdateInfo { available: false, version: current.clone(), current },
+    }
+}
+
+/// Download + install the update entirely in-app, emitting `update_progress`
+/// ({chunk,total}) and `update_installing`, then relaunch. Never opens a browser.
+#[tauri::command]
+async fn install_update(app: tauri::AppHandle) -> Result<(), String> {
+    use tauri_plugin_updater::UpdaterExt;
+    let update = app
+        .updater()
+        .map_err(|e| e.to_string())?
+        .check()
+        .await
+        .map_err(|e| e.to_string())?
+        .ok_or_else(|| "No update available.".to_string())?;
+    let a1 = app.clone();
+    let a2 = app.clone();
+    update
+        .download_and_install(
+            move |chunk_length, content_length| {
+                let _ = a1.emit(
+                    "update_progress",
+                    serde_json::json!({ "chunk": chunk_length, "total": content_length }),
+                );
+            },
+            move || {
+                let _ = a2.emit("update_installing", ());
+            },
+        )
+        .await
+        .map_err(|e| {
+            logger::warn(format!("updater: install failed: {e}"));
+            e.to_string()
+        })?;
+    app.restart()
+}
+
 /// Headless revert-all for the uninstaller / `--revert-all` CLI. Restores every
 /// still-active change from the persisted log, marks them undone (the log file
 /// itself is kept as a record), and prints a summary. `dry_run` reports what
@@ -196,6 +255,8 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             ping,
             check_for_updates,
+            get_update_info,
+            install_update,
             hardware_profiler::get_hardware_profile,
             hardware_tier::get_hardware_tier,
             game_detector::get_installed_games,
