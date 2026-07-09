@@ -5,10 +5,12 @@ import {
   Download,
   ExternalLink,
   FolderOpen,
+  Gamepad2,
   Info,
   RefreshCw,
   Settings as SettingsIcon,
   ShieldCheck,
+  Wifi,
 } from "lucide-react";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { useSystemStore } from "../store/systemStore";
@@ -51,6 +53,10 @@ export default function Settings() {
 
   const aiEnabled = useSettingsStore((s) => s.aiEnabled);
   const setAiEnabled = useSettingsStore((s) => s.setAiEnabled);
+  const shareOnlineStatus = useSettingsStore((s) => s.shareOnlineStatus);
+  const setShareOnlineStatus = useSettingsStore((s) => s.setShareOnlineStatus);
+  const readyCheckEnabled = useSettingsStore((s) => s.readyCheckEnabled);
+  const setReadyCheckEnabled = useSettingsStore((s) => s.setReadyCheckEnabled);
   const clearMessages = useAiStore((s) => s.clearMessages);
 
   const [updateStatus, setUpdateStatus] = useState<string | null>(null);
@@ -120,6 +126,37 @@ export default function Settings() {
           </div>
           <Toggle on={aiEnabled} onClick={toggleAi} />
         </div>
+        <div className="flex items-center justify-between border-t border-edge py-3">
+          <div className="pr-4">
+            <p className="flex items-center gap-2 text-[13px] font-medium text-txt">
+              <Gamepad2 size={14} className="text-accent" /> Pre-game Ready Check
+            </p>
+            <p className="mt-0.5 text-[11.5px] text-txt2">
+              A quick read-only pre-flight (thermals, background apps, refresh rate, power plan) shown for a few
+              seconds when a game launches. Never changes anything on its own.
+            </p>
+          </div>
+          <Toggle on={readyCheckEnabled} onClick={() => setReadyCheckEnabled(!readyCheckEnabled)} />
+        </div>
+      </Section>
+
+      {/* Privacy */}
+      <Section icon={ShieldCheck} title="Privacy">
+        <div className="flex items-center justify-between py-1">
+          <div className="pr-4">
+            <p className="flex items-center gap-2 text-[13px] font-medium text-txt">
+              <Wifi size={14} className="text-accent" /> Share anonymous online status
+            </p>
+            <p className="mt-0.5 text-[11.5px] text-txt2">
+              Sends a single anonymous "online" ping every 5 minutes — app version only, nothing else.
+              No personal data, no machine id. Off by default; turn it off anytime.
+            </p>
+          </div>
+          <Toggle on={shareOnlineStatus} onClick={() => setShareOnlineStatus(!shareOnlineStatus)} />
+        </div>
+        <p className="mt-2 text-[10.5px] text-txt3">
+          No personal data. No tracking. No account. Everything else stays 100% on this PC.
+        </p>
       </Section>
 
       {/* About */}
@@ -128,7 +165,7 @@ export default function Settings() {
         <Row label="Version" value={backendVersion ? `v${backendVersion}` : "—"} />
         <Row label="Backend core" value={backendConnected ? "Connected" : "Disconnected"} tone={backendConnected ? "text-success" : "text-txt3"} />
         <Row label="This PC" value={hardware ? hardware.cpuName : "Detecting…"} />
-        <Row label="Telemetry" value="None — nothing leaves this PC" />
+        <Row label="Privacy" value="No personal data · no tracking · no account" />
         <p className="mt-3 text-[12px] leading-relaxed text-txt2">
           A free Windows gaming optimizer with per-game profiles and proof reports. Every system
           change is confirmed first, logged in plain English, and fully reversible — nothing is ever
@@ -143,7 +180,7 @@ export default function Settings() {
           </button>
         </div>
         <p className="mt-2 text-[10.5px] text-txt3">
-          Logs are stored locally at %AppData%\MujifyTweaks\logs to help you report bugs — no telemetry, nothing leaves your PC.
+          Logs are stored locally at %AppData%\MujifyTweaks\logs to help you report bugs — no personal data leaves your PC.
         </p>
       </Section>
 

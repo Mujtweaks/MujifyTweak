@@ -21,8 +21,10 @@ import Support from "./pages/Support";
 import Settings from "./pages/Settings";
 import Toaster from "./components/Toaster";
 import WelcomeModal from "./components/WelcomeModal";
+import ReadyCheck from "./components/ReadyCheck";
 import { checkResetTweaks, connectBackend, fetchHardware } from "./lib/backend";
 import { toast } from "./store/toastStore";
+import { startHeartbeat } from "./lib/heartbeat";
 import { initEventBridge, listenNavigate } from "./lib/events";
 import { NAV_ITEMS, type PageId } from "./lib/nav";
 
@@ -56,6 +58,8 @@ export default function App() {
     void connectBackend();
     void fetchHardware();
     void initEventBridge();
+    // Opt-in anonymous online ping (no-ops unless enabled + endpoint configured).
+    startHeartbeat();
     // Windows feature updates can silently reset tweaks — re-detect on launch
     // and let the user re-apply the ones that drifted back to default.
     void checkResetTweaks().then((ids) => {
@@ -135,6 +139,7 @@ export default function App() {
         <GamesBar onNavigate={setPage} />
       </div>
       <Toaster />
+      <ReadyCheck onNavigate={setPage} />
       {showWelcome && <WelcomeModal onClose={dismissWelcome} />}
     </div>
   );

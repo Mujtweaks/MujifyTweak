@@ -23,6 +23,7 @@ import type {
   SettingsAdvice,
   GameSession,
   DetectiveReport,
+  ReadyCheckItem,
 } from "./types";
 
 /**
@@ -155,6 +156,19 @@ export async function dismissDetectiveReport(): Promise<void> {
     await invoke("dismiss_detective_report");
   } catch {
     /* ignore */
+  }
+}
+
+/** Pre-game Ready Check — read-only pre-flight for the active game. */
+export async function readyCheck(
+  gameName: string | null,
+  gameInstallPath: string | null,
+): Promise<ReadyCheckItem[]> {
+  if (!isTauri) return [];
+  try {
+    return await invoke<ReadyCheckItem[]>("ready_check", { gameName, gameInstallPath });
+  } catch {
+    return [];
   }
 }
 

@@ -272,6 +272,15 @@ export interface JournalEntry {
   action: string | null; // driver_rollback | health_scan | power_high_perf | max_refresh_rate
 }
 
+/** One pre-game Ready Check line (read-only pre-flight). */
+export interface ReadyCheckItem {
+  label: string;
+  ok: boolean;
+  detail: string;
+  action: string | null;
+  informational: boolean;
+}
+
 /** The Detective's report card when a game regresses below its baseline. */
 export interface DetectiveReport {
   game: string;

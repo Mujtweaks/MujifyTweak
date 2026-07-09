@@ -26,8 +26,8 @@ use tauri::{
 use modules::{
     ai_backend, benchmark, change_journal, change_log, config, driver_doctor, fix_catalog,
     game_detector, game_profiler, game_profiles, game_settings, hardware_profiler, hardware_tier,
-    health_scan, logger, network_monitor, profile_store, rollback_engine, server_ping, sessions,
-    speed_test, support, system_monitor, tweak_catalog, tweaks_engine,
+    health_scan, logger, network_monitor, profile_store, ready_check, rollback_engine, server_ping,
+    sessions, speed_test, support, system_monitor, tweak_catalog, tweaks_engine,
 };
 
 fn show_main(app: &tauri::AppHandle) {
@@ -229,6 +229,7 @@ pub fn run() {
             sessions::dismiss_detective_report,
             change_journal::get_change_journal,
             support::get_support_report,
+            ready_check::ready_check,
             config::get_api_key,
             config::set_api_key,
             ai_backend::ai_chat,

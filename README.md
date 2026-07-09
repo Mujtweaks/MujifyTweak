@@ -1,8 +1,12 @@
 # Mujify Tweaks
 
+![version](https://img.shields.io/github/v/release/Mujtweaks/MujifyTweak?include_prereleases&label=version)
+![downloads](https://img.shields.io/github/downloads/Mujtweaks/MujifyTweak/total?label=downloads)
+![license](https://img.shields.io/badge/license-GPL--3.0-blue)
+
 **A free Windows gaming optimizer that diagnoses what's actually slowing your PC down, fixes it honestly, and proves the gain with a real before/after benchmark.**
 
-Red/black desktop app built with Tauri v2 (Rust) + React/TypeScript. 100% free — no telemetry, no account, no paywall.
+Red/black desktop app built with Tauri v2 (Rust) + React/TypeScript. 100% free — no personal data, no tracking, no account, no paywall.
 
 > Status: `0.9.0-beta.1` — feature-complete core, entering pre-release testing.
 
@@ -33,7 +37,7 @@ Mujify's whole design is "you can always undo it, and nothing happens without yo
 - **Everything is logged.** The Change Log is a complete plain-English history in `%AppData%\MujifyTweaks`; entries are never deleted, only marked reverted.
 - **Uninstall-safe.** If you uninstall while tweaks are applied, the uninstaller runs `--revert-all` first and restores your original settings before removing any files.
 - **Anti-cheat-safe by construction.** No code injection, no driver hooks, no touching game memory — ever. Risky tweaks auto-refuse while a protected anti-cheat game is running.
-- **No telemetry.** No data ever leaves your machine. Logs are local only (Settings → About → Open logs folder).
+- **No personal data, no tracking, no account.** The only thing ever sent is an optional, anonymous "online" ping (app version only, off by default, toggleable in Settings). Everything else — health scans, tweaks, sessions, the Detective, logs — stays 100% on your machine.
 - **Proven by tests, not on your machine.** The apply/undo logic is verified by `cargo test` against a mock Windows layer; the real code path only runs when you click Apply.
 
 ## Screenshots
