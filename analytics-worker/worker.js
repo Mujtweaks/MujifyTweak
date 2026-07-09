@@ -372,12 +372,16 @@ tbody tr{transition:background .12s}tbody tr:hover{background:rgba(255,255,255,.
 .tworow2{display:grid;grid-template-columns:1fr 1.35fr;gap:14px}
 svg.chart{display:block;width:100%}
 /* ---- geo rows ---- */
-.rows .row{display:flex;align-items:center;gap:10px;padding:7.5px 0;border-bottom:1px solid var(--edge);font-size:12px}
+.rows .row{display:flex;align-items:center;gap:10px;padding:7.5px 4px;border-bottom:1px solid var(--edge);font-size:12px;border-radius:8px;transition:background .12s}
 .rows .row:last-child{border-bottom:0}
+.rows .row:hover,.vrow:hover{background:rgba(255,255,255,.025)}
+.vrow{border-radius:8px;transition:background .12s;padding-left:4px;padding-right:4px}
 .flag{font-size:16px;width:24px;text-align:center;flex-shrink:0}
 .rname{width:42px;color:var(--txt);font-weight:600}
 .rbar{flex:1;height:6px;border-radius:99px;background:#1d1d22;overflow:hidden}
-.rbar i{display:block;height:100%;border-radius:99px;background:linear-gradient(90deg,#E3000E,#ff4d57);box-shadow:0 0 8px rgba(227,0,14,.4)}
+.rbar i{display:block;height:100%;border-radius:99px;background:linear-gradient(90deg,#E3000E,#ff4d57);box-shadow:0 0 8px rgba(227,0,14,.4);transform-origin:left}
+.grow i{animation:grow .6s cubic-bezier(.34,1.1,.64,1)}
+@keyframes grow{from{transform:scaleX(0)}to{transform:scaleX(1)}}
 .rval{color:var(--txt2);font-variant-numeric:tabular-nums;min-width:52px;text-align:right;font-size:11px}
 .rpct{color:var(--txt3);min-width:36px;text-align:right;font-size:10.5px}
 /* ---- versions ---- */
@@ -533,6 +537,7 @@ var INITIAL = ${initial};
 var token = new URLSearchParams(location.search).get("token");
 var latest = INITIAL;
 var view = { days: 14, hours: 24 };
+var geoSig = "", verSig = ""; // rebuild geo/version lists (and re-animate bars) only on real change
 
 function fmt(n){if(n==null)return"-";return n>=1e6?(n/1e6).toFixed(2)+"M":n>=1e3?(n/1e3).toFixed(n>=1e4?0:1)+"k":String(n)}
 function flag(cc){if(!cc||cc.length!==2||cc==="??")return"🌐";
@@ -674,30 +679,34 @@ function render(d){
   var cn=document.getElementById("countries");
   var totC=0; d.countries.forEach(function(x){totC+=x.pings});
   document.getElementById("geoChip").textContent=d.countries.length+" countr"+(d.countries.length===1?"y":"ies")+" today";
-  if(!d.countries.length){cn.innerHTML='<div class="empty">no pings yet today</div>';}
-  else{var cmax=d.countries[0].pings; cn.innerHTML="";
-    d.countries.forEach(function(x){
-      var r=document.createElement("div");r.className="row";
-      r.innerHTML='<span class="flag">'+flag(x.code)+'</span><span class="rname">'+esc(x.code)+
-        '</span><span class="rbar"><i style="width:'+Math.round(x.pings/cmax*100)+'%"></i></span>'+
-        '<span class="rpct">'+(totC?Math.round(x.pings/totC*100):0)+'%</span>'+
-        '<span class="rval">'+fmt(x.pings)+' pings</span>';
-      cn.appendChild(r);});}
+  var gsig=JSON.stringify(d.countries);
+  if(gsig!==geoSig){geoSig=gsig;
+    if(!d.countries.length){cn.innerHTML='<div class="empty">no pings yet today</div>';}
+    else{var cmax=d.countries[0].pings; cn.innerHTML="";
+      d.countries.forEach(function(x){
+        var r=document.createElement("div");r.className="row grow";
+        r.innerHTML='<span class="flag">'+flag(x.code)+'</span><span class="rname">'+esc(x.code)+
+          '</span><span class="rbar"><i style="width:'+Math.round(x.pings/cmax*100)+'%"></i></span>'+
+          '<span class="rpct">'+(totC?Math.round(x.pings/totC*100):0)+'%</span>'+
+          '<span class="rval">'+fmt(x.pings)+' pings</span>';
+        cn.appendChild(r);});}}
 
   var vs=document.getElementById("vlist");
   var keys=Object.keys(d.versions||{});
   var VCOLORS=["#E3000E","#A855F7","#4A9EFF","#22C55E","#F59E0B","#9a9aa2"];
-  if(!keys.length){vs.innerHTML='<div class="empty">no pings yet today</div>';}
-  else{var tot=0;keys.forEach(function(k){tot+=d.versions[k]});vs.innerHTML="";
-    keys.sort(function(a,b){return d.versions[b]-d.versions[a]}).slice(0,6).forEach(function(k,i){
-      var pct=d.versions[k]/tot*100;
-      var isLatest=d.latestRelease&&(k===d.latestRelease||("v"+k)===d.latestRelease);
-      var r=document.createElement("div");r.className="vrow";
-      r.innerHTML='<span class="vpill"><span class="vdot" style="background:'+VCOLORS[i%6]+'"></span>'+
-        (isLatest?"✦ ":"")+"v"+esc(k)+'</span>'+
-        '<span class="rbar"><i style="width:'+pct.toFixed(0)+'%;background:linear-gradient(90deg,'+VCOLORS[i%6]+','+VCOLORS[i%6]+'cc)"></i></span>'+
-        '<span class="rval">'+pct.toFixed(1)+'%</span>';
-      vs.appendChild(r);});}
+  var vsig=JSON.stringify(d.versions)+"|"+d.latestRelease;
+  if(vsig!==verSig){verSig=vsig;
+    if(!keys.length){vs.innerHTML='<div class="empty">no pings yet today</div>';}
+    else{var tot=0;keys.forEach(function(k){tot+=d.versions[k]});vs.innerHTML="";
+      keys.sort(function(a,b){return d.versions[b]-d.versions[a]}).slice(0,6).forEach(function(k,i){
+        var pct=d.versions[k]/tot*100;
+        var isLatest=d.latestRelease&&(k===d.latestRelease||("v"+k)===d.latestRelease);
+        var r=document.createElement("div");r.className="vrow grow";
+        r.innerHTML='<span class="vpill"><span class="vdot" style="background:'+VCOLORS[i%6]+'"></span>'+
+          (isLatest?"✦ ":"")+"v"+esc(k)+'</span>'+
+          '<span class="rbar"><i style="width:'+pct.toFixed(0)+'%;background:linear-gradient(90deg,'+VCOLORS[i%6]+','+VCOLORS[i%6]+'cc)"></i></span>'+
+          '<span class="rval">'+pct.toFixed(1)+'%</span>';
+        vs.appendChild(r);});}}
   document.getElementById("vLatest").textContent=d.latestRelease||"none yet";
   document.getElementById("vReleased").textContent=d.latestReleaseAt?new Date(d.latestReleaseAt).toLocaleDateString():"—";
   document.getElementById("vOutdated").textContent=d.outdatedPings==null?"—":fmt(d.outdatedPings)+" pings";
