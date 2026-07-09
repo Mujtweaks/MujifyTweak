@@ -18,7 +18,7 @@
 // "milestone" events (new peak / new version / new country) are derived from
 // real counter transitions, never invented.
 
-const WORKER_VERSION = "2.1.0";
+const WORKER_VERSION = "2.2.0";
 
 const CORS = {
   "Access-Control-Allow-Origin": "*",
@@ -209,22 +209,22 @@ export class Counter {
 
       const online = this.onlineNow(nowMin);
 
-      // Last 14 days (zero-filled) for the daily chart + weekly growth.
+      // Last 30 days (zero-filled) — the client offers a real 14D/30D toggle.
       const days = [];
-      for (let i = 13; i >= 0; i--) {
+      for (let i = 29; i >= 0; i--) {
         const d = new Date(now - i * 86400000).toISOString().slice(0, 10);
         days.push({ date: d, pings: d === today ? this.s.dailyPings : this.s.history[d] || 0 });
       }
       const sum = (arr) => arr.reduce((a, x) => a + x.pings, 0);
-      const thisWeek = sum(days.slice(7));
-      const prevWeek = sum(days.slice(0, 7));
+      const thisWeek = sum(days.slice(23));
+      const prevWeek = sum(days.slice(16, 23));
       const growthPct = prevWeek > 0 ? ((thisWeek - prevWeek) / prevWeek) * 100 : null;
       const yesterday = new Date(now - 86400000).toISOString().slice(0, 10);
       const yesterdayPings = this.s.history[yesterday] || 0;
 
-      // Last 24 hours (zero-filled) for the timeline + sparklines.
+      // Last 48 hours (zero-filled) — the client offers a real 24H/48H toggle.
       const hours = [];
-      for (let i = 23; i >= 0; i--) {
+      for (let i = 47; i >= 0; i--) {
         const h = new Date(now - i * 3600000).toISOString().slice(0, 13);
         hours.push({ hour: h.slice(11) + ":00", pings: this.s.hourly[h] || 0 });
       }
@@ -354,6 +354,20 @@ header.top{display:flex;align-items:center;justify-content:space-between;margin-
  display:flex;justify-content:space-between;align-items:center}
 .chip{letter-spacing:.02em;text-transform:none;font-weight:600;color:var(--txt2);border:1px solid var(--edge);
  background:var(--card2);border-radius:7px;padding:3px 9px;font-size:10px}
+.chip.tgl{cursor:pointer;user-select:none}
+.chip.tgl:hover{color:var(--txt);border-color:var(--edge2)}
+.chip.on{background:rgba(227,0,14,.16);border-color:rgba(227,0,14,.45);color:#fff}
+svg.chart{cursor:crosshair;touch-action:none}
+#tip{position:fixed;display:none;z-index:50;background:#1a1a1f;border:1px solid var(--edge2);border-radius:9px;
+ padding:7px 11px;font-size:11.5px;font-weight:700;color:var(--txt);pointer-events:none;box-shadow:0 10px 28px rgba(0,0,0,.55)}
+#tip b{display:block;color:var(--txt3);font-size:9.5px;font-weight:600;letter-spacing:.08em;margin-bottom:2px}
+#tip i{font-style:normal;color:var(--red2)}
+.bump{animation:bump .5s ease}
+@keyframes bump{0%{opacity:.35}40%{opacity:1}}
+tbody tr{transition:background .12s}tbody tr:hover{background:rgba(255,255,255,.025)}
+.fitem{transition:background .12s;border-radius:8px}.fitem:hover{background:rgba(255,255,255,.025)}
+.spin{animation:rot .7s linear infinite}
+@keyframes rot{to{transform:rotate(360deg)}}
 .tworow{display:grid;grid-template-columns:1.35fr 1fr;gap:14px}
 .tworow2{display:grid;grid-template-columns:1fr 1.35fr;gap:14px}
 svg.chart{display:block;width:100%}
@@ -426,7 +440,7 @@ td.ev{color:var(--txt);font-weight:600}
       <div class="htitle"><h1>MUJIFY TWEAKS</h1><small>Owner Dashboard · Private</small></div>
       <div class="tools">
         <div class="live"><span class="dot"></span>LIVE</div>
-        <button class="iconbtn" onclick="refresh()" title="Refresh now"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 1 1-2.6-6.4M21 4v5h-5"/></svg></button>
+        <button class="iconbtn" onclick="refresh()" title="Refresh now"><svg id="rspin" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 1 1-2.6-6.4M21 4v5h-5"/></svg></button>
         <button class="iconbtn" onclick="exportJson()" title="Export JSON"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v12m0 0 4-4m-4 4-4-4M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/></svg></button>
         <div class="avatar">M</div>
       </div>
@@ -461,9 +475,9 @@ td.ev{color:var(--txt);font-weight:600}
         </div>
 
         <div class="tworow" id="charts">
-          <div class="panel"><h2>Daily pings <span class="chip">Last 14 days</span></h2>
+          <div class="panel"><h2>Daily pings <span><span class="chip tgl on" data-chart="days" data-n="14">14D</span> <span class="chip tgl" data-chart="days" data-n="30">30D</span></span></h2>
             <svg class="chart" id="chartDays" height="150"></svg></div>
-          <div class="panel"><h2>Online timeline <span class="chip">Last 24h · pings/hr</span></h2>
+          <div class="panel"><h2>Online timeline · pings/hr <span><span class="chip tgl on" data-chart="hours" data-n="24">24H</span> <span class="chip tgl" data-chart="hours" data-n="48">48H</span></span></h2>
             <svg class="chart" id="chartHours" height="150"></svg></div>
         </div>
 
@@ -513,17 +527,21 @@ td.ev{color:var(--txt);font-weight:600}
     </div>
   </div>
 </div>
+<div id="tip"></div>
 <script>
 var INITIAL = ${initial};
 var token = new URLSearchParams(location.search).get("token");
 var latest = INITIAL;
+var view = { days: 14, hours: 24 };
 
-function fmt(n){if(n==null)return"–";return n>=1e6?(n/1e6).toFixed(2)+"M":n>=1e3?(n/1e3).toFixed(n>=1e4?0:1)+"k":String(n)}
+function fmt(n){if(n==null)return"-";return n>=1e6?(n/1e6).toFixed(2)+"M":n>=1e3?(n/1e3).toFixed(n>=1e4?0:1)+"k":String(n)}
 function flag(cc){if(!cc||cc.length!==2||cc==="??")return"🌐";
   return String.fromCodePoint(127397+cc.charCodeAt(0),127397+cc.charCodeAt(1))}
 function rel(t){var s=Math.max(0,(Date.now()-t)/1000);
   return s<60?Math.round(s)+"s ago":s<3600?Math.round(s/60)+"m ago":s<86400?Math.round(s/3600)+"h ago":Math.round(s/86400)+"d ago"}
 function esc(x){return String(x).replace(/[<>&]/g,function(ch){return{"<":"&lt;",">":"&gt;","&":"&amp;"}[ch]})}
+function setText(id,val){var el=document.getElementById(id);if(!el)return;var s=String(val);
+  if(el.textContent!==s){el.textContent=s;el.classList.remove("bump");void el.offsetWidth;el.classList.add("bump")}}
 function deltaTxt(el,cur,prev,label){
   el=document.getElementById(el);
   if(prev==null||prev===0){el.textContent=label?("· "+label):" ";el.className="delta flat";return}
@@ -531,7 +549,6 @@ function deltaTxt(el,cur,prev,label){
   el.textContent=(up?"↑ ":"↓ ")+Math.abs(pct).toFixed(1)+"% "+(label||"");
   el.className="delta "+(up?"up":"down");
 }
-// Catmull-Rom → smooth cubic path
 function smoothPath(pts){
   if(pts.length<3){return "M"+pts.map(function(p){return p[0]+","+p[1]}).join("L")}
   var d="M"+pts[0][0]+","+pts[0][1];
@@ -543,10 +560,31 @@ function smoothPath(pts){
   }
   return d;
 }
+
+/* ---- interactive charts: crosshair + tooltip, real data only ---- */
+var tip=document.getElementById("tip");
+function showTip(html,x,y){tip.innerHTML=html;tip.style.display="block";
+  var r=tip.getBoundingClientRect();var px=x+16;if(px+r.width>innerWidth-8)px=x-r.width-16;
+  var py=y-r.height-14;if(py<8)py=y+18;tip.style.left=px+"px";tip.style.top=py+"px"}
+function hideTip(){tip.style.display="none"}
+function chartMove(e){var svg=e.currentTarget,c=svg.__c;if(!c)return;
+  var r=svg.getBoundingClientRect();
+  var i=Math.round((e.clientX-r.left)/r.width*(c.v.length-1));
+  i=Math.max(0,Math.min(c.v.length-1,i));
+  var px=i/(c.v.length-1)*c.W, py=c.padT+(1-c.v[i]/c.max)*(c.H-c.padT-c.padB);
+  var g=document.getElementById(c.cross);if(!g)return;g.style.display="";
+  var ln=g.querySelector("line"),ci=g.querySelector("circle");
+  ln.setAttribute("x1",px);ln.setAttribute("x2",px);
+  ci.setAttribute("cx",px);ci.setAttribute("cy",py);
+  showTip("<b>"+esc(c.l[i])+"</b><i>"+Number(c.v[i]).toLocaleString()+"</i> "+c.unit,e.clientX,e.clientY);
+}
+function chartLeave(e){var c=e.currentTarget.__c;
+  if(c){var g=document.getElementById(c.cross);if(g)g.style.display="none"}hideTip()}
+
 var GID=0;
-function areaChart(id,values,labels,color,h){
+function areaChart(id,values,labels,color,unit){
   var svg=document.getElementById(id); if(!svg)return;
-  var W=svg.clientWidth||560,H=h||150,padB=labels?16:2,padT=8;
+  var W=svg.clientWidth||560,H=150,padB=16,padT=8;
   svg.setAttribute("viewBox","0 0 "+W+" "+H);
   var max=1;values.forEach(function(v){if(v>max)max=v});
   var pts=values.map(function(v,i){return[ i/(values.length-1)*W, padT+(1-v/max)*(H-padT-padB) ]});
@@ -556,10 +594,10 @@ function areaChart(id,values,labels,color,h){
   var grid="";
   for(var g=1;g<=3;g++){var gy=padT+(H-padT-padB)*g/4;
     grid+='<line x1="0" y1="'+gy+'" x2="'+W+'" y2="'+gy+'" stroke="rgba(255,255,255,.04)" stroke-dasharray="3 5"/>'}
-  var lbl="";
-  if(labels){lbl='<text x="2" y="'+(H-3)+'" fill="#5b5b63" font-size="8.5">'+esc(labels[0])+'</text>'+
-    '<text x="'+(W/2-14)+'" y="'+(H-3)+'" fill="#5b5b63" font-size="8.5">'+esc(labels[1])+'</text>'+
-    '<text x="'+(W-36)+'" y="'+(H-3)+'" fill="#5b5b63" font-size="8.5">'+esc(labels[2])+'</text>'}
+  var mid=Math.floor(labels.length/2);
+  var lbl='<text x="2" y="'+(H-3)+'" fill="#5b5b63" font-size="8.5">'+esc(labels[0])+'</text>'+
+    '<text x="'+(W/2-14)+'" y="'+(H-3)+'" fill="#5b5b63" font-size="8.5">'+esc(labels[mid])+'</text>'+
+    '<text x="'+(W-40)+'" y="'+(H-3)+'" fill="#5b5b63" font-size="8.5">'+esc(labels[labels.length-1])+'</text>';
   var last=pts[pts.length-1];
   svg.innerHTML='<defs><linearGradient id="'+gid+'" x1="0" y1="0" x2="0" y2="1">'+
     '<stop offset="0" stop-color="'+color+'" stop-opacity=".32"/><stop offset="1" stop-color="'+color+'" stop-opacity="0"/></linearGradient></defs>'+
@@ -567,7 +605,14 @@ function areaChart(id,values,labels,color,h){
     '<path d="'+line+'" fill="none" stroke="'+color+'" stroke-width="2" stroke-linejoin="round"/>'+
     '<circle cx="'+last[0]+'" cy="'+last[1]+'" r="3" fill="'+color+'"/>'+
     '<circle cx="'+last[0]+'" cy="'+last[1]+'" r="6" fill="'+color+'" opacity=".25"/>'+lbl+
-    '<text x="2" y="10" fill="#5b5b63" font-size="8.5">max '+fmt(max)+'</text>';
+    '<text x="2" y="10" fill="#5b5b63" font-size="8.5">max '+fmt(max)+'</text>'+
+    '<g id="'+id+'X" style="display:none"><line y1="'+padT+'" y2="'+(H-padB)+
+    '" stroke="rgba(255,255,255,.28)" stroke-dasharray="2 3"/><circle r="4.5" fill="'+color+
+    '" stroke="#0A0A0B" stroke-width="2"/></g>';
+  svg.__c={v:values,l:labels,color:color,W:W,H:H,padT:padT,padB:padB,max:max,unit:unit,cross:id+"X"};
+  if(!svg.__wired){svg.__wired=true;
+    svg.addEventListener("pointermove",chartMove);
+    svg.addEventListener("pointerleave",chartLeave);}
 }
 function mini(id,values,color){
   var svg=document.getElementById(id); if(!svg)return;
@@ -590,40 +635,42 @@ var KMETA={ping:["⚡","App online ping","fk-ping","Received","s-ok"],
 function render(d){
   latest=d;
   var hp=d.hours.map(function(x){return x.pings});
+  var hl=d.hours.map(function(x){return x.hour});
   var dp=d.days.map(function(x){return x.pings});
-  document.getElementById("online").textContent=fmt(d.onlineNow);
-  document.getElementById("peak").textContent=fmt(d.peakOnline);
-  document.getElementById("pings").textContent=fmt(d.dailyPings);
-  document.getElementById("total").textContent=fmt(d.totalPings);
+  var dl=d.days.map(function(x){return x.date.slice(5)});
+  setText("online",fmt(d.onlineNow));
+  setText("peak",fmt(d.peakOnline));
+  setText("pings",fmt(d.dailyPings));
+  setText("total",fmt(d.totalPings));
+  document.title="("+d.onlineNow+" online) Mujify Stats";
   document.getElementById("day").textContent=d.day||"";
   var hrsElapsed=Math.max(1,new Date().getUTCHours()+1);
   document.getElementById("avg").textContent="avg "+(d.dailyPings/hrsElapsed).toFixed(1)+"/hr · est. "+fmt(d.dailyActivesEstimate)+" actives";
   document.getElementById("since").textContent=d.since?("since "+d.since):"";
-  deltaTxt("onlineDelta",hp[23],hp[22],"vs last hour");
+  deltaTxt("onlineDelta",hp[hp.length-1],hp[hp.length-2],"vs last hour");
   deltaTxt("peakDelta",d.peakOnline,d.peakYesterday,"vs yesterday");
   deltaTxt("pingsDelta",d.dailyPings,d.yesterdayPings,"vs yesterday");
   document.getElementById("totalDelta").textContent="+"+fmt(d.dailyPings)+" today";
   var g=document.getElementById("growth");
-  if(d.growthPct==null){g.textContent="–";g.className="n flat";
+  if(d.growthPct==null){setText("growth","-");g.className="n flat";
     document.getElementById("growthsub").textContent="needs 2 weeks of history";
     document.getElementById("growthDelta").textContent=" ";}
-  else{var up=d.growthPct>=0;g.textContent=(up?"↑":"↓")+Math.abs(d.growthPct).toFixed(1)+"%";
+  else{var up=d.growthPct>=0;setText("growth",(up?"↑":"↓")+Math.abs(d.growthPct).toFixed(1)+"%");
     g.className="n "+(up?"up":"down");
     document.getElementById("growthsub").textContent=fmt(d.thisWeek)+" vs "+fmt(d.prevWeek)+" pings";
     document.getElementById("growthDelta").textContent="vs previous 7 days";
     document.getElementById("growthDelta").className="delta flat";}
   document.getElementById("updated").textContent=new Date(d.updated).toLocaleTimeString();
-  document.getElementById("fsince").textContent=d.since||"–";
-  document.getElementById("fcolo").textContent=d.colo?("Cloudflare "+d.colo):"–";
+  document.getElementById("fsince").textContent=d.since||"-";
+  document.getElementById("fcolo").textContent=d.colo?("Cloudflare "+d.colo):"-";
   document.getElementById("fver").textContent="v"+(d.workerVersion||"?");
 
-  mini("m1",hp.slice(-12),"#E3000E"); mini("m2",hp,"#E3000E");
-  mini("m3",hp,"#F59E0B"); mini("m4",dp,"#22C55E"); mini("m5",dp.slice(-7),"#4A9EFF");
+  mini("m1",hp.slice(-12),"#E3000E"); mini("m2",hp.slice(-24),"#E3000E");
+  mini("m3",hp.slice(-24),"#F59E0B"); mini("m4",dp.slice(-14),"#22C55E"); mini("m5",dp.slice(-7),"#4A9EFF");
 
-  areaChart("chartDays",dp,[d.days[0].date.slice(5),d.days[7].date.slice(5),d.days[13].date.slice(5)],"#E3000E",150);
-  areaChart("chartHours",hp,[d.hours[0].hour,d.hours[12].hour,d.hours[23].hour],"#E3000E",150);
+  areaChart("chartDays",dp.slice(-view.days),dl.slice(-view.days),"#E3000E","pings");
+  areaChart("chartHours",hp.slice(-view.hours),hl.slice(-view.hours),"#E3000E","pings/hr");
 
-  // countries
   var cn=document.getElementById("countries");
   var totC=0; d.countries.forEach(function(x){totC+=x.pings});
   document.getElementById("geoChip").textContent=d.countries.length+" countr"+(d.countries.length===1?"y":"ies")+" today";
@@ -637,7 +684,6 @@ function render(d){
         '<span class="rval">'+fmt(x.pings)+' pings</span>';
       cn.appendChild(r);});}
 
-  // versions
   var vs=document.getElementById("vlist");
   var keys=Object.keys(d.versions||{});
   var VCOLORS=["#E3000E","#A855F7","#4A9EFF","#22C55E","#F59E0B","#9a9aa2"];
@@ -662,22 +708,20 @@ function render(d){
     ?'<span class="st ok"></span>GitHub releases <b>'+esc(d.latestRelease)+'</b>'
     :'<span class="st warn"></span>GitHub releases <b>none yet</b>';
 
-  // feed
   var fd=document.getElementById("feed");
   if(!d.feed||!d.feed.length){fd.innerHTML='<div class="empty">waiting for the first ping…</div>';}
   else{fd.innerHTML="";
     d.feed.forEach(function(f){
       var m=KMETA[f.k]||KMETA.ping;
-      var sub=f.k==="ping"?("v"+esc(f.v)+" · "+flag(f.c)+" "+esc(f.c))
-        :f.k==="peak"?(esc(f.x)+" online at once")
+      var sub=f.k==="peak"?(esc(f.x)+" online at once")
         :f.k==="version"?("v"+esc(f.x)+" first seen")
-        :(flag(f.x)+" "+esc(f.x)+" first ping ever");
+        :f.k==="country"?(flag(f.x)+" "+esc(f.x)+" first ping ever")
+        :("v"+esc(f.v)+" · "+flag(f.c)+" "+esc(f.c));
       var it=document.createElement("div");it.className="fitem";
       it.innerHTML='<div class="fdot '+m[2]+'">'+m[0]+'</div><div class="fmain"><b>'+m[1]+'</b>'+
         '<div class="fsub">'+sub+'</div></div><span class="ftime" data-t="'+f.t+'">'+rel(f.t)+'</span>';
       fd.appendChild(it);});}
 
-  // events table
   var tb=document.getElementById("evbody");
   if(!d.feed||!d.feed.length){tb.innerHTML='<tr><td colspan="5" class="empty">waiting for the first ping…</td></tr>';}
   else{tb.innerHTML="";
@@ -691,19 +735,29 @@ function render(d){
 }
 
 function refresh(){
+  var rb=document.getElementById("rspin"); if(rb)rb.classList.add("spin");
   var t0=performance.now();
   fetch("/stats?token="+encodeURIComponent(token)+"&json=1",{cache:"no-store"})
     .then(function(r){
       document.getElementById("hlat").textContent=Math.round(performance.now()-t0)+"ms";
       return r.ok?r.json():null})
     .then(function(d){if(d)render(d)})
-    .catch(function(){});
+    .catch(function(){})
+    .finally(function(){setTimeout(function(){if(rb)rb.classList.remove("spin")},350)});
 }
 function exportJson(){
   var blob=new Blob([JSON.stringify(latest,null,2)],{type:"application/json"});
   var a=document.createElement("a");a.href=URL.createObjectURL(blob);
   a.download="mujify-stats-"+(latest.day||"export")+".json";a.click();
 }
+document.querySelectorAll(".tgl").forEach(function(ch){
+  ch.addEventListener("click",function(){
+    var grp=ch.getAttribute("data-chart");
+    view[grp]=Number(ch.getAttribute("data-n"));
+    document.querySelectorAll('.tgl[data-chart="'+grp+'"]').forEach(function(o){o.classList.toggle("on",o===ch)});
+    render(latest);
+  });
+});
 render(INITIAL);
 refresh();
 setInterval(refresh,10000);
