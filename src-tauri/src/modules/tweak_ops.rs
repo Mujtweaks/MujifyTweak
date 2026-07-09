@@ -238,6 +238,10 @@ const MMCSS_GAMES: &str =
     r"SOFTWARE\Microsoft\Windows NT\CurrentVersion\Multimedia\SystemProfile\Tasks\Games";
 const MMCSS_PROFILE: &str = r"SOFTWARE\Microsoft\Windows NT\CurrentVersion\Multimedia\SystemProfile";
 const TCP_INTERFACES: &str = r"SYSTEM\CurrentControlSet\Services\Tcpip\Parameters\Interfaces";
+/// Primary display adapter's driver key (subkey 0000 = first adapter). Home of
+/// the vendor GPU knobs: NVIDIA PowerMizer, AMD ULPS.
+const DISPLAY_CLASS_0: &str =
+    r"SYSTEM\CurrentControlSet\Control\Class\{4d36e968-e325-11ce-bfc1-08002be10318}\0000";
 
 /// The concrete op list for a tweak id. Unknown ids return empty (nothing runs).
 /// Every op here is fully reversible via its captured UndoOp.
@@ -339,6 +343,38 @@ pub fn ops_for(tweak_id: &str) -> Vec<Op> {
             sz(Hkcu, r"Control Panel\Keyboard", "KeyboardSpeed", "31"),
         ],
         "disable_sticky_keys" => vec![sz(Hkcu, r"Control Panel\Accessibility\StickyKeys", "Flags", "506")],
+
+        // ---- New general system/performance tweaks ----
+        "usb_selective_suspend_off" => vec![dw(Hklm, r"SYSTEM\CurrentControlSet\Services\USB", "DisableSelectiveSuspend", 1)],
+        "disable_fast_startup" => vec![dw(Hklm, r"SYSTEM\CurrentControlSet\Control\Session Manager\Power", "HiberbootEnabled", 0)],
+        "zero_startup_delay" => vec![dw(Hkcu, r"Software\Microsoft\Windows\CurrentVersion\Explorer\Serialize", "StartupDelayInMSec", 0)],
+        "disable_delivery_optimization" => vec![dw(Hklm, r"SOFTWARE\Policies\Microsoft\Windows\DeliveryOptimization", "DODownloadMode", 0)],
+        "disable_widgets" => vec![dw(Hklm, r"SOFTWARE\Policies\Microsoft\Dsh", "AllowNewsAndInterests", 0)],
+        "disable_copilot" => vec![
+            dw(Hkcu, r"Software\Policies\Microsoft\Windows\WindowsCopilot", "TurnOffWindowsCopilot", 1),
+            dw(Hklm, r"SOFTWARE\Policies\Microsoft\Windows\WindowsCopilot", "TurnOffWindowsCopilot", 1),
+        ],
+        "disable_background_apps" => vec![
+            dw(Hkcu, r"Software\Microsoft\Windows\CurrentVersion\BackgroundAccessApplications", "GlobalUserDisabled", 1),
+            dw(Hklm, r"SOFTWARE\Policies\Microsoft\Windows\AppPrivacy", "LetAppsRunInBackground", 2),
+        ],
+        "disable_storage_sense" => vec![dw(Hklm, r"SOFTWARE\Policies\Microsoft\Windows\StorageSense", "AllowStorageSenseGlobal", 0)],
+        "disable_edge_preload" => vec![
+            dw(Hklm, r"SOFTWARE\Policies\Microsoft\Edge", "StartupBoostEnabled", 0),
+            dw(Hklm, r"SOFTWARE\Policies\Microsoft\Edge", "BackgroundModeEnabled", 0),
+        ],
+
+        // ---- Vendor: NVIDIA (shown only when an NVIDIA GPU is detected) ----
+        "nvidia_disable_telemetry" => vec![Op::DisableService { name: "NvTelemetryContainer" }],
+        "nvidia_max_performance" => vec![
+            dw(Hklm, DISPLAY_CLASS_0, "PowerMizerEnable", 1),
+            dw(Hklm, DISPLAY_CLASS_0, "PowerMizerLevel", 1),
+            dw(Hklm, DISPLAY_CLASS_0, "PowerMizerLevelAC", 1),
+            dw(Hklm, DISPLAY_CLASS_0, "PerfLevelSrc", 0x2222),
+        ],
+
+        // ---- Vendor: AMD (shown only when an AMD GPU is detected) ----
+        "amd_disable_ulps" => vec![dw(Hklm, DISPLAY_CLASS_0, "EnableUlps", 0)],
 
         _ => Vec::new(),
     }
@@ -481,6 +517,50 @@ mod tests {
         undo_all(&m, &undos);
         assert_eq!(m.get_service("DiagTrack").unwrap().start_type, "auto");
         assert!(m.get_service("dmwappushservice").unwrap().running);
+    }
+
+    #[test]
+    fn new_general_tweaks_apply_and_revert_exactly() {
+        let m = MockMutator::new();
+        // Fast Startup: prior value present → undo restores it, not deletes.
+        let path = r"SYSTEM\CurrentControlSet\Control\Session Manager\Power";
+        let m = m.with_dword(Hklm, path, "HiberbootEnabled", 1);
+        let undos = apply_all(&m, "disable_fast_startup");
+        assert_eq!(m.get_dword(Hklm, path, "HiberbootEnabled"), Some(0));
+        undo_all(&m, &undos);
+        assert_eq!(m.get_dword(Hklm, path, "HiberbootEnabled"), Some(1));
+
+        // Copilot: two scopes, both set then both cleared (didn't exist before).
+        let undos = apply_all(&m, "disable_copilot");
+        assert_eq!(m.get_dword(Hkcu, r"Software\Policies\Microsoft\Windows\WindowsCopilot", "TurnOffWindowsCopilot"), Some(1));
+        assert_eq!(m.get_dword(Hklm, r"SOFTWARE\Policies\Microsoft\Windows\WindowsCopilot", "TurnOffWindowsCopilot"), Some(1));
+        undo_all(&m, &undos);
+        assert_eq!(m.get_dword(Hkcu, r"Software\Policies\Microsoft\Windows\WindowsCopilot", "TurnOffWindowsCopilot"), None);
+    }
+
+    #[test]
+    fn vendor_gpu_tweaks_apply_and_revert() {
+        let m = MockMutator::new();
+        // NVIDIA PowerMizer max performance.
+        let undos = apply_all(&m, "nvidia_max_performance");
+        assert_eq!(m.get_dword(Hklm, DISPLAY_CLASS_0, "PowerMizerEnable"), Some(1));
+        assert_eq!(m.get_dword(Hklm, DISPLAY_CLASS_0, "PerfLevelSrc"), Some(0x2222));
+        undo_all(&m, &undos);
+        assert_eq!(m.get_dword(Hklm, DISPLAY_CLASS_0, "PowerMizerEnable"), None);
+
+        // AMD ULPS off — prior 1 restored on undo.
+        let m = MockMutator::new().with_dword(Hklm, DISPLAY_CLASS_0, "EnableUlps", 1);
+        let undos = apply_all(&m, "amd_disable_ulps");
+        assert_eq!(m.get_dword(Hklm, DISPLAY_CLASS_0, "EnableUlps"), Some(0));
+        undo_all(&m, &undos);
+        assert_eq!(m.get_dword(Hklm, DISPLAY_CLASS_0, "EnableUlps"), Some(1));
+
+        // NVIDIA telemetry service disabled + restored.
+        let m = MockMutator::new().with_service("NvTelemetryContainer", "auto", true);
+        let undos = apply_all(&m, "nvidia_disable_telemetry");
+        assert_eq!(m.get_service("NvTelemetryContainer").unwrap().start_type, "disabled");
+        undo_all(&m, &undos);
+        assert_eq!(m.get_service("NvTelemetryContainer").unwrap().start_type, "auto");
     }
 
     #[test]

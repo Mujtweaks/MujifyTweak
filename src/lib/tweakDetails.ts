@@ -319,4 +319,68 @@ export const TWEAK_DETAILS: Record<string, TweakDetail> = {
     action: "registry",
     changes: "HKCU\\...\\StickyKeys → Flags = 506. Reversible.",
   },
+
+  // ---------- New general tweaks ----------
+  usb_selective_suspend_off: {
+    what: "Stops Windows from suspending USB devices to save power, which can cause tiny input hitches on mice, keyboards and controllers.",
+    action: "registry",
+    changes: "HKLM\\...\\Services\\USB → DisableSelectiveSuspend = 1. Reversible.",
+  },
+  disable_fast_startup: {
+    what: "Fast Startup keeps a hibernation-like kernel image between boots, which can cause driver/state inconsistencies. This forces a clean cold boot.",
+    action: "registry",
+    changes: "HKLM\\...\\Session Manager\\Power → HiberbootEnabled = 0. Reversible.",
+  },
+  zero_startup_delay: {
+    what: "Removes the artificial delay Windows adds before launching startup apps after you log in.",
+    action: "registry",
+    changes: "HKCU\\...\\Explorer\\Serialize → StartupDelayInMSec = 0. Reversible.",
+  },
+  disable_delivery_optimization: {
+    what: "Stops Windows Update from uploading update files to other PCs over the internet using your bandwidth.",
+    action: "registry",
+    changes: "HKLM\\...\\DeliveryOptimization → DODownloadMode = 0. Reversible.",
+  },
+  disable_widgets: {
+    what: "Turns off the taskbar Widgets board and the background process that feeds it news and weather.",
+    action: "registry",
+    changes: "HKLM\\...\\Policies\\Microsoft\\Dsh → AllowNewsAndInterests = 0. Reversible.",
+  },
+  disable_copilot: {
+    what: "Turns off the Windows Copilot AI assistant and its background process.",
+    action: "registry",
+    changes: "HKCU + HKLM \\Policies\\Microsoft\\Windows\\WindowsCopilot → TurnOffWindowsCopilot = 1. Reversible.",
+  },
+  disable_background_apps: {
+    what: "Stops Microsoft Store / UWP apps from running, updating and syncing in the background.",
+    action: "registry",
+    changes: "HKCU\\...\\BackgroundAccessApplications → GlobalUserDisabled = 1, and HKLM\\...\\AppPrivacy → LetAppsRunInBackground = 2. Reversible.",
+  },
+  disable_storage_sense: {
+    what: "Stops the automatic Storage Sense disk-cleanup task from running in the background.",
+    action: "registry",
+    changes: "HKLM\\...\\StorageSense → AllowStorageSenseGlobal = 0. Reversible.",
+  },
+  disable_edge_preload: {
+    what: "Stops Microsoft Edge preloading itself at boot and running in the background when closed.",
+    action: "registry",
+    changes: "HKLM\\...\\Policies\\Microsoft\\Edge → StartupBoostEnabled = 0, BackgroundModeEnabled = 0. Reversible.",
+  },
+
+  // ---------- Vendor-specific ----------
+  nvidia_max_performance: {
+    what: "Sets the NVIDIA driver's PowerMizer policy on the primary adapter to prefer maximum performance, so the GPU holds high clocks instead of down-clocking during games.",
+    action: "registry",
+    changes: "HKLM\\...\\Class\\{4d36e968...}\\0000 → PowerMizerEnable = 1, PowerMizerLevel = 1, PowerMizerLevelAC = 1, PerfLevelSrc = 0x2222. Reversible.",
+  },
+  nvidia_disable_telemetry: {
+    what: "Disables the NVIDIA telemetry background service (NvTelemetryContainer).",
+    action: "service-disable",
+    changes: "Service NvTelemetryContainer → Disabled. Reversible.",
+  },
+  amd_disable_ulps: {
+    what: "Turns off AMD's Ultra Low Power State so the Radeon GPU doesn't aggressively drop to its lowest clocks, which can cause micro-stutter.",
+    action: "registry",
+    changes: "HKLM\\...\\Class\\{4d36e968...}\\0000 → EnableUlps = 0. Reversible.",
+  },
 };

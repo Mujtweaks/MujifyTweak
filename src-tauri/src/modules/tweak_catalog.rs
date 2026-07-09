@@ -102,6 +102,13 @@ const CATALOG: &[TweakDef] = &[
     TweakDef { id: "disable_print_spooler", title: "Disable Print Spooler", description: "Stops the print service if you don't print — one less background process.", category: System, risk: Safe, impact: 2 },
     TweakDef { id: "disable_tips", title: "Disable Windows Tips & Ads", description: "Turns off suggestion notifications and lock-screen tips.", category: System, risk: Safe, impact: 1 },
     TweakDef { id: "disable_hibernation", title: "Disable Hibernation", description: "Frees several GB of disk (hiberfil.sys) and removes hybrid-sleep overhead.", category: System, risk: Safe, impact: 2 },
+    TweakDef { id: "usb_selective_suspend_off", title: "Disable USB Selective Suspend", description: "Stops Windows suspending USB devices — steadier mouse/keyboard/controller input.", category: System, risk: Safe, impact: 2 },
+    TweakDef { id: "disable_fast_startup", title: "Disable Fast Startup", description: "Forces a clean cold boot so drivers and state load fresh — more consistent behaviour.", category: System, risk: Safe, impact: 2 },
+    TweakDef { id: "zero_startup_delay", title: "Zero Startup App Delay", description: "Removes the artificial delay before startup apps launch after boot.", category: System, risk: Safe, impact: 1 },
+    TweakDef { id: "disable_widgets", title: "Disable Widgets / News & Interests", description: "Turns off the taskbar Widgets board and its background feed process.", category: System, risk: Safe, impact: 2 },
+    TweakDef { id: "disable_background_apps", title: "Disable Background Apps", description: "Stops UWP/Store apps from running and updating in the background.", category: System, risk: Moderate, impact: 3 },
+    TweakDef { id: "disable_storage_sense", title: "Disable Storage Sense", description: "Stops the automatic disk-cleanup task from running in the background.", category: System, risk: Safe, impact: 1 },
+    TweakDef { id: "disable_edge_preload", title: "Disable Edge Startup Boost", description: "Stops Microsoft Edge preloading itself and running in the background at boot.", category: System, risk: Safe, impact: 2 },
     TweakDef { id: "clear_standby", title: "Clear Standby Memory", description: "Flushes the standby memory list back to the game when RAM runs low.", category: System, risk: Safe, impact: 3 },
     TweakDef { id: "disable_memory_compression", title: "Disable Memory Compression", description: "Reduces CPU overhead from compressing RAM pages on high-memory systems.", category: System, risk: Moderate, impact: 3 },
     TweakDef { id: "disable_hvci", title: "Disable Memory Integrity (Core Isolation)", description: "Turns off HVCI/VBS Memory Integrity to reclaim its gaming performance cost. This LOWERS a security protection and needs a restart to take effect — a deliberate tradeoff, not a blanket recommendation.", category: System, risk: Advanced, impact: 3 },
@@ -128,6 +135,7 @@ const CATALOG: &[TweakDef] = &[
     TweakDef { id: "flush_dns", title: "Flush DNS Cache", description: "Clears stale DNS entries before an online session.", category: Network, risk: Safe, impact: 2 },
     TweakDef { id: "dns_cloudflare", title: "Fast DNS (1.1.1.1)", description: "Points DNS at Cloudflare for faster, private name resolution.", category: Network, risk: Safe, impact: 2 },
     TweakDef { id: "disable_teredo", title: "Disable Teredo / ISATAP", description: "Removes legacy IPv6 tunneling that can add latency and instability.", category: Network, risk: Safe, impact: 2 },
+    TweakDef { id: "disable_delivery_optimization", title: "Disable Update P2P Sharing", description: "Stops Delivery Optimization uploading Windows updates to other PCs over your connection.", category: Network, risk: Safe, impact: 2 },
 
     // ---------- Graphics ----------
     TweakDef { id: "gpu_low_latency", title: "GPU Low Latency Mode", description: "Enables the driver's low-latency render queue (NVIDIA Reflex / AMD Anti-Lag).", category: Graphics, risk: Safe, impact: 4 },
@@ -138,9 +146,14 @@ const CATALOG: &[TweakDef] = &[
     TweakDef { id: "gpu_priority", title: "GPU Scheduling Priority", description: "Raises the GPU priority of games via the multimedia scheduler tasks.", category: Graphics, risk: Moderate, impact: 3 },
     TweakDef { id: "shader_cache", title: "Increase Shader Cache Size", description: "Lets the driver keep more compiled shaders to reduce traversal stutter.", category: Graphics, risk: Safe, impact: 2 },
     TweakDef { id: "disable_vsync_hint", title: "Disable Windowed VSync Hint", description: "Removes the DWM VSync hint that can cap windowed frame rates.", category: Graphics, risk: Moderate, impact: 2 },
+    // Vendor-specific — the UI shows each only when that GPU brand is detected.
+    TweakDef { id: "nvidia_max_performance", title: "NVIDIA: Prefer Maximum Performance", description: "Sets the NVIDIA PowerMizer policy to hold high clocks instead of down-clocking during games.", category: Graphics, risk: Moderate, impact: 4 },
+    TweakDef { id: "nvidia_disable_telemetry", title: "NVIDIA: Disable Telemetry", description: "Disables the NVIDIA telemetry background service.", category: Graphics, risk: Safe, impact: 2 },
+    TweakDef { id: "amd_disable_ulps", title: "AMD: Disable ULPS", description: "Turns off Ultra Low Power State so the Radeon GPU doesn't aggressively down-clock.", category: Graphics, risk: Moderate, impact: 3 },
 
     // ---------- Privacy ----------
     TweakDef { id: "disable_recall", title: "Disable Microsoft Recall", description: "Stops Windows Recall from continuously screenshotting and indexing everything you do — background AI capture with serious privacy exposure.", category: Privacy, risk: Safe, impact: 3 },
+    TweakDef { id: "disable_copilot", title: "Disable Windows Copilot", description: "Turns off the Windows Copilot AI assistant and its background process.", category: Privacy, risk: Safe, impact: 2 },
     TweakDef { id: "disable_telemetry", title: "Disable Windows Telemetry", description: "Turns off diagnostic data collection and its background uploads.", category: Privacy, risk: Safe, impact: 3 },
     TweakDef { id: "disable_cortana", title: "Disable Cortana", description: "Removes the Cortana background process and its indexing hooks.", category: Privacy, risk: Safe, impact: 2 },
     TweakDef { id: "disable_ad_id", title: "Disable Advertising ID", description: "Stops apps from tracking you with a per-device advertising identifier.", category: Privacy, risk: Safe, impact: 2 },
