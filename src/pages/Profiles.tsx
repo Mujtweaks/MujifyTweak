@@ -15,6 +15,10 @@ export default function Profiles({ onNavigate }: { onNavigate: (page: PageId) =>
   const [search, setSearch] = useState("");
   const [busy, setBusy] = useState(true);
   const [optimizeGame, setOptimizeGame] = useState<GameInfo | null>(null);
+  const [showAdd, setShowAdd] = useState(false);
+  const [newName, setNewName] = useState("");
+  const [newPath, setNewPath] = useState("");
+  const [saving, setSaving] = useState(false);
 
   const reload = async () => {
     const [g, ps] = await Promise.all([fetchInstalledGames(), listProfiles()]);
@@ -31,13 +35,19 @@ export default function Profiles({ onNavigate }: { onNavigate: (page: PageId) =>
   const profiled = useMemo(() => new Set(profiles.map((p) => p.gameName.toLowerCase())), [profiles]);
   const filtered = games.filter((g) => g.name.toLowerCase().includes(search.toLowerCase()));
 
-  const addProfile = async (game?: GameInfo) => {
+  // Add ANY game manually (for titles no launcher scan found). Creates a real
+  // profile + a library tile so it can be optimized like the rest.
+  const addManualGame = async () => {
+    const name = newName.trim();
+    if (!name) return;
+    setSaving(true);
+    const cleanPath = newPath.trim() || null;
     const profile: Profile = {
       schemaVersion: 1,
       id: "",
-      gameName: game?.name ?? `New Profile ${profiles.length + 1}`,
-      gameExe: game?.exe ?? null,
-      launcher: game?.launcher ?? null,
+      gameName: name,
+      gameExe: null,
+      launcher: "Manual",
       preset: "balanced",
       launchOptions: null,
       enabledTweaks: [],
@@ -46,7 +56,14 @@ export default function Profiles({ onNavigate }: { onNavigate: (page: PageId) =>
       avgFpsBefore: null,
       avgFpsAfter: null,
     };
+    // Persist the profile, and add a library tile immediately so it appears.
     await saveProfile(profile);
+    const manual: GameInfo = { name, exe: "", launcher: "Manual", installPath: cleanPath, appId: null };
+    setGames((prev) => (prev.some((g) => g.name.toLowerCase() === name.toLowerCase()) ? prev : [...prev, manual]));
+    setSaving(false);
+    setShowAdd(false);
+    setNewName("");
+    setNewPath("");
     await reload();
   };
 
@@ -96,7 +113,7 @@ export default function Profiles({ onNavigate }: { onNavigate: (page: PageId) =>
           })}
 
           {/* Add game */}
-          <button onClick={() => addProfile()} className="flex flex-col">
+          <button onClick={() => setShowAdd(true)} className="flex flex-col">
             <div className="grid aspect-[3/4] place-items-center rounded-xl border border-dashed border-edge2 text-txt3 transition-colors hover:border-accent/40 hover:text-txt">
               <div className="text-center">
                 <Plus size={24} strokeWidth={1.75} className="mx-auto" />
@@ -104,6 +121,39 @@ export default function Profiles({ onNavigate }: { onNavigate: (page: PageId) =>
               </div>
             </div>
           </button>
+        </div>
+      )}
+
+      {showAdd && (
+        <div className="fixed inset-0 z-50 grid place-items-center bg-black/70 p-4 backdrop-blur-sm" onClick={() => setShowAdd(false)}>
+          <div className="w-full max-w-[420px] rounded-card border border-edge bg-panel p-6" onClick={(e) => e.stopPropagation()}>
+            <h3 className="text-[16px] font-bold text-txt">Add a game</h3>
+            <p className="mt-1 text-[12px] text-txt2">Add any game — even one no launcher found. It gets a profile you can optimize.</p>
+            <label className="mt-4 block text-[11px] font-semibold uppercase tracking-wide text-txt3">Game name</label>
+            <input
+              autoFocus
+              value={newName}
+              onChange={(e) => setNewName(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && void addManualGame()}
+              placeholder="e.g. Watch Dogs 2"
+              className="mt-1 w-full rounded-btn border border-edge bg-card px-3 py-2 text-[13px] text-txt placeholder:text-txt3 focus:border-accent/50 focus:outline-none"
+            />
+            <label className="mt-3 block text-[11px] font-semibold uppercase tracking-wide text-txt3">Install folder <span className="text-txt3/70">(optional)</span></label>
+            <input
+              value={newPath}
+              onChange={(e) => setNewPath(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && void addManualGame()}
+              placeholder="e.g. D:\\Games\\Watch Dogs 2"
+              className="mt-1 w-full rounded-btn border border-edge bg-card px-3 py-2 text-[13px] text-txt placeholder:text-txt3 focus:border-accent/50 focus:outline-none"
+            />
+            <p className="mt-1.5 text-[10.5px] text-txt3">Adding the folder lets Mujify detect the game engine for a tailored profile.</p>
+            <div className="mt-5 flex justify-end gap-2">
+              <button onClick={() => setShowAdd(false)} className="rounded-btn border border-edge bg-card px-4 py-2 text-[12px] font-medium text-txt2 hover:text-txt">Cancel</button>
+              <button onClick={() => void addManualGame()} disabled={!newName.trim() || saving} className="rounded-btn bg-accent px-4 py-2 text-[12px] font-bold text-white disabled:opacity-40">
+                {saving ? "Adding…" : "Add Game"}
+              </button>
+            </div>
+          </div>
         </div>
       )}
 

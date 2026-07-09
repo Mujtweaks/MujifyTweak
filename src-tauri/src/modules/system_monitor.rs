@@ -260,6 +260,23 @@ fn compute_health(
     )
 }
 
+/// The headline System Score — a STABLE 0-100 that reflects how well-optimized
+/// the machine is, NOT momentary CPU/GPU load. It only moves when the user's
+/// tuning actually changes (tweaks applied/reverted, power plan). The live
+/// per-subsystem gauges (HealthScores above) stay as the moment-to-moment load
+/// meters; this is the number the dashboard gauge shows.
+///
+/// Formula: 55 baseline (a healthy but un-tuned PC) + up to 35 for active
+/// optimizations (4 each) + 10 for a High/Ultimate performance power plan.
+fn optimization_score(active_tweaks: usize, high_perf: bool) -> u8 {
+    let mut s: i32 = 55;
+    s += (active_tweaks as i32 * 4).min(35);
+    if high_perf {
+        s += 10;
+    }
+    s.clamp(0, 100) as u8
+}
+
 /// Bottleneck classifier (headline + detail).
 fn classify_bottleneck(cpu: f32, gpu: Option<f32>, ram_pct: f32) -> (String, String) {
     if ram_pct > 90.0 {
@@ -341,8 +358,19 @@ pub fn start(app: AppHandle) {
             // Real temps from the LHM sidecar (null until it reports / needs admin).
             let (cpu_temp, gpu_temp) = *LATEST_TEMPS.lock().unwrap();
 
-            let (health, system_score) =
+            // Per-subsystem health = live load gauges (kept). The headline score
+            // is derived from tuning state, so it doesn't swing with load.
+            let (health, _live_health) =
                 compute_health(cpu, gpu, ram_pct, disk_act, cpu_temp, gpu_temp);
+            let high_perf = power_plan
+                .as_deref()
+                .map(|n| {
+                    let n = n.to_lowercase();
+                    n.contains("high performance") || n.contains("ultimate")
+                })
+                .unwrap_or(false);
+            let active_tweaks = super::change_log::active_entries().len();
+            let system_score = optimization_score(active_tweaks, high_perf);
             let (bottleneck, bottleneck_detail) = classify_bottleneck(cpu, gpu, ram_pct);
 
             let stats = SystemStats {
@@ -370,4 +398,28 @@ pub fn start(app: AppHandle) {
             thread::sleep(Duration::from_secs(1));
         }
     });
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn optimization_score_is_stable_and_tuning_based() {
+        // An un-tuned PC sits at the 55 baseline regardless of live load.
+        assert_eq!(optimization_score(0, false), 55);
+        // Applying optimizations raises it (4 each, capped at +35).
+        assert_eq!(optimization_score(5, false), 75);
+        assert_eq!(optimization_score(20, false), 90); // capped at +35
+        // A performance power plan adds 10.
+        assert_eq!(optimization_score(0, true), 65);
+        // Fully tuned tops out at 100, never above.
+        assert_eq!(optimization_score(50, true), 100);
+    }
+
+    #[test]
+    fn bottleneck_flags_full_ram() {
+        let (b, _) = classify_bottleneck(30.0, Some(40.0), 95.0);
+        assert!(b.contains("RAM"));
+    }
 }
