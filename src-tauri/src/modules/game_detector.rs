@@ -53,6 +53,92 @@ fn stem_of(process_name: &str) -> String {
         .to_string()
 }
 
+/// Path fragments that mean "this exe lives inside a game library" — used to
+/// detect ANY running game, not just the curated ones.
+const LIB_MARKERS: &[&str] = &[
+    "steamapps\\common",
+    "epic games\\",
+    "gog galaxy\\games",
+    "gog games\\",
+    "riot games\\",
+    "\\ea games\\",
+    "\\origin games\\",
+    "ubisoft game launcher\\games",
+    "ubisoft\\ubisoft game launcher",
+    "\\xboxgames\\",
+    "\\windowsapps\\",
+];
+
+/// Launcher / helper / crash-handler exes that live in game folders but are NOT
+/// the game itself — never treat these as the active game.
+const NOT_GAME_EXES: &[&str] = &[
+    "steam", "steamwebhelper", "steamservice", "gameoverlayui", "cef",
+    "epicgameslauncher", "epicwebhelper", "unrealcefsubprocess", "eoshelper",
+    "galaxyclient", "galaxycommunication", "battle.net", "agent",
+    "riotclientservices", "riotclientux", "riotclientcrashhandler",
+    "eadesktop", "eabackgroundservice", "origin", "ubisoftconnect", "upc",
+    "crashhandler", "crashreportclient", "unitycrashhandler64", "unitycrashhandler32",
+    "launcher", "vconsole2", "easyanticheat", "battleye", "vgtray",
+];
+
+/// Turn a folder or exe name into a readable title ("watch_dogs2" → "Watch Dogs2").
+fn titleize(raw: &str) -> String {
+    let cleaned = raw.replace(['_', '-'], " ");
+    cleaned
+        .split_whitespace()
+        .map(|w| {
+            let mut c = w.chars();
+            match c.next() {
+                Some(f) => f.to_uppercase().collect::<String>() + c.as_str(),
+                None => String::new(),
+            }
+        })
+        .collect::<Vec<_>>()
+        .join(" ")
+}
+
+/// The game's folder name — the segment right after the library marker in the
+/// exe path (e.g. …\steamapps\common\<GameFolder>\bin\game.exe → "GameFolder").
+fn game_name_from_path(path: &str) -> Option<String> {
+    let p = path.replace('/', "\\");
+    let pl = p.to_lowercase();
+    for m in LIB_MARKERS {
+        if let Some(idx) = pl.find(m) {
+            let after = &p[idx + m.len()..];
+            let seg = after.trim_start_matches('\\').split('\\').next()?;
+            if !seg.is_empty() && !seg.eq_ignore_ascii_case("bin") {
+                return Some(titleize(seg));
+            }
+        }
+    }
+    None
+}
+
+/// Generic active-game detection: an exe inside a game library that isn't a
+/// known launcher/helper. Curated name wins; else the folder name; else the exe.
+fn game_from_running(exe_path: &str, stem: &str) -> Option<GameInfo> {
+    let path_l = exe_path.to_lowercase();
+    if !LIB_MARKERS.iter().any(|m| path_l.contains(m)) {
+        return None;
+    }
+    if NOT_GAME_EXES.iter().any(|n| stem == *n || stem.contains(n)) {
+        return None;
+    }
+    let name = games_db::lookup(stem)
+        .map(|s| s.to_string())
+        .or_else(|| game_name_from_path(exe_path))
+        .unwrap_or_else(|| titleize(stem));
+    Some(GameInfo {
+        name,
+        exe: format!("{stem}.exe"),
+        launcher: None,
+        install_path: std::path::Path::new(exe_path)
+            .parent()
+            .map(|p| p.to_string_lossy().to_string()),
+        app_id: None,
+    })
+}
+
 pub fn start(app: AppHandle) {
     if RUNNING.swap(true, Ordering::SeqCst) {
         return;
@@ -71,7 +157,8 @@ pub fn start(app: AppHandle) {
                 .map(|p| stem_of(&p.name().to_string_lossy()))
                 .collect();
 
-            // Active game = first running process matching the known-games table.
+            // Active game — first a curated match (nice display names), then a
+            // GENERIC pass so games not in the table are still detected.
             let mut active: Option<GameInfo> = None;
             for process in sys.processes().values() {
                 let raw = process.name().to_string_lossy().to_string();
@@ -88,6 +175,17 @@ pub fn start(app: AppHandle) {
                         app_id: None,
                     });
                     break;
+                }
+            }
+            if active.is_none() {
+                for process in sys.processes().values() {
+                    let stem = stem_of(&process.name().to_string_lossy());
+                    if let Some(path) = process.exe() {
+                        if let Some(g) = game_from_running(&path.to_string_lossy(), &stem) {
+                            active = Some(g);
+                            break;
+                        }
+                    }
                 }
             }
 
@@ -245,14 +343,77 @@ fn scan_epic(games: &mut Vec<GameInfo>) {
     }
 }
 
-/// Read-only scan across Steam + Epic libraries. No launches, no modifications.
+/// Parse GOG Galaxy's registry install records.
+fn scan_gog(games: &mut Vec<GameInfo>) {
+    use winreg::enums::HKEY_LOCAL_MACHINE;
+    use winreg::RegKey;
+    let hklm = RegKey::predef(HKEY_LOCAL_MACHINE);
+    let Ok(root) = hklm.open_subkey(r"SOFTWARE\WOW6432Node\GOG.com\Games") else {
+        return;
+    };
+    for id in root.enum_keys().flatten() {
+        let Ok(k) = root.open_subkey(&id) else { continue };
+        let name: Option<String> = k.get_value("gameName").ok();
+        let path: Option<String> = k.get_value("path").ok();
+        if let Some(name) = name {
+            if !games.iter().any(|g| g.name.eq_ignore_ascii_case(&name)) {
+                games.push(GameInfo {
+                    name,
+                    exe: String::new(),
+                    launcher: Some("GOG".into()),
+                    install_path: path,
+                    app_id: None,
+                });
+            }
+        }
+    }
+}
+
+/// Parse Ubisoft Connect's registry install records (name = install folder).
+fn scan_ubisoft(games: &mut Vec<GameInfo>) {
+    use winreg::enums::HKEY_LOCAL_MACHINE;
+    use winreg::RegKey;
+    let hklm = RegKey::predef(HKEY_LOCAL_MACHINE);
+    let Ok(root) = hklm.open_subkey(r"SOFTWARE\WOW6432Node\Ubisoft\Launcher\Installs") else {
+        return;
+    };
+    for id in root.enum_keys().flatten() {
+        let Ok(k) = root.open_subkey(&id) else { continue };
+        let dir: Option<String> = k.get_value("InstallDir").ok();
+        if let Some(dir) = dir {
+            let name = dir
+                .replace('/', "\\")
+                .trim_end_matches('\\')
+                .rsplit('\\')
+                .next()
+                .map(titleize)
+                .unwrap_or_else(|| "Ubisoft Game".into());
+            if !games.iter().any(|g| g.name.eq_ignore_ascii_case(&name)) {
+                games.push(GameInfo {
+                    name,
+                    exe: String::new(),
+                    launcher: Some("Ubisoft".into()),
+                    install_path: Some(dir),
+                    app_id: None,
+                });
+            }
+        }
+    }
+}
+
+/// Read-only scan across installed libraries. No launches, no modifications.
+/// Steam + Epic + GOG + Ubisoft are read directly; Xbox/Game Pass, EA and
+/// Battle.net don't expose a clean per-game record and are picked up instead by
+/// the generic running-game detection when they launch.
 #[tauri::command]
 pub fn get_installed_games() -> Vec<GameInfo> {
     let mut games = Vec::new();
     scan_steam(&mut games);
     scan_epic(&mut games);
+    scan_gog(&mut games);
+    scan_ubisoft(&mut games);
     games.sort_by(|a, b| a.name.to_lowercase().cmp(&b.name.to_lowercase()));
-    games.truncate(200);
+    games.truncate(300);
     games
 }
 
@@ -266,5 +427,30 @@ mod tests {
         assert!(NON_GAME_APPIDS.contains(&"228980"));
         // …while real games (e.g. Wallpaper Engine 431960) must not be.
         assert!(!NON_GAME_APPIDS.contains(&"431960"));
+    }
+
+    #[test]
+    fn generic_detection_finds_uncurated_games_by_path() {
+        // An unknown game inside a Steam library folder is detected + named
+        // from its folder, not the exe.
+        let g = game_from_running(
+            r"D:\Steam\steamapps\common\Some Cool Game\bin\game.exe",
+            "game",
+        )
+        .expect("should detect a game inside steamapps/common");
+        assert_eq!(g.name, "Some Cool Game");
+    }
+
+    #[test]
+    fn generic_detection_ignores_launchers_and_non_library_exes() {
+        // The Steam client itself must never be flagged as a game…
+        assert!(game_from_running(r"C:\Program Files (x86)\Steam\steam.exe", "steam").is_none());
+        // …nor a random app outside any game library.
+        assert!(game_from_running(r"C:\Windows\explorer.exe", "explorer").is_none());
+    }
+
+    #[test]
+    fn titleize_cleans_folder_names() {
+        assert_eq!(titleize("watch_dogs-2"), "Watch Dogs 2");
     }
 }
