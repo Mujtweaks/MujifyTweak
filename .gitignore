@@ -36,7 +36,9 @@ src-tauri/gen/schemas
 mx.dev.cfg
 *.dev.cfg
 
-# Owner-only tooling & docs — relocated OUT of the repo to the deep local store.
-# These patterns stop any stray copy ever re-entering the public repo.
+# Owner-only tooling & docs — kept locally inside the project but buried in
+# .build-cache/vendor/ and NEVER pushed to the public repo. The folder ignore
+# plus the name patterns are belt-and-suspenders against any stray copy.
+/.build-cache/
 OWNER_DASHBOARD.md
 analytics-worker/
