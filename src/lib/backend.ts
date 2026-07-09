@@ -45,7 +45,21 @@ export async function checkForUpdates(): Promise<{ ok: boolean; message: string 
     const message = await invoke<string>("check_for_updates");
     return { ok: true, message };
   } catch (err) {
-    return { ok: false, message: String(err) };
+    // No public release channel configured yet (or offline) → skip gracefully.
+    // Never surface a raw error or block the app; you're not missing anything.
+    console.warn("update check failed:", err);
+    return { ok: false, message: "Couldn't check for updates right now — try again later." };
+  }
+}
+
+/** Open the local logs folder (%AppData%\MujifyTweaks\logs) in File Explorer. */
+export async function openLogsFolder(): Promise<void> {
+  if (!isTauri) return;
+  try {
+    await invoke("open_logs_folder");
+  } catch (err) {
+    console.error("open_logs_folder failed:", err);
+    toast.error("Couldn't open logs", "The logs folder isn't available.");
   }
 }
 

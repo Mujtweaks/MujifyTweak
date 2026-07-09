@@ -1,6 +1,6 @@
 [package]
 name = "mujify-tweaks"
-version = "0.1.0"
+version = "0.9.0-beta.1"
 description = "Mujify Tweaks — free Windows gaming optimizer with per-game profiles, proof reports and full rollback"
 authors = ["Mujify"]
 edition = "2021"

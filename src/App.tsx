@@ -19,6 +19,7 @@ import DriverManager from "./pages/DriverManager";
 import StartupManager from "./pages/StartupManager";
 import Settings from "./pages/Settings";
 import Toaster from "./components/Toaster";
+import WelcomeModal from "./components/WelcomeModal";
 import { checkResetTweaks, connectBackend, fetchHardware } from "./lib/backend";
 import { toast } from "./store/toastStore";
 import { initEventBridge, listenNavigate } from "./lib/events";
@@ -33,6 +34,22 @@ function pageFromHash(): PageId | null {
 
 export default function App() {
   const [page, setPage] = useState<PageId>(() => pageFromHash() ?? "home");
+  // First-run welcome — shown once, then never again (persisted flag).
+  const [showWelcome, setShowWelcome] = useState(() => {
+    try {
+      return !localStorage.getItem("mujify.welcomed");
+    } catch {
+      return false;
+    }
+  });
+  const dismissWelcome = () => {
+    try {
+      localStorage.setItem("mujify.welcomed", "1");
+    } catch {
+      /* ignore storage errors — worst case the welcome shows again next launch */
+    }
+    setShowWelcome(false);
+  };
 
   useEffect(() => {
     void connectBackend();
@@ -115,6 +132,7 @@ export default function App() {
         <GamesBar onNavigate={setPage} />
       </div>
       <Toaster />
+      {showWelcome && <WelcomeModal onClose={dismissWelcome} />}
     </div>
   );
 }

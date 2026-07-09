@@ -22,6 +22,7 @@ pub mod games_db;
 pub mod hardware_profiler;
 pub mod hardware_tier;
 pub mod health_scan;
+pub mod logger;
 pub mod network_monitor;
 pub mod power_util;
 pub mod profile_store;

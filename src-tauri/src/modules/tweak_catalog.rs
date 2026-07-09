@@ -83,6 +83,7 @@ pub fn info_for(id: &str) -> Option<TweakMeta> {
 }
 
 /// Every tweak id in the catalog (used for iteration / invariants in tests).
+#[allow(dead_code)]
 pub fn all_ids() -> Vec<&'static str> {
     CATALOG.iter().map(|d| d.id).collect()
 }

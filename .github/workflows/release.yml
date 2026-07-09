@@ -8,10 +8,10 @@ name: Release
 #   TAURI_SIGNING_PRIVATE_KEY_PASSWORD  the key password
 #
 # NOTE: the updater endpoint in tauri.conf.json points at
-# github.com/MUJIFY_OWNER/... — replace MUJIFY_OWNER with the real owner, and
-# because the repo is PRIVATE, host the released assets somewhere publicly
-# reachable (a public releases repo or GitHub Pages) or the auto-updater's
-# unauthenticated fetch will 404. Building/signing below works regardless.
+# github.com/REPLACE_WITH_GITHUB_OWNER/... — set the real owner there (see the
+# "Release configuration" section of README.md for every spot to update). The
+# repo must be PUBLIC (or the assets hosted somewhere publicly reachable) or the
+# auto-updater's unauthenticated fetch will 404. Building/signing works regardless.
 
 on:
   push:
@@ -71,6 +71,7 @@ jobs:
           releaseName: "Mujify Tweaks ${{ github.ref_name }}"
           releaseBody: "See the assets below to download and install."
           releaseDraft: false
-          prerelease: false
+          # 0.9.0-beta.x is a pre-release; flip to false for the first stable 1.0.
+          prerelease: true
           # Emits latest.json (the updater manifest) alongside the NSIS installer.
           includeUpdaterJson: true

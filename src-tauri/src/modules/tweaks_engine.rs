@@ -122,7 +122,12 @@ pub fn apply_tweaks(
                 let _ = app.emit("change_log_update", &entry);
                 applied.push(entry);
             }
-            Err(msg) => blocked.push(format!("{id}: {msg}")),
+            Err(msg) => {
+                // Record RealMutator/guard failures locally (no telemetry) so a
+                // user can report why an apply didn't go through.
+                super::logger::warn(format!("apply '{id}' not applied: {msg}"));
+                blocked.push(format!("{id}: {msg}"));
+            }
         }
     }
     Ok(ApplyOutcome { applied, blocked })

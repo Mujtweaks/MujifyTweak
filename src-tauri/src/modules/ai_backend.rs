@@ -108,7 +108,12 @@ pub async fn ai_chat(
                 tokio::time::sleep(std::time::Duration::from_millis(500 * attempt as u64)).await;
                 continue;
             }
-            Err(e) => return Err(e.message),
+            Err(e) => {
+                // Log the failure (never the API key — it's only ever in the
+                // request header, never in this message) for local bug reports.
+                super::logger::warn(format!("ai: request failed: {}", e.message));
+                return Err(e.message);
+            }
         }
     }
     Err(busy_msg())

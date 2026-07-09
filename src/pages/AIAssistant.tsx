@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { Bot, Cpu, RotateCcw, Send, Sparkles, Zap } from "lucide-react";
+import { Bot, ChevronsDown, ChevronsUp, Cpu, RotateCcw, Send, Sparkles, Zap } from "lucide-react";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import { invoke } from "@tauri-apps/api/core";
 import { nvidiaKey } from "../lib/aiConfig";
@@ -139,6 +139,10 @@ export default function AIAssistant({ onNavigate }: { onNavigate: (page: PageId)
   const [keyReady, setKeyReady] = useState<boolean | null>(null);
   const [input, setInput] = useState("");
   const endRef = useRef<HTMLDivElement>(null);
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const scrollToTop = () => scrollRef.current?.scrollTo({ top: 0, behavior: "smooth" });
+  const scrollToBottom = () =>
+    scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
 
   // Restore the saved conversation and check the API key on mount.
   useEffect(() => {
@@ -276,8 +280,8 @@ export default function AIAssistant({ onNavigate }: { onNavigate: (page: PageId)
 
       <div className="grid min-h-0 flex-1 grid-cols-[1fr_300px] gap-4">
         {/* Chat */}
-        <div className="flex min-h-0 flex-col rounded-2xl border border-edge bg-card">
-          <div className="flex-1 space-y-3 overflow-y-auto p-5">
+        <div className="relative flex min-h-0 flex-col rounded-2xl border border-edge bg-card">
+          <div ref={scrollRef} className="flex-1 space-y-3 overflow-y-auto p-5">
             {messages.length === 0 && !streamingContent && (
               <div className="grid h-full place-items-center text-center">
                 <div>
@@ -331,6 +335,28 @@ export default function AIAssistant({ onNavigate }: { onNavigate: (page: PageId)
             )}
             <div ref={endRef} />
           </div>
+
+          {/* One-click jump to the top / latest of the conversation */}
+          {(messages.length > 2 || streamingContent) && (
+            <div className="absolute bottom-[74px] right-4 z-10 flex flex-col gap-1.5">
+              <button
+                onClick={scrollToTop}
+                title="Jump to top"
+                aria-label="Jump to top of chat"
+                className="grid h-8 w-8 place-items-center rounded-full border border-edge bg-panel/90 text-txt2 shadow-lg backdrop-blur transition-colors hover:text-txt"
+              >
+                <ChevronsUp size={16} />
+              </button>
+              <button
+                onClick={scrollToBottom}
+                title="Jump to latest"
+                aria-label="Jump to latest message"
+                className="grid h-8 w-8 place-items-center rounded-full border border-edge bg-panel/90 text-txt2 shadow-lg backdrop-blur transition-colors hover:text-txt"
+              >
+                <ChevronsDown size={16} />
+              </button>
+            </div>
+          )}
 
           <div className="border-t border-edge p-3">
             <div className="flex items-center gap-2 rounded-full border border-edge bg-bg px-4 py-2">

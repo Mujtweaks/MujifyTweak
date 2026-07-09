@@ -26,8 +26,8 @@ use tauri::{
 use modules::{
     ai_backend, benchmark, change_log, config, driver_doctor, fix_catalog, game_detector,
     game_profiler, game_profiles, game_settings, hardware_profiler, hardware_tier, health_scan,
-    network_monitor, profile_store, rollback_engine, server_ping, speed_test, system_monitor,
-    tweak_catalog, tweaks_engine,
+    logger, network_monitor, profile_store, rollback_engine, server_ping, speed_test,
+    system_monitor, tweak_catalog, tweaks_engine,
 };
 
 fn show_main(app: &tauri::AppHandle) {
@@ -101,12 +101,72 @@ async fn check_for_updates(app: tauri::AppHandle) -> Result<String, String> {
     match updater.check().await {
         Ok(Some(update)) => Ok(format!("Update available: v{}", update.version)),
         Ok(None) => Ok("You're on the latest version.".into()),
-        Err(e) => Err(format!("Update check unavailable: {e}")),
+        Err(e) => {
+            logger::warn(format!("updater: check failed: {e}"));
+            Err(format!("Update check unavailable: {e}"))
+        }
     }
+}
+
+/// Headless revert-all for the uninstaller / `--revert-all` CLI. Restores every
+/// still-active change from the persisted log, marks them undone (the log file
+/// itself is kept as a record), and prints a summary. `dry_run` reports what
+/// WOULD happen without changing anything — safe to run any time.
+fn cli_revert_all(dry_run: bool) {
+    change_log::load();
+    let entries = change_log::active_entries(); // newest-first
+    if entries.is_empty() {
+        println!("Mujify Tweaks: no active changes to restore — nothing to do.");
+        return;
+    }
+    println!(
+        "Mujify Tweaks: {} {} original Windows setting(s)…",
+        if dry_run { "would restore" } else { "restoring" },
+        entries.len()
+    );
+    let summary =
+        rollback_engine::revert_entries(&modules::system_mutator::RealMutator, &entries, dry_run);
+    for d in &summary.descriptions {
+        println!("  {} {}", if dry_run { "would revert:" } else { "reverted:" }, d);
+    }
+    if !dry_run {
+        // Persist undone flags for what actually reverted; the log file is kept.
+        for id in &summary.reverted_ids {
+            change_log::mark_undone(id);
+        }
+    }
+    println!(
+        "Mujify Tweaks: {} {} setting(s){}.",
+        if dry_run { "would restore" } else { "restored" },
+        summary.reverted,
+        if summary.failed > 0 {
+            format!(", {} could not be restored (see the app's Change Log)", summary.failed)
+        } else {
+            String::new()
+        }
+    );
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    // Local crash logging (no telemetry) — records panics to
+    // %AppData%\MujifyTweaks\logs so users can report bugs without tracking.
+    logger::install_panic_hook();
+
+    // Uninstall / manual restore path: `mujify-tweaks.exe --revert-all [--dry-run]`.
+    // The NSIS uninstaller calls this BEFORE removing files, so a user who
+    // uninstalls with tweaks still applied gets their original Windows settings
+    // back. Runs headless and exits without ever starting the GUI.
+    let args: Vec<String> = std::env::args().collect();
+    if args.iter().any(|a| a == "--revert-all") {
+        cli_revert_all(args.iter().any(|a| a == "--dry-run"));
+        return;
+    }
+
+    // A single local startup line (no telemetry) — confirms the app launched and
+    // at what version, which is the first thing a bug report needs.
+    logger::info(format!("Mujify Tweaks v{} started", env!("CARGO_PKG_VERSION")));
+
     // Restore the persisted change log so Revert All survives restarts.
     change_log::load();
 
@@ -160,6 +220,7 @@ pub fn run() {
             rollback_engine::get_change_log,
             benchmark::run_benchmark,
             benchmark::get_latest_report,
+            logger::open_logs_folder,
             config::get_api_key,
             config::set_api_key,
             ai_backend::ai_chat,

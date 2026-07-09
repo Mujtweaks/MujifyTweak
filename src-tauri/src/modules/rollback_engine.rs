@@ -64,6 +64,53 @@ pub fn get_change_log() -> Vec<change_log::ChangeLogEntry> {
     all
 }
 
+/// Summary of a headless revert-all (used by the uninstaller / --revert-all CLI).
+#[derive(Debug, Default)]
+pub struct RevertSummary {
+    pub reverted: usize,
+    pub failed: usize,
+    pub reverted_ids: Vec<String>,
+    pub descriptions: Vec<String>,
+}
+
+/// Reverse a set of change-log entries (newest-first) through a mutator. With
+/// `dry_run`, nothing is applied — it only reports what WOULD be reverted, so
+/// the uninstaller's `--revert-all --dry-run` is completely safe to run. Pure
+/// over the mutator + entries: MockMutator proves it without touching the real
+/// machine or the persisted log. This is the engine behind uninstall safety —
+/// a user who removes Mujify with tweaks still applied gets their original
+/// Windows settings back before the files are deleted.
+pub fn revert_entries(
+    m: &dyn SystemMutator,
+    entries: &[change_log::ChangeLogEntry],
+    dry_run: bool,
+) -> RevertSummary {
+    let mut s = RevertSummary::default();
+    for entry in entries {
+        if dry_run {
+            s.reverted += 1;
+            s.reverted_ids.push(entry.id.clone());
+            s.descriptions.push(entry.description.clone());
+            continue;
+        }
+        // Reverse order — last-applied op is undone first.
+        let mut ok = true;
+        for undo in entry.undo_ops.iter().rev() {
+            if undo_op(m, undo).is_err() {
+                ok = false;
+            }
+        }
+        if ok {
+            s.reverted += 1;
+            s.reverted_ids.push(entry.id.clone());
+            s.descriptions.push(entry.description.clone());
+        } else {
+            s.failed += 1;
+        }
+    }
+    s
+}
+
 #[cfg(test)]
 mod tests {
     use super::super::system_mutator::{MockMutator, RegHive, SystemMutator};
@@ -92,5 +139,39 @@ mod tests {
         assert_eq!(m.active_power_plan_guid().unwrap(), "BALANCED-GUID");
         // GameDVR_Enabled restored to its real prior value (1), not deleted.
         assert_eq!(m.get_dword(RegHive::Hkcu, r"System\GameConfigStore", "GameDVR_Enabled"), Some(1));
+    }
+
+    // The uninstaller's revert-all: dry-run reports but changes nothing; the real
+    // run restores the exact prior state. Proven under MockMutator (never runs on
+    // a real machine here).
+    #[test]
+    fn revert_entries_dry_run_is_safe_then_real_restores() {
+        use super::super::change_log::ChangeLogEntry;
+        let m = MockMutator::new();
+        let undos: Vec<UndoOp> = ops_for("power_high_perf")
+            .iter()
+            .map(|o| apply_op(&m, o).unwrap())
+            .collect();
+        assert_eq!(m.active_power_plan_guid().unwrap(), super::super::tweak_ops::HIGH_PERF_GUID);
+        let entry = ChangeLogEntry {
+            id: "e1".into(),
+            timestamp: 0,
+            tweak_id: "power_high_perf".into(),
+            description: "High Performance Power Plan".into(),
+            risk_level: "safe".into(),
+            reversible: true,
+            undone: false,
+            undo_ops: undos,
+        };
+        // Dry run: counts it, but the plan is STILL high-perf (nothing changed).
+        let dry = super::revert_entries(&m, std::slice::from_ref(&entry), true);
+        assert_eq!(dry.reverted, 1);
+        assert_eq!(dry.reverted_ids, vec!["e1".to_string()]);
+        assert_eq!(m.active_power_plan_guid().unwrap(), super::super::tweak_ops::HIGH_PERF_GUID);
+        // Real run: restores the original Balanced plan.
+        let real = super::revert_entries(&m, std::slice::from_ref(&entry), false);
+        assert_eq!(real.reverted, 1);
+        assert_eq!(real.failed, 0);
+        assert_eq!(m.active_power_plan_guid().unwrap(), "BALANCED-GUID");
     }
 }

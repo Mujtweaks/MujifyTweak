@@ -1,7 +1,7 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "Mujify Tweaks",
-  "version": "0.1.0",
+  "version": "0.9.0-beta.1",
   "identifier": "com.mujify.tweaks",
   "build": {
     "beforeDevCommand": "npm run dev",
@@ -33,7 +33,7 @@
     "updater": {
       "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDVEMzQxNkUyMzNGMjRDNTIKUldSU1RQSXo0aFkwWFhSUGl4WWFpVkJVOHlGTklocXV3Z2EzZUFVL2MrZU9hdDBCNDlCN0oxeEMK",
       "endpoints": [
-        "https://github.com/MUJIFY_OWNER/mujify-tweaks/releases/latest/download/latest.json"
+        "https://github.com/REPLACE_WITH_GITHUB_OWNER/mujify-tweaks/releases/latest/download/latest.json"
       ]
     }
   },
@@ -51,7 +51,8 @@
     "windows": {
       "nsis": {
         "displayLanguageSelector": false,
-        "installMode": "perMachine"
+        "installMode": "perMachine",
+        "installerHooks": "nsis-hooks.nsh"
       }
     }
   }

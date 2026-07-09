@@ -172,7 +172,10 @@ fn start_capture(app: AppHandle, exe: String) {
 
     let (mut rx, child) = match sidecar.spawn() {
         Ok(pair) => pair,
-        Err(_) => return,
+        Err(e) => {
+            super::logger::warn(format!("sidecar: PresentMon spawn failed: {e}"));
+            return;
+        }
     };
     *CURRENT_CHILD.lock().unwrap() = Some(child);
 

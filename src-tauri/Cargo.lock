@@ -2609,7 +2609,7 @@ dependencies = [
 
 [[package]]
 name = "mujify-tweaks"
-version = "0.1.0"
+version = "0.9.0-beta.1"
 dependencies = [
  "base64 0.22.1",
  "chrono",

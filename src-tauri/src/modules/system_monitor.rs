@@ -54,7 +54,10 @@ fn start_temp_sidecar(app: AppHandle) {
     };
     let (mut rx, _child) = match sidecar.spawn() {
         Ok(pair) => pair,
-        Err(_) => return,
+        Err(e) => {
+            super::logger::warn(format!("sidecar: LHMWrapper spawn failed: {e}"));
+            return;
+        }
     };
     tauri::async_runtime::spawn(async move {
         while let Some(event) = rx.recv().await {

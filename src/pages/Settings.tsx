@@ -4,6 +4,7 @@ import {
   Cpu,
   Download,
   ExternalLink,
+  FolderOpen,
   Info,
   RefreshCw,
   Settings as SettingsIcon,
@@ -13,7 +14,7 @@ import { openUrl } from "@tauri-apps/plugin-opener";
 import { useSystemStore } from "../store/systemStore";
 import { useSettingsStore } from "../store/settingsStore";
 import { useAiStore } from "../store/aiStore";
-import { checkForUpdates } from "../lib/backend";
+import { checkForUpdates, openLogsFolder } from "../lib/backend";
 import { toast } from "../store/toastStore";
 import { isTauri } from "../lib/tauri";
 import Toggle from "../components/Toggle";
@@ -133,9 +134,17 @@ export default function Settings() {
           change is confirmed first, logged in plain English, and fully reversible — nothing is ever
           applied without your click.
         </p>
-        <button onClick={openRepo} className="mt-3 flex items-center gap-2 text-[12px] font-medium text-accent hover:text-accent-hi">
-          <ExternalLink size={14} /> View on GitHub
-        </button>
+        <div className="mt-3 flex flex-wrap items-center gap-4">
+          <button onClick={openRepo} className="flex items-center gap-2 text-[12px] font-medium text-accent hover:text-accent-hi">
+            <ExternalLink size={14} /> View on GitHub
+          </button>
+          <button onClick={() => void openLogsFolder()} className="flex items-center gap-2 text-[12px] font-medium text-txt2 hover:text-txt">
+            <FolderOpen size={14} /> Open logs folder
+          </button>
+        </div>
+        <p className="mt-2 text-[10.5px] text-txt3">
+          Logs are stored locally at %AppData%\MujifyTweaks\logs to help you report bugs — no telemetry, nothing leaves your PC.
+        </p>
       </Section>
 
       {/* Safety */}

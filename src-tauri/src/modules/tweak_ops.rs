@@ -49,6 +49,7 @@ pub enum Op {
     /// (or absence) for a perfect revert. FOUNDATION ONLY — the future
     /// auto-apply-game-settings phase will use this; no tweak/fix references it
     /// yet, so `ops_for`/`fix_ops` never produce it.
+    #[allow(dead_code)]
     FileEdit { path: String, content: Vec<u8> },
 }
 
