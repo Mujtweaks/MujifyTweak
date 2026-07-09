@@ -88,21 +88,34 @@ const QUICK = [
 
 // The AI's grounding context: real live stats + the real, persisted change log.
 function buildSystemPrompt(
+  userName: string,
   stats: any,
   hw: any,
   activeGame: any,
   changeLog: ChangeLogEntry[],
   driverIssues: DeviceIssue[],
 ): string {
+  const name = userName?.trim() || "the user";
+  const gpuList: string =
+    hw?.gpus?.length > 1
+      ? hw.gpus.map((g: any) => `${g.name} (${g.vendor})`).join(" + ")
+      : `${hw?.gpuName ?? "Unknown"} (${hw?.gpuVendor ?? "?"})`;
+  const power = hw?.onBattery ? "on battery" : "plugged in / AC power";
   return `You are Mujify AI, an expert Windows PC optimizer built into the Mujify Tweaks app.
 
-CURRENT PC STATE:
-CPU: ${hw?.cpuName ?? "Unknown"} — ${stats?.cpuUsagePercent?.toFixed(0) ?? "?"}% usage, ${stats?.cpuTempC != null ? `${stats.cpuTempC.toFixed(0)}°C` : "temp unavailable"}
-GPU: ${hw?.gpuName ?? "Unknown"} — ${stats?.gpuUsagePercent?.toFixed(0) ?? "?"}% usage, ${stats?.gpuTempC != null ? `${stats.gpuTempC.toFixed(0)}°C` : "temp unavailable"}
-RAM: ${stats?.ramUsedGb?.toFixed(1) ?? "?"}GB used of ${stats?.ramTotalGb?.toFixed(0) ?? "?"}GB (${stats?.ramUsagePercent?.toFixed(0) ?? "?"}%)
+WHO YOU'RE TALKING TO:
+The user's name is "${name}". Address them by name when it feels natural. If they ask "what's my name", answer with "${name}".
+
+THIS MACHINE (real, detected):
+Form factor: ${hw?.chassis ?? (hw?.isLaptop ? "Laptop" : "Desktop")} — currently ${power}
+CPU: ${hw?.cpuName ?? "Unknown"} (${hw?.cpuVendor ?? "?"}) — ${hw?.cpuCores ?? "?"} cores / ${hw?.cpuThreads ?? "?"} threads — ${stats?.cpuUsagePercent?.toFixed(0) ?? "?"}% usage, ${stats?.cpuTempC != null ? `${stats.cpuTempC.toFixed(0)}°C` : "temp unavailable"}
+GPU(s): ${gpuList} — ${stats?.gpuUsagePercent?.toFixed(0) ?? "?"}% usage, ${stats?.gpuTempC != null ? `${stats.gpuTempC.toFixed(0)}°C` : "temp unavailable"}
+NPU: ${hw?.npuName ?? "none detected"}
+RAM: ${stats?.ramUsedGb?.toFixed(1) ?? "?"}GB used of ${stats?.ramTotalGb?.toFixed(0) ?? hw?.ramTotalGb?.toFixed(0) ?? "?"}GB${hw?.ramSpeedMhz ? ` @ ${hw.ramSpeedMhz}MHz ${hw?.ramType ?? ""}` : ""} (${stats?.ramUsagePercent?.toFixed(0) ?? "?"}%)
 Storage: ${hw?.storageSummary ?? "Unknown"}
+OS: ${hw?.osEdition ?? "Windows"}${hw?.osBuild ? ` (build ${hw.osBuild})` : ""}${hw?.isCopilotPlus ? " · Copilot+ class" : ""}
 Active game: ${activeGame?.name ?? "None"}
-System score: ${stats?.systemScore ?? "?"}
+System score: ${stats?.systemScore ?? "?"} / 100
 Bottleneck: ${stats?.bottleneck ?? "None detected"}
 
 CHANGES ALREADY MADE (Change Log):
@@ -111,8 +124,13 @@ ${changeLog.length === 0 ? "Nothing applied yet." : changeLog.slice(-10).map((e)
 DEVICE & DRIVER HEALTH (Device Manager problems):
 ${driverIssues.length === 0 ? "No device problems detected." : driverIssues.map((d) => `- ${d.name}: ${d.errorText} (code ${d.errorCode})`).join("\n")}
 
+HOW TO TAILOR YOUR ADVICE TO THIS EXACT MACHINE:
+- Refer to the hardware by its real name (e.g. "your ${hw?.gpuName ?? "GPU"}"). Recommend the vendor-specific tweaks that match: NVIDIA GPUs → NVIDIA tweaks, AMD → AMD tweaks, Intel/Arc → Intel tweaks. Never recommend a vendor's tweak for hardware it doesn't have.
+- LAPTOP RULES: this is a ${hw?.chassis === "Laptop" || hw?.isLaptop ? "LAPTOP" : "DESKTOP"}. On a laptop, warn that aggressive tweaks raise heat and drain battery; do NOT recommend the Ultimate Performance power plan while on battery; prefer High Performance only when plugged in.
+- The NPU does not affect game FPS — never claim an "NPU boost" for gaming. If asked about the NPU, explain it runs Windows AI features (Recall/Copilot/Studio Effects) and can be quieted via the Windows-AI tweaks.
+- If the user mentions ANY hardware/driver problem, report EVERY problem device listed above, then offer the safe fix (restore point, then let Windows re-scan/match signed drivers). Never suggest third-party driver packs.
+
 RULES:
-- If the user mentions ANY hardware or driver problem, report EVERY problem device listed above (not only the one they named), then offer the safe fix: create a System Restore point, then let Windows re-scan and match signed drivers. Never suggest downloading third-party driver packs.
 - Be specific and actionable. No vague advice.
 - If the user asks you to change something, explain exactly what will change before doing it.
 - Never suggest anything that requires injection, driver modification, or bypassing anti-cheat.
@@ -207,7 +225,8 @@ export default function AIAssistant({ onNavigate }: { onNavigate: (page: PageId)
     } catch {
       driverIssues = [];
     }
-    const systemPrompt = buildSystemPrompt(stats, hw, activeGame, changeLog, driverIssues);
+    const userName = useSettingsStore.getState().userName;
+    const systemPrompt = buildSystemPrompt(userName, stats, hw, activeGame, changeLog, driverIssues);
 
     // Rust streams the reply back via the ai_chunk / ai_done events above.
     // getState().messages already includes the user turn we just pushed.

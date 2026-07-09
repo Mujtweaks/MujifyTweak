@@ -45,7 +45,7 @@ pub fn load_ai_session() -> Option<Vec<AiMessage>> {
     serde_json::from_str(&text).ok()
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, Clone)]
 struct NimMessage {
     role: String,
     content: String,
@@ -72,9 +72,6 @@ pub async fn ai_chat(
     let key = super::config::get_api_key("nvidia".to_string())
         .ok_or_else(|| "The AI service isn't configured right now.".to_string())?;
 
-    // Nemotron 3 Ultra on build.nvidia.com (OpenAI-compatible chat completions).
-    let model = "nvidia/nemotron-3-ultra-550b-a55b";
-
     let mut nim_messages: Vec<NimMessage> = Vec::with_capacity(messages.len() + 1);
     nim_messages.push(NimMessage {
         role: "system".into(),
@@ -87,41 +84,61 @@ pub async fn ai_chat(
         });
     }
 
-    let body = NimRequest {
-        model: model.into(),
-        messages: nim_messages,
-        stream: true,
-        max_tokens: 1024,
-        temperature: 0.7,
-    };
-
     let client = reqwest::Client::new();
 
     // The free endpoint occasionally returns a transient "ResourceExhausted"
     // (shared worker at capacity). Retry a few times with a short backoff before
-    // giving up — but only while nothing has been streamed to the UI yet.
+    // giving up — but only while nothing has been streamed to the UI yet. If a
+    // model slug is rejected (400/404), fall through to the next known-good model
+    // so a catalog change never leaves the assistant dead.
     const MAX_ATTEMPTS: u32 = 4;
-    for attempt in 1..=MAX_ATTEMPTS {
-        match stream_once(&app, &client, &key, &body).await {
-            Ok(()) => return Ok(()),
-            Err(e) if e.retriable && attempt < MAX_ATTEMPTS => {
-                tokio::time::sleep(std::time::Duration::from_millis(500 * attempt as u64)).await;
-                continue;
-            }
-            Err(e) => {
-                // Log the failure (never the API key — it's only ever in the
-                // request header, never in this message) for local bug reports.
-                super::logger::warn(format!("ai: request failed: {}", e.message));
-                return Err(e.message);
+    for (mi, model) in NIM_MODELS.iter().enumerate() {
+        let body = NimRequest {
+            model: (*model).to_string(),
+            messages: nim_messages.clone(),
+            stream: true,
+            max_tokens: 1024,
+            temperature: 0.7,
+        };
+        for attempt in 1..=MAX_ATTEMPTS {
+            match stream_once(&app, &client, &key, &body).await {
+                Ok(()) => return Ok(()),
+                // A rejected model → try the next model in the list (if any).
+                Err(e) if e.try_next_model && mi + 1 < NIM_MODELS.len() => {
+                    super::logger::warn(format!("ai: model '{model}' rejected, trying next"));
+                    break;
+                }
+                Err(e) if e.retriable && attempt < MAX_ATTEMPTS => {
+                    tokio::time::sleep(std::time::Duration::from_millis(500 * attempt as u64))
+                        .await;
+                    continue;
+                }
+                Err(e) => {
+                    // Log the failure (never the API key — it's only ever in the
+                    // request header, never in this message) for local bug reports.
+                    super::logger::warn(format!("ai: request failed: {}", e.message));
+                    return Err(e.message);
+                }
             }
         }
     }
     Err(busy_msg())
 }
 
+/// Chat models tried in order. Slugs on build.nvidia.com change over time, so a
+/// rejected model falls through to the next. Verify the primary at
+/// build.nvidia.com if the AI ever stops responding.
+const NIM_MODELS: &[&str] = &[
+    "nvidia/llama-3.3-nemotron-super-49b-v1",
+    "meta/llama-3.3-70b-instruct",
+];
+
 struct AiErr {
     /// True if retrying the whole request may succeed (nothing streamed yet).
     retriable: bool,
+    /// True when the failure looks like a bad/unknown model slug (400/404) so
+    /// the caller should try the next model rather than give up.
+    try_next_model: bool,
     message: String,
 }
 
@@ -145,19 +162,28 @@ async fn stream_once(
         .json(body)
         .send()
         .await
-        .map_err(|e| AiErr { retriable: true, message: format!("Network error: {e}") })?;
+        .map_err(|e| AiErr {
+            retriable: true,
+            try_next_model: false,
+            message: format!("Network error: {e}"),
+        })?;
 
     if !response.status().is_success() {
         let status = response.status();
         let err_body = response.text().await.unwrap_or_default();
         let code = status.as_u16();
         let retriable = code == 429 || code == 503 || err_body.contains("ResourceExhausted");
+        // 400/404 usually means the model slug is wrong/retired — try the next.
+        let try_next_model = code == 400 || code == 404;
         let message = if retriable {
             busy_msg()
         } else {
-            format!("The AI service returned an error ({status}).")
+            // Surface the real status + a snippet of the body so a failure is
+            // diagnosable instead of an opaque "400". (No key is ever in here.)
+            let snippet: String = err_body.chars().take(240).collect();
+            format!("Mujify AI error {status}: {}", snippet.trim())
         };
-        return Err(AiErr { retriable, message });
+        return Err(AiErr { retriable, try_next_model, message });
     }
 
     // Parse the SSE stream incrementally so the UI shows a live typing effect.
@@ -172,6 +198,7 @@ async fn stream_once(
             Err(e) => {
                 return Err(AiErr {
                     retriable: !emitted,
+                    try_next_model: false,
                     message: format!("Stream error: {e}"),
                 })
             }
@@ -202,7 +229,7 @@ async fn stream_once(
                     } else {
                         format!("Mujify AI hit an error: {err_msg}")
                     };
-                    return Err(AiErr { retriable, message });
+                    return Err(AiErr { retriable, try_next_model: false, message });
                 }
                 if let Some(delta) = parsed["choices"][0]["delta"]["content"].as_str() {
                     if !delta.is_empty() {
