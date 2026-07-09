@@ -255,7 +255,11 @@ pub fn ops_for(tweak_id: &str) -> Vec<Op> {
             sz(Hklm, MMCSS_GAMES, "SFIO Priority", "High"),
         ],
         "gpu_priority" => vec![dw(Hklm, MMCSS_GAMES, "GPU Priority", 8)],
-        "disable_tips" => vec![dw(Hkcu, r"Software\Microsoft\Windows\CurrentVersion\ContentDeliveryManager", "SubscribedContent-338389Enabled", 0)],
+        "disable_tips" => vec![
+            dw(Hkcu, r"Software\Microsoft\Windows\CurrentVersion\ContentDeliveryManager", "SubscribedContent-338389Enabled", 0),
+            dw(Hkcu, r"Software\Microsoft\Windows\CurrentVersion\ContentDeliveryManager", "SoftLandingEnabled", 0),
+            dw(Hkcu, r"Software\Microsoft\Windows\CurrentVersion\ContentDeliveryManager", "SystemPaneSuggestionsEnabled", 0),
+        ],
         "disable_hibernation" => vec![dw(Hklm, r"SYSTEM\CurrentControlSet\Control\Power", "HibernateEnabled", 0)],
         "power_ultimate" => vec![Op::UltimatePlan],
         "disable_memory_compression" => vec![Op::MemoryCompression { enable: false }],

@@ -122,7 +122,7 @@ const CATALOG: &[TweakDef] = &[
     // ---------- Network ----------
     TweakDef { id: "disable_nagle", title: "Disable Nagle's Algorithm", description: "Sends small game packets immediately instead of batching them — lower input lag.", category: Network, risk: Moderate, impact: 4 },
     TweakDef { id: "network_throttling_index", title: "Network Throttling Index", description: "Removes the multimedia network throttle for better bandwidth and throughput.", category: Network, risk: Moderate, impact: 4 },
-    TweakDef { id: "network_qos", title: "QoS DSCP Priority", description: "Tags the active game's packets as high priority (DSCP 46) on your network.", category: Network, risk: Safe, impact: 3 },
+    TweakDef { id: "network_qos", title: "Disable QoS Bandwidth Reserve", description: "Stops Windows reserving up to 20% of your bandwidth for background QoS traffic.", category: Network, risk: Safe, impact: 3 },
     TweakDef { id: "tcp_optimize", title: "TCP Auto-Tuning", description: "Tunes TCP window auto-tuning and scaling for gaming traffic.", category: Network, risk: Moderate, impact: 3 },
     TweakDef { id: "tcp_ack_frequency", title: "TCP ACK Frequency", description: "Acknowledges packets immediately rather than delaying — pairs with Nagle off.", category: Network, risk: Moderate, impact: 3 },
     TweakDef { id: "flush_dns", title: "Flush DNS Cache", description: "Clears stale DNS entries before an online session.", category: Network, risk: Safe, impact: 2 },

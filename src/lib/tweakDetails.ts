@@ -97,7 +97,8 @@ export const TWEAK_DETAILS: Record<string, TweakDetail> = {
   disable_tips: {
     what: "Turns off Windows suggestion notifications, tips and lock-screen ads.",
     action: "registry",
-    changes: "HKCU\\...\\ContentDeliveryManager → SubscribedContent-338389Enabled = 0. Reversible.",
+    changes:
+      "HKCU\\...\\ContentDeliveryManager → SubscribedContent-338389Enabled, SoftLandingEnabled and SystemPaneSuggestionsEnabled = 0. All reversible.",
   },
   disable_hibernation: {
     what: "Turns off hibernation, freeing the multi-GB hiberfil.sys and removing hybrid-sleep overhead.",
