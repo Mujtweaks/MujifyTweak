@@ -149,7 +149,7 @@ export default function Settings() {
             </p>
             <p className="mt-0.5 text-[11.5px] text-txt2">
               Sends a single anonymous "online" ping every 5 minutes — app version only, nothing else.
-              No personal data, no machine id. Off by default; turn it off anytime.
+              No personal data, no machine id. On by default and openly disclosed; one-click off, anytime.
             </p>
           </div>
           <Toggle on={shareOnlineStatus} onClick={() => setShareOnlineStatus(!shareOnlineStatus)} />
