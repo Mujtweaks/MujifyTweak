@@ -61,15 +61,25 @@ export interface NetworkStats {
   upMbps: number | null;
 }
 
+/** One graphics adapter. */
+export interface GpuInfo {
+  name: string;
+  vendor: string;
+  driver: string | null;
+}
+
 /** Returned by HardwareProfiler (Checkpoint 2). */
 export interface HardwareProfile {
   cpuName: string;
+  cpuVendor: string;
   cpuCores: number;
   cpuThreads: number;
   cpuBaseClockMhz: number | null;
   gpuName: string;
   gpuVendor: string;
   gpuDriverVersion: string | null;
+  gpus: GpuInfo[];
+  npuName: string | null;
   ramTotalGb: number;
   ramSpeedMhz: number | null;
   ramType: string | null;
@@ -77,6 +87,11 @@ export interface HardwareProfile {
   storageKind: string | null;
   motherboard: string | null;
   isLaptop: boolean | null;
+  chassis: string;
+  onBattery: boolean;
+  osEdition: string | null;
+  osBuild: string | null;
+  isCopilotPlus: boolean;
 }
 
 /** GameDetector (Checkpoint 4) — active game + installed library entries. */

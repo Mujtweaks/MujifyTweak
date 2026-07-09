@@ -11,16 +11,30 @@ use sysinfo::System;
 
 use super::wmi_util::{connect, get_f64, get_string, get_u16_array, get_u64, query, query_ns};
 
+/// One graphics adapter (a machine can have an iGPU + a dGPU).
+#[derive(Serialize, Clone, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct GpuInfo {
+    pub name: String,
+    pub vendor: String,
+    pub driver: Option<String>,
+}
+
 #[derive(Serialize, Clone, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct HardwareProfile {
     pub cpu_name: String,
+    pub cpu_vendor: String,
     pub cpu_cores: u32,
     pub cpu_threads: u32,
     pub cpu_base_clock_mhz: Option<u32>,
+    /// Primary GPU (kept for existing UI); `gpus` has every real adapter.
     pub gpu_name: String,
     pub gpu_vendor: String,
     pub gpu_driver_version: Option<String>,
+    pub gpus: Vec<GpuInfo>,
+    /// Neural Processing Unit, when present (Intel AI Boost / AMD Ryzen AI / etc).
+    pub npu_name: Option<String>,
     pub ram_total_gb: f32,
     pub ram_speed_mhz: Option<u32>,
     pub ram_type: Option<String>,
@@ -28,6 +42,15 @@ pub struct HardwareProfile {
     pub storage_kind: Option<String>,
     pub motherboard: Option<String>,
     pub is_laptop: Option<bool>,
+    /// "Laptop" | "Desktop" — plain-English form factor for the UI + AI.
+    pub chassis: String,
+    /// True only when a battery is present AND currently discharging.
+    pub on_battery: bool,
+    pub os_edition: Option<String>,
+    pub os_build: Option<String>,
+    /// Heuristic: has an NPU and a recent build — the AI treats it as a hint,
+    /// never a hard claim.
+    pub is_copilot_plus: bool,
 }
 
 static CACHE: Mutex<Option<HardwareProfile>> = Mutex::new(None);
@@ -68,6 +91,28 @@ fn vendor_of(name: &str) -> String {
     }
 }
 
+/// CPU maker from the brand string.
+fn cpu_vendor_of(name: &str) -> String {
+    let n = name.to_lowercase();
+    if n.contains("intel") {
+        "Intel".into()
+    } else if n.contains("amd") || n.contains("ryzen") {
+        "AMD".into()
+    } else {
+        "Unknown".into()
+    }
+}
+
+/// Does this PnP device name look like a Neural Processing Unit?
+fn is_npu_name(name: &str) -> bool {
+    let n = name.to_lowercase();
+    n.contains("npu")
+        || n.contains("ai boost")
+        || n.contains("neural")
+        || n.contains("ryzen ai")
+        || n.contains("hexagon")
+}
+
 fn smbios_ram_type(code: u64) -> Option<&'static str> {
     match code {
         20 => Some("DDR"),
@@ -90,11 +135,18 @@ fn build_profile() -> HardwareProfile {
     }
     p.cpu_threads = sys.cpus().len() as u32;
     p.cpu_cores = System::physical_core_count().unwrap_or(sys.cpus().len()) as u32;
+    p.cpu_vendor = cpu_vendor_of(&p.cpu_name);
     p.ram_total_gb = sys.total_memory() as f32 / 1_073_741_824.0;
 
     let conn = match connect() {
-        Some(c) => c,
-        None => return p, // sysinfo-only fallback; still real data
+        Some(c) => {
+            p.chassis = "Desktop".into(); // refined below once chassis type is read
+            c
+        }
+        None => {
+            p.chassis = "Desktop".into();
+            return p; // sysinfo-only fallback; still real data
+        }
     };
 
     // CPU extras
@@ -102,31 +154,52 @@ fn build_profile() -> HardwareProfile {
         if p.cpu_name.is_empty() {
             if let Some(name) = get_string(&row, "Name") {
                 p.cpu_name = name;
+                p.cpu_vendor = cpu_vendor_of(&p.cpu_name);
             }
         }
         p.cpu_base_clock_mhz = get_u64(&row, "MaxClockSpeed").map(|v| v as u32);
         break;
     }
 
-    // GPU — skip virtual display adapters (Parsec/DeskIn/etc), keep the real one.
-    let gpus = query(
-        &conn,
-        "SELECT Name, DriverVersion FROM Win32_VideoController",
-    );
-    let real = gpus
+    // GPU — collect EVERY real adapter (iGPU + dGPU), skip virtual/remote ones.
+    let gpu_rows = query(&conn, "SELECT Name, DriverVersion FROM Win32_VideoController");
+    let mut all_gpus: Vec<GpuInfo> = Vec::new();
+    for r in &gpu_rows {
+        if let Some(name) = get_string(r, "Name") {
+            if is_virtual_gpu(&name) {
+                continue;
+            }
+            all_gpus.push(GpuInfo {
+                name: clean_gpu_name(&name),
+                vendor: vendor_of(&name),
+                driver: get_string(r, "DriverVersion"),
+            });
+        }
+    }
+    if let Some(first) = all_gpus.first() {
+        p.gpu_name = first.name.clone();
+        p.gpu_vendor = first.vendor.clone();
+        p.gpu_driver_version = first.driver.clone();
+    } else if let Some((row, name)) = gpu_rows
         .iter()
         .filter_map(|r| get_string(r, "Name").map(|n| (r, n)))
-        .find(|(_, n)| !is_virtual_gpu(n))
-        .or_else(|| {
-            gpus.iter()
-                .filter_map(|r| get_string(r, "Name").map(|n| (r, n)))
-                .next()
-        });
-    if let Some((row, name)) = real {
+        .next()
+    {
+        // All adapters were virtual — still surface one so the UI isn't blank.
         p.gpu_vendor = vendor_of(&name);
         p.gpu_name = clean_gpu_name(&name);
         p.gpu_driver_version = get_string(row, "DriverVersion");
     }
+    p.gpus = all_gpus;
+
+    // NPU — a PnP device whose name reads like a neural accelerator.
+    p.npu_name = query(
+        &conn,
+        "SELECT Name FROM Win32_PnPEntity WHERE Name LIKE '%NPU%' OR Name LIKE '%AI Boost%' OR Name LIKE '%Neural%' OR Name LIKE '%Ryzen AI%'",
+    )
+    .iter()
+    .filter_map(|r| get_string(r, "Name"))
+    .find(|n| is_npu_name(n));
 
     // RAM speed/type from the first populated module.
     let mut total_capacity: u64 = 0;
@@ -198,7 +271,7 @@ fn build_profile() -> HardwareProfile {
         break;
     }
 
-    // Laptop vs desktop via chassis type (9/10/14 = portable/notebook/sub-notebook).
+    // Laptop vs desktop via chassis type (8–14/30–32 = portable/notebook/tablet).
     for row in query(&conn, "SELECT ChassisTypes FROM Win32_SystemEnclosure") {
         let types = get_u16_array(&row, "ChassisTypes");
         if !types.is_empty() {
@@ -206,6 +279,32 @@ fn build_profile() -> HardwareProfile {
         }
         break;
     }
+    p.chassis = match p.is_laptop {
+        Some(true) => "Laptop".into(),
+        _ => "Desktop".into(),
+    };
+
+    // On battery? A present battery reporting "discharging" (BatteryStatus == 1).
+    for row in query(&conn, "SELECT BatteryStatus FROM Win32_Battery") {
+        p.on_battery = get_u64(&row, "BatteryStatus") == Some(1);
+        // A battery being present also strongly implies a laptop.
+        if p.is_laptop.is_none() {
+            p.is_laptop = Some(true);
+            p.chassis = "Laptop".into();
+        }
+        break;
+    }
+
+    // OS edition + build number.
+    for row in query(&conn, "SELECT Caption, BuildNumber FROM Win32_OperatingSystem") {
+        p.os_edition = get_string(&row, "Caption").map(|c| c.replace("Microsoft ", ""));
+        p.os_build = get_string(&row, "BuildNumber");
+        break;
+    }
+
+    // Copilot+ is a heuristic hint only: an NPU present on a recent Win11 build.
+    let build_num = p.os_build.as_deref().and_then(|b| b.parse::<u32>().ok());
+    p.is_copilot_plus = p.npu_name.is_some() && build_num.map(|b| b >= 26100).unwrap_or(false);
 
     p
 }
@@ -220,4 +319,39 @@ pub fn get_hardware_profile() -> HardwareProfile {
     let profile = build_profile();
     *cache = Some(profile.clone());
     profile
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn cpu_vendor_classifies_intel_and_amd() {
+        assert_eq!(cpu_vendor_of("Intel(R) Core(TM) Ultra 7 258V"), "Intel");
+        assert_eq!(cpu_vendor_of("AMD Ryzen 7 7800X3D"), "AMD");
+        assert_eq!(cpu_vendor_of("Some Unknown CPU"), "Unknown");
+    }
+
+    #[test]
+    fn gpu_vendor_classifies_all_three() {
+        assert_eq!(vendor_of("NVIDIA GeForce RTX 4070"), "NVIDIA");
+        assert_eq!(vendor_of("AMD Radeon RX 7800 XT"), "AMD");
+        assert_eq!(vendor_of("Intel(R) Arc(TM) 140V GPU (16GB)"), "Intel");
+    }
+
+    #[test]
+    fn npu_names_are_recognised() {
+        assert!(is_npu_name("Intel(R) AI Boost"));
+        assert!(is_npu_name("AMD Ryzen AI"));
+        assert!(is_npu_name("Neural Processor"));
+        assert!(!is_npu_name("Intel(R) Arc(TM) 140V GPU"));
+        assert!(!is_npu_name("Realtek Audio"));
+    }
+
+    #[test]
+    fn virtual_adapters_are_filtered() {
+        assert!(is_virtual_gpu("Parsec Virtual Display Adapter"));
+        assert!(is_virtual_gpu("Microsoft Basic Display Adapter"));
+        assert!(!is_virtual_gpu("Intel Arc 140V"));
+    }
 }
