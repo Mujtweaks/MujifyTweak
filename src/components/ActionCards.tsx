@@ -1,8 +1,10 @@
 import { useState } from "react";
 import { BarChart3, LineChart, ListChecks, RotateCcw, Search, Zap, type LucideIcon } from "lucide-react";
-import { scanTweaks } from "../lib/backend";
+import { scanSystemHealth, scanTweaks } from "../lib/backend";
 import { useSystemStore } from "../store/systemStore";
+import { useGameStore } from "../store/gameStore";
 import { useTweakStore } from "../store/tweakStore";
+import { toast } from "../store/toastStore";
 import ApplyConfirmModal from "./ApplyConfirmModal";
 import { PRESET_RISK } from "../lib/categories";
 import type { ApplyOutcome, TweakInfo } from "../lib/types";
@@ -52,10 +54,12 @@ function Card({
 
 export default function ActionCards({ onNavigate }: ActionCardsProps) {
   const hardware = useSystemStore((s) => s.hardware);
+  const activeGame = useGameStore((s) => s.activeGame);
   const scanResult = useTweakStore((s) => s.scanResult);
   const setScan = useTweakStore((s) => s.setScan);
   const setSelected = useTweakStore((s) => s.setSelected);
   const [scanning, setScanning] = useState(false);
+  const [checking, setChecking] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
   const [boostTweaks, setBoostTweaks] = useState<TweakInfo[]>([]);
 
@@ -72,11 +76,35 @@ export default function ActionCards({ onNavigate }: ActionCardsProps) {
     setShowConfirm(true);
   };
 
+  // Real scan — checks the system for issues AND for optimizations not applied,
+  // reports what it found, then opens Diagnostics for the detail. Never a
+  // no-op navigate. Read-only: it changes nothing.
+  const runScan = async () => {
+    setChecking(true);
+    const [tw, health] = await Promise.all([
+      scanResult ? Promise.resolve(scanResult) : scanTweaks(hardware?.isLaptop ?? null),
+      scanSystemHealth(activeGame?.name ?? null, activeGame?.installPath ?? null),
+    ]);
+    setChecking(false);
+    if (tw && !scanResult) setScan(tw);
+    const issues = health?.findings?.length ?? 0;
+    const recommended = tw ? tw.tweaks.filter((t) => t.appliable && !t.applied).length : 0;
+    if (issues === 0 && recommended === 0) {
+      toast.success("Scan complete", "No issues found — your system looks well-tuned.");
+    } else {
+      toast.info(
+        "Scan complete",
+        `${issues} issue${issues === 1 ? "" : "s"} found · ${recommended} optimization${recommended === 1 ? "" : "s"} available. Opening Diagnostics…`,
+      );
+    }
+    onNavigate("diagnostics");
+  };
+
   return (
     <div className="flex flex-col gap-3">
       <div className="grid grid-cols-2 gap-3">
         <Card title="BOOST" desc="Apply optimizations — confirmed, logged, reversible." icon={Zap} primary onClick={boost} busy={scanning} />
-        <Card title="SCAN" desc="Check your system for issues." icon={Search} onClick={() => onNavigate("optimizer")} />
+        <Card title="SCAN" desc="Check your system for issues." icon={Search} onClick={runScan} busy={checking} />
         <Card title="ANALYZE" desc="See what's slowing you down." icon={BarChart3} onClick={() => onNavigate("diagnostics")} />
         <Card title="REVERT ALL" desc="Undo every change instantly." icon={RotateCcw} onClick={() => onNavigate("changelog")} />
       </div>

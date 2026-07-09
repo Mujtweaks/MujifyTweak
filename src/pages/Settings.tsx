@@ -3,7 +3,6 @@ import {
   Bot,
   Cpu,
   Download,
-  ExternalLink,
   FolderOpen,
   Gamepad2,
   Info,
@@ -16,7 +15,6 @@ import { useSystemStore } from "../store/systemStore";
 import { useSettingsStore } from "../store/settingsStore";
 import { useAiStore } from "../store/aiStore";
 import { getUpdateInfo, openLogsFolder } from "../lib/backend";
-import { GITHUB_RELEASES, openExternal } from "../lib/links";
 import { toast } from "../store/toastStore";
 import Toggle from "../components/Toggle";
 import UpdateModal from "../components/UpdateModal";
@@ -87,8 +85,6 @@ export default function Settings() {
       next ? "The AI page is available again." : "Chat cleared and the AI page is now off.",
     );
   };
-
-  const openRepo = () => void openExternal(GITHUB_RELEASES);
 
   return (
     <div className="mx-auto flex max-w-2xl flex-col gap-4">
@@ -187,9 +183,6 @@ export default function Settings() {
           applied without your click.
         </p>
         <div className="mt-3 flex flex-wrap items-center gap-4">
-          <button onClick={openRepo} className="flex items-center gap-2 text-[12px] font-medium text-accent hover:text-accent-hi">
-            <ExternalLink size={14} /> View on GitHub
-          </button>
           <button onClick={() => void openLogsFolder()} className="flex items-center gap-2 text-[12px] font-medium text-txt2 hover:text-txt">
             <FolderOpen size={14} /> Open logs folder
           </button>
