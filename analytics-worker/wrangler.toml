@@ -1,0 +1,26 @@
+# Mujify analytics worker. Deploy from this folder with:  npx wrangler deploy
+#
+# NOTE: `name` MUST stay "mujify-stats" — it matches the worker already created
+# in the Cloudflare dashboard, so deploying REPLACES the hello-world placeholder
+# at https://mujify-stats.cheaplabs2-4b2.workers.dev (the exact URL baked into
+# the app's ANALYTICS_ENDPOINT and CSP). Renaming would silently deploy a second
+# worker at a different URL that the app never calls.
+name = "mujify-stats"
+main = "worker.js"
+compatibility_date = "2024-09-01"
+
+# A single global Durable Object holds the anonymous counters (no IPs/ids).
+# `new_sqlite_classes` (SQLite-backed storage) is REQUIRED on the Workers FREE
+# plan — plain `new_classes` (KV-backed DOs) errors asking for the paid plan.
+[[durable_objects.bindings]]
+name = "COUNTER"
+class_name = "Counter"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["Counter"]
+
+# The /stats dashboard token is a SECRET, never a var. Set it once with:
+#   npx wrangler secret put STATS_TOKEN
+# (A [vars] STATS_TOKEN here would shadow the secret with a known placeholder
+# value, leaving the stats page effectively unprotected — never add one.)

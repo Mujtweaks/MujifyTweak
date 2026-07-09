@@ -3,7 +3,7 @@
 // Small app-level preferences that live on this PC only (localStorage) — no
 // account, nothing leaves the machine. Includes the AI toggle, the user's
 // chosen name (personalization), the pre-game Ready Check toggle, and the
-// opt-in anonymous online-status ping.
+// anonymous online-status ping (on by default, disclosed at first run).
 import { create } from "zustand";
 
 const KEYS = {
@@ -33,7 +33,8 @@ interface SettingsState {
   /** The name the user chose on first run (local only). "" → falls back to "GAMER". */
   userName: string;
   readyCheckEnabled: boolean;
-  /** Opt-in: send a single anonymous "online" ping (version only). Default off. */
+  /** Send a single anonymous "online" ping (version only). ON by default —
+   *  openly disclosed on the first-run welcome screen; one-click off here. */
   shareOnlineStatus: boolean;
   setAiEnabled: (v: boolean) => void;
   setUserName: (v: string) => void;
@@ -45,7 +46,7 @@ export const useSettingsStore = create<SettingsState>((set) => ({
   aiEnabled: read(KEYS.ai, "true") !== "false",
   userName: read(KEYS.name, ""),
   readyCheckEnabled: read(KEYS.readyCheck, "true") !== "false",
-  shareOnlineStatus: read(KEYS.shareOnline, "false") === "true",
+  shareOnlineStatus: read(KEYS.shareOnline, "true") !== "false",
   setAiEnabled: (v) => {
     write(KEYS.ai, String(v));
     set({ aiEnabled: v });

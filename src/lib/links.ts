@@ -8,6 +8,12 @@ export const WEBSITE = "https://mujifytweaks.site.je";
 export const GITHUB_REPO = "https://github.com/Mujtweaks/MujifyTweak";
 export const GITHUB_RELEASES = "https://github.com/Mujtweaks/MujifyTweak/releases";
 
+// Anonymous "online" ping endpoint (the Cloudflare Worker in analytics-worker/).
+// The worker exists at this URL (host is allowlisted in tauri.conf.json's CSP
+// connect-src). Until the real counter code is deployed there, the placeholder
+// responds harmlessly and the heartbeat's errors are swallowed — never an issue.
+export const ANALYTICS_ENDPOINT = "https://mujify-stats.cheaplabs2-4b2.workers.dev";
+
 // The only URLs the app may open externally (defense-in-depth on top of the
 // Tauri opener capability allowlist). NOTE: if the website domain changes, update
 // it here AND in src-tauri/capabilities/default.json.
