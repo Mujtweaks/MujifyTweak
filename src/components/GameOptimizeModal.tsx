@@ -30,6 +30,7 @@ export default function GameOptimizeModal({ game, onClose }: { game: GameInfo; o
   const [profile, setProfile] = useState<GameProfileResult | null>(null);
   const [loading, setLoading] = useState(true);
   const [confirm, setConfirm] = useState<TweakInfo[] | null>(null);
+  const [autoApply, setAutoApply] = useState(false);
 
   useEffect(() => {
     void getGameProfile(game.name, game.installPath ?? null).then((p) => {
@@ -74,7 +75,9 @@ export default function GameOptimizeModal({ game, onClose }: { game: GameInfo; o
       launcher: game.launcher ?? null,
       preset: "recommended",
       launchOptions: null,
-      enabledTweaks: recommended.map((x) => x.tweak.id),
+      // Save the appliable recommended tweaks so auto-apply has something to run.
+      enabledTweaks: recommended.filter((x) => x.tweak.appliable).map((x) => x.tweak.id),
+      autoApply,
       createdAt: new Date().toISOString(),
       lastPlayed: null,
       avgFpsBefore: null,
@@ -186,7 +189,22 @@ export default function GameOptimizeModal({ game, onClose }: { game: GameInfo; o
         </div>
 
         {/* Footer */}
-        <div className="flex items-center justify-end gap-2.5 border-t border-edge px-5 py-4">
+        <div className="flex items-center justify-between gap-2.5 border-t border-edge px-5 py-4">
+          <button
+            type="button"
+            onClick={() => setAutoApply((v) => !v)}
+            className="flex items-center gap-2 text-left"
+            title="Also needs the master switch in Settings → Auto-apply"
+          >
+            <span className={`relative h-[18px] w-[32px] shrink-0 rounded-full transition-colors ${autoApply ? "bg-accent" : "bg-edge2"}`}>
+              <span className={`absolute top-[2px] h-[14px] w-[14px] rounded-full bg-white transition-all ${autoApply ? "left-[16px]" : "left-[2px]"}`} />
+            </span>
+            <span className="text-[11px] leading-tight text-txt2">
+              Auto-apply on launch
+              <span className="block text-[9.5px] text-txt3">needs the master switch in Settings</span>
+            </span>
+          </button>
+          <div className="flex items-center gap-2.5">
           <button onClick={onClose} className="rounded-btn border border-edge bg-card px-4 py-2 text-[12.5px] font-medium text-txt2 hover:text-txt">
             Close
           </button>
@@ -208,6 +226,7 @@ export default function GameOptimizeModal({ game, onClose }: { game: GameInfo; o
               Apply Recommended{applyCount > 0 ? ` (${applyCount})` : ""}
             </button>
           )}
+          </div>
         </div>
       </div>
 

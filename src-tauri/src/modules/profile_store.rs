@@ -23,6 +23,11 @@ pub struct Profile {
     pub preset: String,
     pub launch_options: Option<String>,
     pub enabled_tweaks: Vec<String>,
+    /// Opt-in: auto-apply this profile's tweaks when the game launches (and
+    /// revert on exit). Only ever acts when the global master switch is ALSO on.
+    /// `default` keeps older profile JSON loading fine.
+    #[serde(default)]
+    pub auto_apply: bool,
     pub created_at: String,
     pub last_played: Option<String>,
     /// Populated only from real measured sessions (Checkpoints 13–15). Never faked.

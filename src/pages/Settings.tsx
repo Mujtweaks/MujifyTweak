@@ -10,6 +10,7 @@ import {
   Settings as SettingsIcon,
   ShieldCheck,
   Wifi,
+  Zap,
 } from "lucide-react";
 import { useSystemStore } from "../store/systemStore";
 import { useSettingsStore } from "../store/settingsStore";
@@ -49,6 +50,8 @@ export default function Settings() {
   const aiEnabled = useSettingsStore((s) => s.aiEnabled);
   const setAiEnabled = useSettingsStore((s) => s.setAiEnabled);
   const shareOnlineStatus = useSettingsStore((s) => s.shareOnlineStatus);
+  const autoApplyEnabled = useSettingsStore((s) => s.autoApplyEnabled);
+  const setAutoApplyEnabled = useSettingsStore((s) => s.setAutoApplyEnabled);
   const setShareOnlineStatus = useSettingsStore((s) => s.setShareOnlineStatus);
   const readyCheckEnabled = useSettingsStore((s) => s.readyCheckEnabled);
   const setReadyCheckEnabled = useSettingsStore((s) => s.setReadyCheckEnabled);
@@ -148,6 +151,19 @@ export default function Settings() {
             </p>
           </div>
           <Toggle on={readyCheckEnabled} onClick={() => setReadyCheckEnabled(!readyCheckEnabled)} />
+        </div>
+        <div className="flex items-center justify-between border-t border-edge py-3">
+          <div className="pr-4">
+            <p className="flex items-center gap-2 text-[13px] font-medium text-txt">
+              <Zap size={14} className="text-accent" /> Auto-apply game profiles
+            </p>
+            <p className="mt-0.5 text-[11.5px] text-txt2">
+              Master switch. When ON, any game profile you've also marked "Auto-apply on launch" applies its tweaks the
+              moment that game starts and reverts them automatically when it closes — all logged and reversible. Both
+              this switch and the per-game toggle must be on, so nothing ever changes on its own.
+            </p>
+          </div>
+          <Toggle on={autoApplyEnabled} onClick={() => setAutoApplyEnabled(!autoApplyEnabled)} />
         </div>
       </Section>
 

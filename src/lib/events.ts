@@ -4,6 +4,7 @@ import { useSystemStore } from "../store/systemStore";
 import { useGameStore } from "../store/gameStore";
 import { useTweakStore } from "../store/tweakStore";
 import { toast } from "../store/toastStore";
+import { onGameChangeAutoApply } from "./autoApply";
 import type {
   ActivityEntry,
   AntiCheatStatus,
@@ -46,6 +47,8 @@ export async function initEventBridge(): Promise<void> {
     if (e.payload && e.payload.name !== prev?.name) {
       toast.info(`${e.payload.name} detected`, "Game launched — profile ready to apply.");
     }
+    // Auto-apply/revert per-game profiles (no-op unless the user opted in).
+    void onGameChangeAutoApply(e.payload);
   });
 
   await listen<AntiCheatStatus>("anti_cheat_status", (e) =>

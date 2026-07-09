@@ -11,6 +11,7 @@ const KEYS = {
   name: "mujify.userName",
   readyCheck: "mujify.readyCheck",
   shareOnline: "mujify.shareOnline",
+  autoApply: "mujify.autoApply",
 };
 
 function read(key: string, def: string): string {
@@ -36,10 +37,15 @@ interface SettingsState {
   /** Send a single anonymous "online" ping (version only). ON by default —
    *  openly disclosed on the first-run welcome screen; one-click off here. */
   shareOnlineStatus: boolean;
+  /** Master switch for auto-applying per-game profiles on launch. OFF by
+   *  default — a profile also needs its own autoApply flag for anything to run,
+   *  so the system never changes on its own unless the user opts in twice. */
+  autoApplyEnabled: boolean;
   setAiEnabled: (v: boolean) => void;
   setUserName: (v: string) => void;
   setReadyCheckEnabled: (v: boolean) => void;
   setShareOnlineStatus: (v: boolean) => void;
+  setAutoApplyEnabled: (v: boolean) => void;
 }
 
 export const useSettingsStore = create<SettingsState>((set) => ({
@@ -47,6 +53,7 @@ export const useSettingsStore = create<SettingsState>((set) => ({
   userName: read(KEYS.name, ""),
   readyCheckEnabled: read(KEYS.readyCheck, "true") !== "false",
   shareOnlineStatus: read(KEYS.shareOnline, "true") !== "false",
+  autoApplyEnabled: read(KEYS.autoApply, "false") === "true",
   setAiEnabled: (v) => {
     write(KEYS.ai, String(v));
     set({ aiEnabled: v });
@@ -62,6 +69,10 @@ export const useSettingsStore = create<SettingsState>((set) => ({
   setShareOnlineStatus: (v) => {
     write(KEYS.shareOnline, String(v));
     set({ shareOnlineStatus: v });
+  },
+  setAutoApplyEnabled: (v) => {
+    write(KEYS.autoApply, String(v));
+    set({ autoApplyEnabled: v });
   },
 }));
 

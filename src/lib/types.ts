@@ -392,6 +392,8 @@ export interface Profile {
   preset: string;
   launchOptions: string | null;
   enabledTweaks: string[];
+  /** Opt-in auto-apply on launch (only acts when the master switch is also on). */
+  autoApply?: boolean;
   createdAt: string;
   lastPlayed: string | null;
   avgFpsBefore: number | null;
