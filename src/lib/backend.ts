@@ -13,6 +13,7 @@ import type {
   GameRecProfile,
   GameServersResult,
   DeviceIssue,
+  BloatApp,
   FixInfo,
   HardwareProfile,
   SystemHealthReport,
@@ -273,6 +274,36 @@ export async function scanFixes(): Promise<FixInfo[]> {
   } catch (err) {
     console.error("scan_fixes failed:", err);
     return [];
+  }
+}
+
+/** Read-only: preinstalled Store bloat that's safe to remove (allowlisted). */
+export async function scanBloatware(): Promise<BloatApp[]> {
+  if (!isTauri) return [];
+  try {
+    return await invoke<BloatApp[]>("scan_bloatware");
+  } catch (err) {
+    console.error("scan_bloatware failed:", err);
+    return [];
+  }
+}
+
+/** Remove one allowlisted Store app (reinstallable from the Store, not a
+ *  captured-state revert). Only ever called on the user's explicit click. */
+export async function removeBloatware(app: BloatApp): Promise<boolean> {
+  if (!isTauri) return false;
+  try {
+    await invoke("remove_bloatware", {
+      friendly: app.name,
+      packageFullName: app.packageFullName,
+      confirm: true,
+    });
+    toast.success(`${app.name} removed`, "Reinstallable anytime from the Microsoft Store.");
+    return true;
+  } catch (err) {
+    console.error("remove_bloatware failed:", err);
+    toast.errorHelp("Removal failed", String(err));
+    return false;
   }
 }
 

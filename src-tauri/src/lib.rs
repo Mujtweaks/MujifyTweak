@@ -24,7 +24,7 @@ use tauri::{
 };
 
 use modules::{
-    ai_backend, benchmark, change_journal, change_log, config, driver_doctor, fix_catalog,
+    ai_backend, benchmark, change_journal, change_log, config, debloat, driver_doctor, fix_catalog,
     game_detector, game_profiler, game_profiles, game_settings, hardware_profiler, hardware_tier,
     health_scan, logger, network_monitor, profile_store, ready_check, rollback_engine, server_ping,
     sessions, speed_test, support, system_monitor, tweak_catalog, tweaks_engine,
@@ -274,6 +274,8 @@ pub fn run() {
             driver_doctor::scan_device_health,
             driver_doctor::repair_drivers,
             health_scan::scan_system_health,
+            debloat::scan_bloatware,
+            debloat::remove_bloatware,
             profile_store::list_profiles,
             profile_store::save_profile,
             profile_store::delete_profile,

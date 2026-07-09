@@ -61,6 +61,14 @@ export interface NetworkStats {
   upMbps: number | null;
 }
 
+/** One removable preinstalled Store app (Debloat). */
+export interface BloatApp {
+  name: string;
+  category: string;
+  packageFullName: string;
+  reinstallable: boolean;
+}
+
 /** One graphics adapter. */
 export interface GpuInfo {
   name: string;
