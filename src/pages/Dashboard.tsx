@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Cpu, HardDrive, MemoryStick, Monitor, Signal, Zap, type LucideIcon } from "lucide-react";
+import { BrainCircuit, Cpu, HardDrive, Laptop, MemoryStick, Monitor, Signal, Zap, type LucideIcon } from "lucide-react";
 import ScoreGauge from "../components/ScoreGauge";
 import ActionCards from "../components/ActionCards";
 import StatGauges from "../components/StatGauges";
@@ -28,10 +28,15 @@ function HwRow({ icon: Icon, label, value }: { icon: LucideIcon; label: string; 
 
 function HardwareStrip() {
   const hw = useSystemStore((s) => s.hardware);
+  // Show every real GPU (iGPU + dGPU), not just the primary.
+  const gpuValue =
+    hw && hw.gpus?.length > 1 ? hw.gpus.map((g) => g.name).join("  +  ") : (hw?.gpuName ?? null);
   return (
     <div className="grid grid-cols-2 gap-x-6 gap-y-3 rounded-card border border-edge bg-card p-4">
       <HwRow icon={Cpu} label="Processor" value={hw?.cpuName ?? null} />
-      <HwRow icon={Monitor} label="Graphics" value={hw?.gpuName ?? null} />
+      <HwRow icon={Monitor} label="Graphics" value={gpuValue} />
+      {/* NPU — only shown when the machine actually has one. */}
+      {hw?.npuName && <HwRow icon={BrainCircuit} label="Neural (NPU)" value={hw.npuName} />}
       <HwRow
         icon={MemoryStick}
         label="Memory"
@@ -42,6 +47,16 @@ function HardwareStrip() {
         }
       />
       <HwRow icon={HardDrive} label="Storage" value={hw?.storageSummary ?? null} />
+      {/* Form factor + OS — so the machine is fully described. */}
+      <HwRow
+        icon={Laptop}
+        label="System"
+        value={
+          hw
+            ? `${hw.chassis || (hw.isLaptop ? "Laptop" : "Desktop")}${hw.onBattery ? " · on battery" : ""}${hw.osEdition ? ` · ${hw.osEdition}` : ""}`
+            : null
+        }
+      />
     </div>
   );
 }
