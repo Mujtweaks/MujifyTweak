@@ -35,3 +35,8 @@ src-tauri/gen/schemas
 *.key.pub
 mx.dev.cfg
 *.dev.cfg
+
+# Owner-only tooling & docs — relocated OUT of the repo to the deep local store.
+# These patterns stop any stray copy ever re-entering the public repo.
+OWNER_DASHBOARD.md
+analytics-worker/

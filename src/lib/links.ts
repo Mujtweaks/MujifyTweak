@@ -8,7 +8,8 @@ export const WEBSITE = "https://mujifytweaks.site.je";
 export const GITHUB_REPO = "https://github.com/Mujtweaks/MujifyTweak";
 export const GITHUB_RELEASES = "https://github.com/Mujtweaks/MujifyTweak/releases";
 
-// Anonymous "online" ping endpoint (the Cloudflare Worker in analytics-worker/).
+// Anonymous "online" ping endpoint (the Cloudflare Worker, kept in the owner's
+// private local store outside this repo — see the owner dashboard notes).
 // The worker exists at this URL (host is allowlisted in tauri.conf.json's CSP
 // connect-src). Until the real counter code is deployed there, the placeholder
 // responds harmlessly and the heartbeat's errors are swallowed — never an issue.
