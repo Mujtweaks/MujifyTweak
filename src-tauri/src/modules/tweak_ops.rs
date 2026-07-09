@@ -306,6 +306,14 @@ pub fn ops_for(tweak_id: &str) -> Vec<Op> {
             Op::DisableService { name: "DiagTrack" },
             Op::DisableService { name: "dmwappushservice" },
         ],
+        // Recall snapshotting off via the documented WindowsAI policies — set for
+        // the current user AND machine-wide, plus the newer enablement gate.
+        // Pure registry DWORDs → exact prior state captured, fully reversible.
+        "disable_recall" => vec![
+            dw(Hkcu, r"Software\Policies\Microsoft\Windows\WindowsAI", "DisableAIDataAnalysis", 1),
+            dw(Hklm, r"SOFTWARE\Policies\Microsoft\Windows\WindowsAI", "DisableAIDataAnalysis", 1),
+            dw(Hklm, r"SOFTWARE\Policies\Microsoft\Windows\WindowsAI", "AllowRecallEnablement", 0),
+        ],
         "disable_cortana" => vec![dw(Hklm, r"SOFTWARE\Policies\Microsoft\Windows\Windows Search", "AllowCortana", 0)],
         "disable_ad_id" => vec![dw(Hkcu, r"Software\Microsoft\Windows\CurrentVersion\AdvertisingInfo", "Enabled", 0)],
         "disable_activity_history" => vec![
@@ -472,6 +480,21 @@ mod tests {
     }
 
     #[test]
+    fn disable_recall_applies_and_reverts_exactly() {
+        let m = MockMutator::new();
+        let undos = apply_all(&m, "disable_recall");
+        // Both policy scopes set + the enablement gate closed.
+        assert_eq!(m.get_dword(Hkcu, r"Software\Policies\Microsoft\Windows\WindowsAI", "DisableAIDataAnalysis"), Some(1));
+        assert_eq!(m.get_dword(Hklm, r"SOFTWARE\Policies\Microsoft\Windows\WindowsAI", "DisableAIDataAnalysis"), Some(1));
+        assert_eq!(m.get_dword(Hklm, r"SOFTWARE\Policies\Microsoft\Windows\WindowsAI", "AllowRecallEnablement"), Some(0));
+        // Revert deletes the values that never existed before — exact restore.
+        undo_all(&m, &undos);
+        assert_eq!(m.get_dword(Hkcu, r"Software\Policies\Microsoft\Windows\WindowsAI", "DisableAIDataAnalysis"), None);
+        assert_eq!(m.get_dword(Hklm, r"SOFTWARE\Policies\Microsoft\Windows\WindowsAI", "DisableAIDataAnalysis"), None);
+        assert_eq!(m.get_dword(Hklm, r"SOFTWARE\Policies\Microsoft\Windows\WindowsAI", "AllowRecallEnablement"), None);
+    }
+
+    #[test]
     fn max_refresh_maxes_and_reverts_exactly() {
         // 1440p panel stuck at 60 Hz but capable of 144 → apply raises it, undo
         // restores the exact prior mode.
@@ -547,7 +570,7 @@ mod tests {
             // newly wired this session:
             "disable_hibernation", "power_ultimate", "disable_memory_compression",
             "disable_core_parking", "disable_nagle", "tcp_ack_frequency", "network_qos",
-            "tcp_optimize", "dns_cloudflare", "disable_teredo",
+            "tcp_optimize", "dns_cloudflare", "disable_teredo", "disable_recall",
         ] {
             assert!(is_appliable(id), "{id} should be appliable");
         }

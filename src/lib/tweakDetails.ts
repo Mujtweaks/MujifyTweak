@@ -254,6 +254,12 @@ export const TWEAK_DETAILS: Record<string, TweakDetail> = {
   },
 
   // ---------- Privacy ----------
+  disable_recall: {
+    what: "Stops Windows Recall from continuously screenshotting and indexing everything on your screen. Snapshots are stored in a searchable AI database on your PC — a serious privacy exposure if anyone gets access to your machine, plus background capture overhead. Only Copilot+ PCs run Recall; on other PCs this sets the same policies as a preventive lock.",
+    action: "registry",
+    changes:
+      "HKCU + HKLM \\Policies\\Microsoft\\Windows\\WindowsAI → DisableAIDataAnalysis = 1, and HKLM → AllowRecallEnablement = 0. All reversible.",
+  },
   disable_telemetry: {
     what: "Turns off Windows diagnostic data collection and its background upload services.",
     action: "service-disable",

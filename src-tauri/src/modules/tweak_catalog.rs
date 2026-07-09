@@ -140,6 +140,7 @@ const CATALOG: &[TweakDef] = &[
     TweakDef { id: "disable_vsync_hint", title: "Disable Windowed VSync Hint", description: "Removes the DWM VSync hint that can cap windowed frame rates.", category: Graphics, risk: Moderate, impact: 2 },
 
     // ---------- Privacy ----------
+    TweakDef { id: "disable_recall", title: "Disable Microsoft Recall", description: "Stops Windows Recall from continuously screenshotting and indexing everything you do — background AI capture with serious privacy exposure.", category: Privacy, risk: Safe, impact: 3 },
     TweakDef { id: "disable_telemetry", title: "Disable Windows Telemetry", description: "Turns off diagnostic data collection and its background uploads.", category: Privacy, risk: Safe, impact: 3 },
     TweakDef { id: "disable_cortana", title: "Disable Cortana", description: "Removes the Cortana background process and its indexing hooks.", category: Privacy, risk: Safe, impact: 2 },
     TweakDef { id: "disable_ad_id", title: "Disable Advertising ID", description: "Stops apps from tracking you with a per-device advertising identifier.", category: Privacy, risk: Safe, impact: 2 },
@@ -190,6 +191,22 @@ fn mouse_accel_off() -> bool {
     is_zero("MouseSpeed") && is_zero("MouseThreshold1") && is_zero("MouseThreshold2")
 }
 
+/// Read-only: is Recall snapshotting already disabled by policy? True when any
+/// of the documented policy values is set (per-user or machine-wide).
+fn recall_disabled() -> bool {
+    use winreg::enums::{HKEY_CURRENT_USER, HKEY_LOCAL_MACHINE};
+    use winreg::RegKey;
+    let dw = |hive, path: &str, name: &str| {
+        RegKey::predef(hive)
+            .open_subkey(path)
+            .and_then(|k| k.get_value::<u32, _>(name))
+            .ok()
+    };
+    dw(HKEY_CURRENT_USER, r"Software\Policies\Microsoft\Windows\WindowsAI", "DisableAIDataAnalysis") == Some(1)
+        || dw(HKEY_LOCAL_MACHINE, r"SOFTWARE\Policies\Microsoft\Windows\WindowsAI", "DisableAIDataAnalysis") == Some(1)
+        || dw(HKEY_LOCAL_MACHINE, r"SOFTWARE\Policies\Microsoft\Windows\WindowsAI", "AllowRecallEnablement") == Some(0)
+}
+
 /// Scan current state and report per-tweak applied/available + category rollups.
 /// Reads only — nothing is changed on the system.
 #[tauri::command]
@@ -197,6 +214,7 @@ pub fn scan_tweaks(is_laptop: Option<bool>) -> ScanResult {
     let hp = high_perf_active();
     let gb = game_bar_disabled();
     let ma = mouse_accel_off();
+    let rc = recall_disabled();
 
     let tweaks: Vec<TweakInfo> = CATALOG
         .iter()
@@ -205,6 +223,7 @@ pub fn scan_tweaks(is_laptop: Option<bool>) -> ScanResult {
                 "power_high_perf" | "power_ultimate" => hp,
                 "disable_game_bar" | "disable_gamedvr" => gb,
                 "mouse_accel_off" => ma,
+                "disable_recall" => rc,
                 _ => false,
             };
             let available = !(d.id == "power_ultimate" && is_laptop == Some(true));
