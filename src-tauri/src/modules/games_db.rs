@@ -41,6 +41,22 @@ pub const KNOWN_GAMES: &[(&str, &str)] = &[
     ("deltaforce", "Delta Force"),
     ("pubg", "PUBG: Battlegrounds"),
     ("tslgame", "PUBG: Battlegrounds"),
+    // Battle.net
+    ("wow", "World of Warcraft"),
+    ("wowclassic", "World of Warcraft Classic"),
+    ("diablo iv", "Diablo IV"),
+    ("hearthstone", "Hearthstone"),
+    ("heroesofthestorm_x64", "Heroes of the Storm"),
+    // Rockstar / Take-Two
+    ("rdr2", "Red Dead Redemption 2"),
+    ("gta6", "Grand Theft Auto VI"),
+    // EA
+    ("eafc24", "EA Sports FC 24"),
+    ("eafc25", "EA Sports FC 25"),
+    ("starwarsjedisurvivor", "Star Wars Jedi: Survivor"),
+    // Amazon Games
+    ("newworld", "New World"),
+    ("lostark", "Lost Ark"),
 ];
 
 /// Match a lowercased exe stem (no ".exe") to a display name.

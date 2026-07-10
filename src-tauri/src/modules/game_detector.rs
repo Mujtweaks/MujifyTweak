@@ -401,10 +401,119 @@ fn scan_ubisoft(games: &mut Vec<GameInfo>) {
     }
 }
 
+/// Windows publishers that (almost) exclusively make games — a strong signal
+/// that an Uninstall-registry entry is a real, playable game. Catches titles
+/// from launchers (Battle.net, EA/Origin, Rockstar, Riot, Amazon Games) that
+/// don't expose a clean per-title manifest the way Steam/Epic/GOG/Ubisoft do.
+const GAME_PUBLISHERS: &[&str] = &[
+    "blizzard entertainment", "riot games", "electronic arts", "rockstar games",
+    "take-two interactive", "2k", "activision", "bethesda softworks", "square enix",
+    "capcom", "sega", "bandai namco", "cd projekt", "fromsoftware", "bungie",
+    "mojang", "mojang studios", "amazon games", "wb games", "warner bros. games",
+    "paradox interactive", "focus entertainment", "team17", "devolver digital",
+    "thq nordic", "koei tecmo", "respawn entertainment", "insomniac games",
+    "id software", "eidos", "annapurna interactive",
+];
+
+/// Uninstall-entry DisplayNames that are launchers/clients themselves (exact
+/// match, lowercased) — never the game, even though a game publisher often owns
+/// the launcher too (e.g. Battle.net is "published" by Blizzard Entertainment).
+const LAUNCHER_APP_NAMES: &[&str] = &[
+    "steam", "battle.net", "origin", "ea app", "ea desktop", "ubisoft connect",
+    "uplay", "epic games launcher", "gog galaxy", "riot client",
+    "rockstar games launcher", "amazon games",
+];
+
+/// Substrings that mean "tool / redistributable / driver", never a game,
+/// regardless of publisher (a game publisher's installer can bundle these too).
+const NOT_A_GAME_CONTAINS: &[&str] = &[
+    "redistributable", "runtime", " sdk", "directx", "visual c++",
+    ".net desktop runtime", "razer", "logitech", "corsair", "chipset",
+    "realtek", "nvidia ", "geforce experience",
+];
+
+/// Is this Windows "installed programs" entry probably a real, playable game?
+/// Pure + unit-tested: real (known) publisher wins first; otherwise fall back to
+/// "installed inside a known game-library-style folder" (same markers used to
+/// detect running games), so unrecognized publishers still get a fair shot.
+fn is_probable_game(display_name: &str, publisher: &str, install_location: &str) -> bool {
+    let name_l = display_name.to_lowercase();
+    if LAUNCHER_APP_NAMES.iter().any(|n| name_l == *n) {
+        return false;
+    }
+    if NOT_A_GAME_CONTAINS.iter().any(|n| name_l.contains(n)) {
+        return false;
+    }
+    let pub_l = publisher.to_lowercase();
+    if GAME_PUBLISHERS.iter().any(|p| pub_l.contains(p)) {
+        return true;
+    }
+    let loc_l = install_location.to_lowercase().replace('/', "\\");
+    LIB_MARKERS.iter().any(|m| loc_l.contains(m))
+}
+
+/// Generic catch-all: any Windows "installed programs" (Uninstall registry)
+/// entry that looks like a real game by publisher or install path. This is what
+/// picks up Battle.net, EA/Origin, Rockstar, Riot, Amazon Games and standalone
+/// installers — launchers that don't expose a clean per-title manifest the way
+/// Steam/Epic/GOG/Ubisoft do. Runs LAST so the precise scanners above always win
+/// on any overlap (dedup by name); read-only, no launches, no modifications.
+fn scan_uninstall_registry(games: &mut Vec<GameInfo>) {
+    use winreg::enums::{HKEY_CURRENT_USER, HKEY_LOCAL_MACHINE};
+    use winreg::RegKey;
+
+    let scan_one = |root: &RegKey, path: &str, games: &mut Vec<GameInfo>| {
+        let Ok(uninstall) = root.open_subkey(path) else {
+            return;
+        };
+        for sub in uninstall.enum_keys().flatten() {
+            let Ok(entry) = uninstall.open_subkey(&sub) else { continue };
+            let name: String = match entry.get_value("DisplayName") {
+                Ok(v) => v,
+                Err(_) => continue,
+            };
+            if name.trim().is_empty() {
+                continue;
+            }
+            // SystemComponent=1 marks a Windows/driver component, not a
+            // user-facing program — skip those outright.
+            let system_component: u32 = entry.get_value("SystemComponent").unwrap_or(0);
+            if system_component == 1 {
+                continue;
+            }
+            let publisher: String = entry.get_value("Publisher").unwrap_or_default();
+            let install_location: String = entry.get_value("InstallLocation").unwrap_or_default();
+            if !is_probable_game(&name, &publisher, &install_location) {
+                continue;
+            }
+            if games.iter().any(|g| g.name.eq_ignore_ascii_case(&name)) {
+                continue; // already found by a more precise scanner
+            }
+            games.push(GameInfo {
+                name,
+                exe: String::new(),
+                launcher: Some(if publisher.trim().is_empty() { "Installed".into() } else { publisher }),
+                install_path: if install_location.trim().is_empty() { None } else { Some(install_location) },
+                app_id: None,
+            });
+        }
+    };
+
+    let hklm = RegKey::predef(HKEY_LOCAL_MACHINE);
+    let hkcu = RegKey::predef(HKEY_CURRENT_USER);
+    scan_one(&hklm, r"SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall", games);
+    scan_one(&hklm, r"SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall", games);
+    scan_one(&hkcu, r"SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall", games);
+}
+
 /// Read-only scan across installed libraries. No launches, no modifications.
-/// Steam + Epic + GOG + Ubisoft are read directly; Xbox/Game Pass, EA and
-/// Battle.net don't expose a clean per-game record and are picked up instead by
-/// the generic running-game detection when they launch.
+/// Steam + Epic + GOG + Ubisoft are read directly for precise metadata (install
+/// path, Steam appid for header art); the Uninstall-registry catch-all then adds
+/// anything else — Battle.net, EA/Origin, Rockstar, Riot, Amazon Games, and any
+/// other installed title recognized by publisher or install path. Xbox/Game Pass
+/// (UWP) titles don't expose a reliably-readable pre-install manifest either;
+/// those are still picked up live the moment they're launched (see
+/// `game_from_running`'s `\xboxgames\` / `\windowsapps\` library markers).
 #[tauri::command]
 pub fn get_installed_games() -> Vec<GameInfo> {
     let mut games = Vec::new();
@@ -412,6 +521,7 @@ pub fn get_installed_games() -> Vec<GameInfo> {
     scan_epic(&mut games);
     scan_gog(&mut games);
     scan_ubisoft(&mut games);
+    scan_uninstall_registry(&mut games);
     games.sort_by(|a, b| a.name.to_lowercase().cmp(&b.name.to_lowercase()));
     games.truncate(300);
     games
@@ -452,5 +562,31 @@ mod tests {
     #[test]
     fn titleize_cleans_folder_names() {
         assert_eq!(titleize("watch_dogs-2"), "Watch Dogs 2");
+    }
+
+    #[test]
+    fn uninstall_scan_recognizes_publisher_whitelisted_games() {
+        assert!(is_probable_game("Overwatch 2", "Blizzard Entertainment", ""));
+        assert!(is_probable_game("Grand Theft Auto V", "Rockstar Games", ""));
+        assert!(is_probable_game("VALORANT", "Riot Games, Inc.", ""));
+    }
+
+    #[test]
+    fn uninstall_scan_filters_launchers_and_tools_even_from_game_publishers() {
+        // The launcher itself, even though a real game publisher "owns" it.
+        assert!(!is_probable_game("Battle.net", "Blizzard Entertainment", ""));
+        assert!(!is_probable_game("EA app", "Electronic Arts", ""));
+        // Redistributables/drivers are never games, regardless of publisher string.
+        assert!(!is_probable_game("Microsoft Visual C++ 2015 Redistributable (x64)", "Microsoft Corporation", ""));
+        assert!(!is_probable_game("NVIDIA GeForce Experience", "NVIDIA Corporation", ""));
+    }
+
+    #[test]
+    fn uninstall_scan_catches_unpublished_titles_by_install_path() {
+        // No recognized publisher, but installed inside a known game-library folder.
+        assert!(is_probable_game("Some Indie Game", "", r"D:\Epic Games\SomeIndieGame"));
+        // Random unrelated software isn't swept in.
+        assert!(!is_probable_game("Notepad++", "", r"C:\Program Files\Notepad++"));
+        assert!(!is_probable_game("Spotify", "Spotify AB", r"C:\Users\me\AppData\Roaming\Spotify"));
     }
 }
