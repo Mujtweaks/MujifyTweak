@@ -20,6 +20,7 @@ import StartupManager from "./pages/StartupManager";
 import Support from "./pages/Support";
 import Settings from "./pages/Settings";
 import Toaster from "./components/Toaster";
+import SplashIntro from "./components/SplashIntro";
 import WelcomeModal from "./components/WelcomeModal";
 import WhatsNewModal from "./components/WhatsNewModal";
 import ReadyCheck from "./components/ReadyCheck";
@@ -38,6 +39,9 @@ function pageFromHash(): PageId | null {
 
 export default function App() {
   const [page, setPage] = useState<PageId>(() => pageFromHash() ?? "home");
+  // Cinematic logo splash on launch — an overlay, so the app keeps loading
+  // underneath and startup is never delayed. Click to skip.
+  const [splash, setSplash] = useState(true);
   // First-run welcome — shown once, then never again (persisted flag).
   const [showWelcome, setShowWelcome] = useState(() => {
     try {
@@ -158,7 +162,8 @@ export default function App() {
       </div>
       <Toaster />
       <ReadyCheck onNavigate={setPage} />
-      {showWelcome && <WelcomeModal onClose={dismissWelcome} />}
+      {splash && <SplashIntro onDone={() => setSplash(false)} />}
+      {!splash && showWelcome && <WelcomeModal onClose={dismissWelcome} />}
       {whatsNew && (
         <WhatsNewModal version={whatsNew.version} notes={whatsNew.notes} onClose={() => setWhatsNew(null)} />
       )}
