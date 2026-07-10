@@ -60,6 +60,58 @@ struct NimRequest {
     temperature: f32,
 }
 
+#[derive(Serialize)]
+struct TavilyReq {
+    query: String,
+    max_results: u32,
+    include_answer: bool,
+    search_depth: String,
+}
+
+/// Real web search via Tavily. Returns a compact, source-cited results block, or
+/// `None` on ANY failure (no key, network error, bad response) — so the assistant
+/// silently continues without search rather than ever inventing "results".
+async fn tavily_search(client: &reqwest::Client, query: &str) -> Option<String> {
+    let key = super::config::get_api_key("tavily".to_string())?;
+    let resp = client
+        .post("https://api.tavily.com/search")
+        .header("Authorization", format!("Bearer {key}"))
+        .header("Content-Type", "application/json")
+        .json(&TavilyReq {
+            query: query.chars().take(400).collect(),
+            max_results: 5,
+            include_answer: true,
+            search_depth: "basic".into(),
+        })
+        .send()
+        .await
+        .ok()?;
+    if !resp.status().is_success() {
+        super::logger::warn(format!("web search: tavily returned {}", resp.status()));
+        return None;
+    }
+    let v: serde_json::Value = resp.json().await.ok()?;
+    let mut out = String::new();
+    if let Some(ans) = v["answer"].as_str() {
+        if !ans.trim().is_empty() {
+            out.push_str(&format!("Summary: {}\n\n", ans.trim()));
+        }
+    }
+    if let Some(results) = v["results"].as_array() {
+        for (i, r) in results.iter().take(5).enumerate() {
+            let title = r["title"].as_str().unwrap_or("").trim();
+            let url = r["url"].as_str().unwrap_or("").trim();
+            let content: String = r["content"].as_str().unwrap_or("").chars().take(300).collect();
+            out.push_str(&format!("[{}] {}\n{}\n{}\n\n", i + 1, title, url, content.trim()));
+        }
+    }
+    if out.trim().is_empty() {
+        None
+    } else {
+        Some(out)
+    }
+}
+
 /// Streams an AI response from NVIDIA NIM to the frontend via `ai_chunk`
 /// (incremental text) events, closed by a single `ai_done`. Called only from
 /// AIAssistant.tsx on an explicit user send — never automatically.
@@ -68,9 +120,27 @@ pub async fn ai_chat(
     app: tauri::AppHandle,
     messages: Vec<AiMessage>,
     system_prompt: String,
+    web_search: bool,
 ) -> Result<(), String> {
     let key = super::config::get_api_key("nvidia".to_string())
         .ok_or_else(|| "The AI service isn't configured right now.".to_string())?;
+
+    let client = reqwest::Client::new();
+
+    // Optional live web search — real Tavily results injected into context so the
+    // model answers current questions with real sources. Fails silently (no fake
+    // results ever). The UI shows a "searching the web" state via `ai_searching`.
+    let mut system_prompt = system_prompt;
+    if web_search {
+        if let Some(last_user) = messages.iter().rev().find(|m| m.role == "user") {
+            let _ = app.emit("ai_searching", ());
+            if let Some(results) = tavily_search(&client, &last_user.content).await {
+                system_prompt = format!(
+                    "{system_prompt}\n\nLIVE WEB SEARCH RESULTS — a real internet search was just run for the user's question. Use these for anything current (versions, prices, news, latest drivers, game updates), and cite the source URLs. If they don't actually answer the question, say so honestly and do NOT invent facts:\n{results}"
+                );
+            }
+        }
+    }
 
     let mut nim_messages: Vec<NimMessage> = Vec::with_capacity(messages.len() + 1);
     nim_messages.push(NimMessage {
@@ -83,8 +153,6 @@ pub async fn ai_chat(
             content: m.content.clone(),
         });
     }
-
-    let client = reqwest::Client::new();
 
     // The free endpoint occasionally returns a transient "ResourceExhausted"
     // (shared worker at capacity). Retry a few times with a short backoff before

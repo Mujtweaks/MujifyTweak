@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { Bot, ChevronsDown, ChevronsUp, Cpu, RotateCcw, Send, Sparkles, Zap } from "lucide-react";
+import { Bot, ChevronsDown, ChevronsUp, Cpu, Globe, RotateCcw, Send, Sparkles, Zap } from "lucide-react";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import { invoke } from "@tauri-apps/api/core";
 import { nvidiaKey } from "../lib/aiConfig";
@@ -156,6 +156,7 @@ export default function AIAssistant({ onNavigate }: { onNavigate: (page: PageId)
 
   const [keyReady, setKeyReady] = useState<boolean | null>(null);
   const [input, setInput] = useState("");
+  const [webSearch, setWebSearch] = useState(false);
   const endRef = useRef<HTMLDivElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const scrollToTop = () => scrollRef.current?.scrollTo({ top: 0, behavior: "smooth" });
@@ -234,6 +235,7 @@ export default function AIAssistant({ onNavigate }: { onNavigate: (page: PageId)
       await invoke("ai_chat", {
         messages: useAiStore.getState().messages,
         systemPrompt,
+        webSearch,
       });
     } catch (err) {
       const msg = String(err);
@@ -378,7 +380,7 @@ export default function AIAssistant({ onNavigate }: { onNavigate: (page: PageId)
           )}
 
           <div className="border-t border-edge p-3">
-            <div className="flex items-center gap-2 rounded-full border border-edge bg-bg px-4 py-2">
+            <div className="flex items-center gap-2 rounded-full border border-edge bg-bg px-2 py-1.5 pl-4">
               <input
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
@@ -388,14 +390,27 @@ export default function AIAssistant({ onNavigate }: { onNavigate: (page: PageId)
                     void send(input);
                   }
                 }}
-                placeholder="Describe a problem or ask anything about your PC..."
+                placeholder={webSearch ? "Ask anything — I'll search the web for it…" : "Describe a problem or ask anything about your PC..."}
                 disabled={isLoading}
                 className="flex-1 bg-transparent text-[13px] text-txt placeholder:text-txt3 focus:outline-none disabled:opacity-60"
               />
+              {/* Web-search toggle — when on, the assistant runs a real Tavily
+                  search first and answers with cited sources. */}
+              <button
+                onClick={() => setWebSearch((v) => !v)}
+                title={webSearch ? "Web search ON — answers use live internet results" : "Turn on web search"}
+                className={`flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-1.5 text-[11.5px] font-medium transition-colors ${
+                  webSearch
+                    ? "border-accent/50 bg-accent/15 text-accent"
+                    : "border-edge text-txt3 hover:text-txt2"
+                }`}
+              >
+                <Globe size={13} strokeWidth={2} /> Web
+              </button>
               <button
                 onClick={() => void send(input)}
                 disabled={isLoading || !input.trim()}
-                className="grid h-8 w-8 place-items-center rounded-full bg-accent text-white hover:bg-accent-hi disabled:opacity-50"
+                className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-accent text-white hover:bg-accent-hi disabled:opacity-50"
               >
                 <Send size={15} />
               </button>
