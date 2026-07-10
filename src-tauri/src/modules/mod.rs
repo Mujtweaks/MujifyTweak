@@ -29,6 +29,7 @@ pub mod network_monitor;
 pub mod power_util;
 pub mod profile_store;
 pub mod ready_check;
+pub mod restore_points;
 pub mod rollback_engine;
 pub mod server_ping;
 pub mod sessions;

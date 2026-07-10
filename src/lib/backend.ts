@@ -14,6 +14,7 @@ import type {
   GameServersResult,
   DeviceIssue,
   BloatApp,
+  RestorePoint,
   FixInfo,
   HardwareProfile,
   SystemHealthReport,
@@ -274,6 +275,53 @@ export async function scanFixes(): Promise<FixInfo[]> {
   } catch (err) {
     console.error("scan_fixes failed:", err);
     return [];
+  }
+}
+
+/** Read-only: every System Restore point on the machine. */
+export async function listRestorePoints(): Promise<RestorePoint[]> {
+  if (!isTauri) return [];
+  try {
+    return await invoke<RestorePoint[]>("list_restore_points");
+  } catch (err) {
+    console.error("list_restore_points failed:", err);
+    return [];
+  }
+}
+
+/** Read-only: is System Restore enabled for the system drive? */
+export async function restoreProtectionEnabled(): Promise<boolean> {
+  if (!isTauri) return false;
+  try {
+    return await invoke<boolean>("restore_protection_enabled");
+  } catch {
+    return false;
+  }
+}
+
+/** Create a restore point (confirmed). Returns the honest result message. */
+export async function createRestorePoint(description: string): Promise<boolean> {
+  if (!isTauri) return false;
+  try {
+    const msg = await invoke<string>("create_restore_point", { description, confirm: true });
+    toast.success("Restore point", msg);
+    return true;
+  } catch (err) {
+    toast.warning("Restore point not created", String(err));
+    return false;
+  }
+}
+
+/** Delete ALL restore points (hard-confirmed, destructive — removes safety nets). */
+export async function deleteAllRestorePoints(): Promise<boolean> {
+  if (!isTauri) return false;
+  try {
+    const msg = await invoke<string>("delete_all_restore_points", { confirm: true });
+    toast.success("Restore points", msg);
+    return true;
+  } catch (err) {
+    toast.errorHelp("Delete failed", String(err));
+    return false;
   }
 }
 

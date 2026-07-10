@@ -26,8 +26,9 @@ use tauri::{
 use modules::{
     ai_backend, benchmark, change_journal, change_log, config, debloat, driver_doctor, fix_catalog,
     game_detector, game_profiler, game_profiles, game_settings, hardware_profiler, hardware_tier,
-    health_scan, logger, network_monitor, profile_store, ready_check, rollback_engine, server_ping,
-    sessions, speed_test, support, system_monitor, tweak_catalog, tweaks_engine,
+    health_scan, logger, network_monitor, profile_store, ready_check, restore_points,
+    rollback_engine, server_ping, sessions, speed_test, support, system_monitor, tweak_catalog,
+    tweaks_engine,
 };
 
 fn show_main(app: &tauri::AppHandle) {
@@ -276,6 +277,10 @@ pub fn run() {
             health_scan::scan_system_health,
             debloat::scan_bloatware,
             debloat::remove_bloatware,
+            restore_points::list_restore_points,
+            restore_points::restore_protection_enabled,
+            restore_points::create_restore_point,
+            restore_points::delete_all_restore_points,
             profile_store::list_profiles,
             profile_store::save_profile,
             profile_store::delete_profile,

@@ -61,6 +61,14 @@ export interface NetworkStats {
   upMbps: number | null;
 }
 
+/** One Windows System Restore point. */
+export interface RestorePoint {
+  sequence: number;
+  description: string;
+  created: string;
+  kind: string;
+}
+
 /** One removable preinstalled Store app (Debloat). */
 export interface BloatApp {
   name: string;

@@ -5,6 +5,7 @@ import ActionCards from "../components/ActionCards";
 import StatGauges from "../components/StatGauges";
 import PerformanceChart from "../components/PerformanceChart";
 import RecentActivity from "../components/RecentActivity";
+import RestorePointCard from "../components/RestorePointCard";
 import PingOptimizer from "../components/PingOptimizer";
 import DetectiveCard from "../components/DetectiveCard";
 import { useSystemStore } from "../store/systemStore";
@@ -78,6 +79,7 @@ export default function Dashboard({ onNavigate }: { onNavigate: (page: PageId) =
         </section>
         <section className="flex min-h-0 flex-col gap-4">
           <PerformanceChart />
+          <RestorePointCard />
           <RecentActivity onNavigate={onNavigate} />
         </section>
       </div>
