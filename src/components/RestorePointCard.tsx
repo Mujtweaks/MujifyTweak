@@ -29,7 +29,7 @@ export default function RestorePointCard() {
 
   const create = async () => {
     setBusy(true);
-    await createRestorePoint("Mujify Tweaks — manual restore point");
+    await createRestorePoint("Mujify Tweaks");
     await load();
     setBusy(false);
   };

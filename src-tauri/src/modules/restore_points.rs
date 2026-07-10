@@ -119,25 +119,29 @@ pub fn create_restore_point(description: String, confirm: bool) -> Result<String
     let safe = desc.replace('\'', "''");
 
     let before = list_restore_points().first().map(|p| p.sequence).unwrap_or(0);
+    // Windows throttles restore points to one per 24h by default
+    // (SystemRestorePointCreationFrequency). Set it to 0 so Create works on
+    // demand every time — a benign, pro-safety change (more restore points, not
+    // fewer). Then create the point; Windows stamps it with the real current
+    // time automatically.
+    let ps = format!(
+        "New-ItemProperty -Path 'HKLM:\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\SystemRestore' -Name 'SystemRestorePointCreationFrequency' -Value 0 -PropertyType DWord -Force -ErrorAction SilentlyContinue | Out-Null; Checkpoint-Computer -Description '{safe}' -RestorePointType MODIFY_SETTINGS -ErrorAction SilentlyContinue"
+    );
     let _ = Command::new("powershell")
-        .args([
-            "-NoProfile",
-            "-Command",
-            &format!("Checkpoint-Computer -Description '{safe}' -RestorePointType MODIFY_SETTINGS -ErrorAction SilentlyContinue"),
-        ])
+        .args(["-NoProfile", "-Command", &ps])
         .creation_flags(CREATE_NO_WINDOW)
         .output()
         .map_err(|e| e.to_string())?;
 
     let after = list_restore_points();
     match after.first() {
-        Some(p) if p.sequence > before => Ok("Restore point created.".into()),
+        Some(p) if p.sequence > before => Ok(format!("Restore point \"{desc}\" created.")),
         Some(_) => Err(
-            "Windows skipped it — a restore point already exists from the last 24 hours (that one still protects you)."
+            "Windows didn't create a new one just now — it can briefly refuse back-to-back requests. Wait a moment and try again."
                 .into(),
         ),
         None => Err(
-            "Couldn't create a restore point — System Restore looks disabled for this drive. Turn it on in Windows: Create a restore point → Configure."
+            "Couldn't create a restore point — System Restore looks disabled for this drive. Turn it on in Windows: Create a restore point → Configure → Turn on system protection."
                 .into(),
         ),
     }
