@@ -40,6 +40,10 @@
   "bundle": {
     "active": true,
     "targets": ["nsis"],
+    "publisher": "Mujify Tweaks",
+    "copyright": "© 2026 Mujify Tweaks",
+    "category": "Utility",
+    "shortDescription": "Free Windows gaming optimizer — diagnose, optimize, prove, reverse.",
     "externalBin": ["binaries/PresentMon", "binaries/LHMWrapper"],
     "icon": [
       "icons/32x32.png",
