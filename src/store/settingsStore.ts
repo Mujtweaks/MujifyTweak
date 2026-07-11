@@ -5,6 +5,17 @@
 // chosen name (personalization), the pre-game Ready Check toggle, and the
 // anonymous online-status ping (on by default, disclosed at first run).
 import { create } from "zustand";
+import { invoke } from "@tauri-apps/api/core";
+import { isTauri } from "../lib/tauri";
+
+// Mirror the auto-apply master switch to the backend, which owns the REAL gate
+// (auto_apply.rs won't act on the frontend's localStorage alone — this command
+// has to have written the value server-side first). Fire-and-forget; the backend
+// re-checks on every apply, so a missed sync just fails safe (stays off).
+function syncAutoApplyMaster(v: boolean) {
+  if (!isTauri) return;
+  void invoke("set_auto_apply_master", { enabled: v }).catch(() => {});
+}
 
 const KEYS = {
   ai: "mujify.aiEnabled",
@@ -73,8 +84,13 @@ export const useSettingsStore = create<SettingsState>((set) => ({
   setAutoApplyEnabled: (v) => {
     write(KEYS.autoApply, String(v));
     set({ autoApplyEnabled: v });
+    syncAutoApplyMaster(v);
   },
 }));
+
+// On load, push the persisted preference to the backend once so the two agree
+// even if the user never toggles it this session (backend defaults to off).
+syncAutoApplyMaster(useSettingsStore.getState().autoApplyEnabled);
 
 /** The display name to greet the user with — their chosen name, or "GAMER". */
 export function displayName(name: string): string {

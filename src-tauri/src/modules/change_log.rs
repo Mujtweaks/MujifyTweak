@@ -39,7 +39,7 @@ fn log_path() -> Option<PathBuf> {
 
 fn persist() {
     if let Some(path) = log_path() {
-        if let Ok(json) = serde_json::to_string_pretty(&*LOG.lock().unwrap()) {
+        if let Ok(json) = serde_json::to_string_pretty(&*LOG.lock().unwrap_or_else(|e| e.into_inner())) {
             let _ = fs::write(path, json);
         }
     }
@@ -50,24 +50,24 @@ pub fn load() {
     if let Some(path) = log_path() {
         if let Ok(text) = fs::read_to_string(&path) {
             if let Ok(entries) = serde_json::from_str::<Vec<ChangeLogEntry>>(&text) {
-                *LOG.lock().unwrap() = entries;
+                *LOG.lock().unwrap_or_else(|e| e.into_inner()) = entries;
             }
         }
     }
 }
 
 pub fn push(entry: ChangeLogEntry) {
-    LOG.lock().unwrap().push(entry);
+    LOG.lock().unwrap_or_else(|e| e.into_inner()).push(entry);
     persist();
 }
 
 pub fn all() -> Vec<ChangeLogEntry> {
-    LOG.lock().unwrap().clone()
+    LOG.lock().unwrap_or_else(|e| e.into_inner()).clone()
 }
 
 /// Find the most recent not-yet-undone entry for a tweak (used by revert).
 pub fn take_active(entry_id: &str) -> Option<ChangeLogEntry> {
-    let log = LOG.lock().unwrap();
+    let log = LOG.lock().unwrap_or_else(|e| e.into_inner());
     log.iter()
         .find(|e| e.id == entry_id && !e.undone)
         .cloned()
@@ -75,7 +75,7 @@ pub fn take_active(entry_id: &str) -> Option<ChangeLogEntry> {
 
 pub fn mark_undone(entry_id: &str) {
     {
-        let mut log = LOG.lock().unwrap();
+        let mut log = LOG.lock().unwrap_or_else(|e| e.into_inner());
         if let Some(e) = log.iter_mut().find(|e| e.id == entry_id) {
             e.undone = true;
         }

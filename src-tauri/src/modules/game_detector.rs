@@ -2,9 +2,11 @@
 //!
 //! Primary mechanism is sysinfo process polling (correct with WMI tracing fully
 //! disabled, per the plan's reliability note). Every 2 s it:
-//!   - snapshots running processes, matches against the known-games table,
-//!   - emits `game_changed` when the active game starts/stops,
-//!   - emits `anti_cheat_status` from the same snapshot.
+//!
+//! - snapshots running processes, matches against the known-games table,
+//! - emits `game_changed` when the active game starts/stops,
+//! - emits `anti_cheat_status` from the same snapshot.
+//!
 //! Installed-library discovery (Steam/Epic/GOG) is a separate on-demand command
 //! that reads registry + manifests — no processes are launched or modified.
 
@@ -522,7 +524,7 @@ pub fn get_installed_games() -> Vec<GameInfo> {
     scan_gog(&mut games);
     scan_ubisoft(&mut games);
     scan_uninstall_registry(&mut games);
-    games.sort_by(|a, b| a.name.to_lowercase().cmp(&b.name.to_lowercase()));
+    games.sort_by_key(|g| g.name.to_lowercase());
     games.truncate(300);
     games
 }

@@ -35,7 +35,7 @@ static LATEST_TEMPS: Mutex<(Option<f32>, Option<f32>)> = Mutex::new((None, None)
 
 /// Most recent live sample, if the monitor has produced one yet.
 pub fn latest() -> Option<SystemStats> {
-    LATEST.lock().unwrap().clone()
+    LATEST.lock().unwrap_or_else(|e| e.into_inner()).clone()
 }
 
 #[derive(Deserialize)]
@@ -64,7 +64,7 @@ fn start_temp_sidecar(app: AppHandle) {
             if let CommandEvent::Stdout(bytes) = event {
                 let line = String::from_utf8_lossy(&bytes);
                 if let Ok(t) = serde_json::from_str::<TempLine>(line.trim()) {
-                    *LATEST_TEMPS.lock().unwrap() = (t.cpu_temp_c, t.gpu_temp_c);
+                    *LATEST_TEMPS.lock().unwrap_or_else(|e| e.into_inner()) = (t.cpu_temp_c, t.gpu_temp_c);
                 }
             }
         }
@@ -329,7 +329,7 @@ pub fn start(app: AppHandle) {
 
         loop {
             // Refresh the (rarely-changing) power plan name every ~10s.
-            if tick % 10 == 0 {
+            if tick.is_multiple_of(10) {
                 power_plan = active_power_plan();
             }
             tick = tick.wrapping_add(1);
@@ -356,7 +356,7 @@ pub fn start(app: AppHandle) {
             };
 
             // Real temps from the LHM sidecar (null until it reports / needs admin).
-            let (cpu_temp, gpu_temp) = *LATEST_TEMPS.lock().unwrap();
+            let (cpu_temp, gpu_temp) = *LATEST_TEMPS.lock().unwrap_or_else(|e| e.into_inner());
 
             // Per-subsystem health = live load gauges (kept). The headline score
             // is derived from tuning state, so it doesn't swing with load.
@@ -393,7 +393,7 @@ pub fn start(app: AppHandle) {
                 health,
             };
 
-            *LATEST.lock().unwrap() = Some(stats.clone());
+            *LATEST.lock().unwrap_or_else(|e| e.into_inner()) = Some(stats.clone());
             let _ = app.emit("system_stats", &stats);
             thread::sleep(Duration::from_secs(1));
         }

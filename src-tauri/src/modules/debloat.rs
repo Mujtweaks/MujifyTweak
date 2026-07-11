@@ -60,12 +60,22 @@ pub struct BloatApp {
     pub reinstallable: bool,
 }
 
-/// Friendly name + category for an installed package name, if it's on the
-/// allowlist. Pure — unit-tested without touching the system.
+/// Escape a string for safe interpolation inside a PowerShell single-quoted
+/// literal (`'` → `''`). Same technique restore_points.rs uses. Defence in depth
+/// on top of the allowlist check — the package name never breaks out of quotes.
+fn ps_single_quote(s: &str) -> String {
+    s.replace('\'', "''")
+}
+
+/// Friendly name + category for a package, if it's on the allowlist. EXACT match
+/// on the package short name, or a PackageFullName that begins with `<name>_`
+/// (the real PFN format is `Name_Version_Arch__Publisher`). NOT a loose
+/// substring — that would let e.g. "Evil.Microsoft.BingNews" masquerade as bloat.
+/// Pure — unit-tested without touching the system.
 fn classify(pkg_name: &str) -> Option<(&'static str, &'static str)> {
     KNOWN_BLOAT
         .iter()
-        .find(|(needle, _, _)| pkg_name.contains(needle))
+        .find(|(needle, _, _)| pkg_name == *needle || pkg_name.starts_with(&format!("{needle}_")))
         .map(|(_, friendly, category)| (*friendly, *category))
 }
 
@@ -133,7 +143,7 @@ pub fn remove_bloatware(
         .args([
             "-NoProfile",
             "-Command",
-            &format!("Remove-AppxPackage -Package '{package_full_name}'"),
+            &format!("Remove-AppxPackage -Package '{}'", ps_single_quote(&package_full_name)),
         ])
         .creation_flags(CREATE_NO_WINDOW)
         .status()
@@ -164,10 +174,29 @@ mod tests {
     fn allowlist_matches_known_bloat_only() {
         assert!(classify("Microsoft.BingNews").is_some());
         assert!(classify("Microsoft.GamingApp").is_some());
+        // A real PackageFullName (Name_Version_Arch__Publisher) still matches.
+        assert!(classify("Microsoft.BingNews_4.53.51371.0_x64__8wekyb3d8bbwe").is_some());
         // System-critical packages must NEVER classify as removable bloat.
         assert!(classify("Microsoft.WindowsStore").is_none());
         assert!(classify("Microsoft.Windows.ShellExperienceHost").is_none());
         assert!(classify("Microsoft.VCLibs.140.00").is_none());
         assert!(classify("Microsoft.SecHealthUI").is_none());
+    }
+
+    #[test]
+    fn substring_impostors_are_rejected() {
+        // These all CONTAIN an allowlisted needle but are NOT it — the old
+        // `.contains()` check would have wrongly flagged them removable.
+        assert!(classify("Evil.Microsoft.BingNews").is_none());
+        assert!(classify("Microsoft.BingNewsDefinitelyNotThis").is_none());
+        assert!(classify("Contoso.Microsoft.GamingApp.Fake").is_none());
+    }
+
+    #[test]
+    fn ps_single_quote_escapes_quotes() {
+        assert_eq!(ps_single_quote("a'b"), "a''b");
+        assert_eq!(ps_single_quote("Name_1.0_x64__abc"), "Name_1.0_x64__abc");
+        // A crafted breakout attempt stays inside the quotes once escaped.
+        assert_eq!(ps_single_quote("x'; Remove-Item C:\\ -Recurse; '"), "x''; Remove-Item C:\\ -Recurse; ''");
     }
 }

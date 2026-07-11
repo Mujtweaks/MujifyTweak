@@ -28,7 +28,7 @@ static LATEST_PING: std::sync::Mutex<Option<f32>> = std::sync::Mutex::new(None);
 
 /// The latest measured ping in ms, or None if the last probe timed out.
 pub fn latest_ping() -> Option<f32> {
-    *LATEST_PING.lock().unwrap()
+    *LATEST_PING.lock().unwrap_or_else(|e| e.into_inner())
 }
 
 #[derive(Serialize, Clone)]
@@ -183,7 +183,7 @@ pub fn start(app: AppHandle) {
 
         loop {
             let ping = ping_once();
-            *LATEST_PING.lock().unwrap() = ping;
+            *LATEST_PING.lock().unwrap_or_else(|e| e.into_inner()) = ping;
             if window.len() == 20 {
                 window.pop_front();
             }

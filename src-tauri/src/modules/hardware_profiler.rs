@@ -150,7 +150,7 @@ fn build_profile() -> HardwareProfile {
     };
 
     // CPU extras
-    for row in query(&conn, "SELECT Name, MaxClockSpeed FROM Win32_Processor") {
+    if let Some(row) = query(&conn, "SELECT Name, MaxClockSpeed FROM Win32_Processor").into_iter().next() {
         if p.cpu_name.is_empty() {
             if let Some(name) = get_string(&row, "Name") {
                 p.cpu_name = name;
@@ -158,7 +158,6 @@ fn build_profile() -> HardwareProfile {
             }
         }
         p.cpu_base_clock_mhz = get_u64(&row, "MaxClockSpeed").map(|v| v as u32);
-        break;
     }
 
     // GPU — collect EVERY real adapter (iGPU + dGPU), skip virtual/remote ones.
@@ -244,40 +243,35 @@ fn build_profile() -> HardwareProfile {
         } else {
             get_string(row, "FriendlyName").unwrap_or_else(|| "Drive".into())
         };
-    } else {
-        for row in query(&conn, "SELECT Model, Size FROM Win32_DiskDrive") {
-            let size_gb = get_u64(&row, "Size").unwrap_or(0) as f32 / 1_073_741_824.0;
-            p.storage_summary = get_string(&row, "Model")
-                .map(|m| {
-                    if size_gb >= 1000.0 {
-                        format!("{} · {:.1}TB", m, size_gb / 1024.0)
-                    } else {
-                        m
-                    }
-                })
-                .unwrap_or_else(|| "Drive".into());
-            break;
-        }
+    } else if let Some(row) = query(&conn, "SELECT Model, Size FROM Win32_DiskDrive").into_iter().next() {
+        let size_gb = get_u64(&row, "Size").unwrap_or(0) as f32 / 1_073_741_824.0;
+        p.storage_summary = get_string(&row, "Model")
+            .map(|m| {
+                if size_gb >= 1000.0 {
+                    format!("{} · {:.1}TB", m, size_gb / 1024.0)
+                } else {
+                    m
+                }
+            })
+            .unwrap_or_else(|| "Drive".into());
     }
 
     // Motherboard
-    for row in query(&conn, "SELECT Manufacturer, Product FROM Win32_BaseBoard") {
+    if let Some(row) = query(&conn, "SELECT Manufacturer, Product FROM Win32_BaseBoard").into_iter().next() {
         let mfr = get_string(&row, "Manufacturer").unwrap_or_default();
         let prod = get_string(&row, "Product").unwrap_or_default();
         let combined = format!("{} {}", mfr, prod).trim().to_string();
         if !combined.is_empty() {
             p.motherboard = Some(combined);
         }
-        break;
     }
 
     // Laptop vs desktop via chassis type (8–14/30–32 = portable/notebook/tablet).
-    for row in query(&conn, "SELECT ChassisTypes FROM Win32_SystemEnclosure") {
+    if let Some(row) = query(&conn, "SELECT ChassisTypes FROM Win32_SystemEnclosure").into_iter().next() {
         let types = get_u16_array(&row, "ChassisTypes");
         if !types.is_empty() {
             p.is_laptop = Some(types.iter().any(|t| matches!(t, 8..=14 | 30 | 31 | 32)));
         }
-        break;
     }
     p.chassis = match p.is_laptop {
         Some(true) => "Laptop".into(),
@@ -285,21 +279,19 @@ fn build_profile() -> HardwareProfile {
     };
 
     // On battery? A present battery reporting "discharging" (BatteryStatus == 1).
-    for row in query(&conn, "SELECT BatteryStatus FROM Win32_Battery") {
+    if let Some(row) = query(&conn, "SELECT BatteryStatus FROM Win32_Battery").into_iter().next() {
         p.on_battery = get_u64(&row, "BatteryStatus") == Some(1);
         // A battery being present also strongly implies a laptop.
         if p.is_laptop.is_none() {
             p.is_laptop = Some(true);
             p.chassis = "Laptop".into();
         }
-        break;
     }
 
     // OS edition + build number.
-    for row in query(&conn, "SELECT Caption, BuildNumber FROM Win32_OperatingSystem") {
+    if let Some(row) = query(&conn, "SELECT Caption, BuildNumber FROM Win32_OperatingSystem").into_iter().next() {
         p.os_edition = get_string(&row, "Caption").map(|c| c.replace("Microsoft ", ""));
         p.os_build = get_string(&row, "BuildNumber");
-        break;
     }
 
     // Copilot+ is a heuristic hint only: an NPU present on a recent Win11 build.
@@ -312,7 +304,7 @@ fn build_profile() -> HardwareProfile {
 /// Tauri command — cached full hardware profile.
 #[tauri::command]
 pub fn get_hardware_profile() -> HardwareProfile {
-    let mut cache = CACHE.lock().unwrap();
+    let mut cache = CACHE.lock().unwrap_or_else(|e| e.into_inner());
     if let Some(p) = cache.as_ref() {
         return p.clone();
     }

@@ -8,6 +8,7 @@
 
 pub mod ai_backend;
 pub mod anti_cheat_guard;
+pub mod auto_apply;
 pub mod benchmark;
 pub mod change_journal;
 pub mod change_log;

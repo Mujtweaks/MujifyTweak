@@ -109,7 +109,7 @@ pub struct RegressionVerdict {
 
 fn median(xs: &[f32]) -> f32 {
     let mut v: Vec<f32> = xs.to_vec();
-    v.sort_by(|a, b| a.partial_cmp(b).unwrap());
+    v.sort_by(|a, b| a.total_cmp(b));
     let n = v.len();
     if n == 0 {
         0.0
@@ -225,7 +225,7 @@ fn finalize(accum: Accum) -> Option<DetectiveReport> {
         changes,
         generated_at: now_ms(),
     };
-    *LATEST_REPORT.lock().unwrap() = Some(report.clone());
+    *LATEST_REPORT.lock().unwrap_or_else(|e| e.into_inner()) = Some(report.clone());
     Some(report)
 }
 
@@ -234,7 +234,7 @@ fn finalize(accum: Accum) -> Option<DetectiveReport> {
 /// exit, finalizes + saves a session and returns a Detective report if the run
 /// regressed. Records only real measured samples — nulls where unmeasured.
 pub fn on_tick(active_game: Option<&str>) -> Option<DetectiveReport> {
-    let mut guard = ACCUM.lock().unwrap();
+    let mut guard = ACCUM.lock().unwrap_or_else(|e| e.into_inner());
     match (active_game, guard.as_ref().map(|a| a.game.clone())) {
         // Same game still running → accumulate a sample.
         (Some(g), Some(cur)) if cur == g => {
@@ -300,13 +300,13 @@ pub fn get_game_sessions(game: String) -> Vec<GameSession> {
 /// The latest Detective report, if a regression was flagged (Dashboard card).
 #[tauri::command]
 pub fn get_detective_report() -> Option<DetectiveReport> {
-    LATEST_REPORT.lock().unwrap().clone()
+    LATEST_REPORT.lock().unwrap_or_else(|e| e.into_inner()).clone()
 }
 
 /// Dismiss the current Detective report (user acknowledged it).
 #[tauri::command]
 pub fn dismiss_detective_report() {
-    *LATEST_REPORT.lock().unwrap() = None;
+    *LATEST_REPORT.lock().unwrap_or_else(|e| e.into_inner()) = None;
 }
 
 #[cfg(test)]

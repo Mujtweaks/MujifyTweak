@@ -71,7 +71,7 @@ pub fn list_profiles() -> Vec<Profile> {
             }
         }
     }
-    out.sort_by(|a, b| a.game_name.to_lowercase().cmp(&b.game_name.to_lowercase()));
+    out.sort_by_key(|p| p.game_name.to_lowercase());
     out
 }
 
@@ -96,4 +96,79 @@ pub fn delete_profile(id: String) -> Result<(), String> {
         fs::remove_file(&path).map_err(|e| e.to_string())?;
     }
     Ok(())
+}
+
+/// Pure selection (testable without the filesystem): the tweak ids to auto-apply
+/// for `game_name` from a set of profiles — only a profile that opted in
+/// (`auto_apply`) AND actually has tweaks qualifies. Empty otherwise.
+fn select_auto_apply_tweaks(profiles: &[Profile], game_name: &str) -> Vec<String> {
+    profiles
+        .iter()
+        .find(|p| {
+            p.auto_apply
+                && !p.enabled_tweaks.is_empty()
+                && p.game_name.eq_ignore_ascii_case(game_name)
+        })
+        .map(|p| p.enabled_tweaks.clone())
+        .unwrap_or_default()
+}
+
+/// Server-side read for the auto-apply gate: the enabled tweak ids of the game's
+/// profile, but ONLY when that profile has opted into auto-apply. Read from
+/// disk; empty when there's no opted-in match. The gate takes the tweak list
+/// from here — never from the caller — so the frontend can't request auto-apply
+/// of anything the saved profile didn't itself enable.
+pub fn auto_apply_tweaks_for(game_name: &str) -> Vec<String> {
+    select_auto_apply_tweaks(&list_profiles(), game_name)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn profile(game: &str, auto: bool, tweaks: &[&str]) -> Profile {
+        Profile {
+            schema_version: SCHEMA_VERSION,
+            id: game.into(),
+            game_name: game.into(),
+            game_exe: None,
+            launcher: None,
+            preset: "balanced".into(),
+            launch_options: None,
+            enabled_tweaks: tweaks.iter().map(|s| s.to_string()).collect(),
+            auto_apply: auto,
+            created_at: String::new(),
+            last_played: None,
+            avg_fps_before: None,
+            avg_fps_after: None,
+        }
+    }
+
+    #[test]
+    fn opted_in_profile_yields_its_tweaks() {
+        let ps = vec![profile("Valorant", true, &["power_high_perf", "mouse_accel_off"])];
+        // Case-insensitive match on the game name.
+        assert_eq!(
+            select_auto_apply_tweaks(&ps, "valorant"),
+            vec!["power_high_perf".to_string(), "mouse_accel_off".to_string()]
+        );
+    }
+
+    #[test]
+    fn profile_without_optin_yields_nothing() {
+        let ps = vec![profile("Valorant", false, &["power_high_perf"])];
+        assert!(select_auto_apply_tweaks(&ps, "Valorant").is_empty());
+    }
+
+    #[test]
+    fn unknown_game_yields_nothing() {
+        let ps = vec![profile("Valorant", true, &["power_high_perf"])];
+        assert!(select_auto_apply_tweaks(&ps, "Fortnite").is_empty());
+    }
+
+    #[test]
+    fn opted_in_but_empty_tweaks_yields_nothing() {
+        let ps = vec![profile("Valorant", true, &[])];
+        assert!(select_auto_apply_tweaks(&ps, "Valorant").is_empty());
+    }
 }

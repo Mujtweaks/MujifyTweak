@@ -434,9 +434,11 @@ mod tests {
 
     #[test]
     fn ram_below_rated_is_flagged_but_at_rated_is_not() {
-        let mut i = HealthInputs::default();
-        i.ram_current_mhz = Some(2133);
-        i.ram_rated_mhz = Some(3200);
+        let mut i = HealthInputs {
+            ram_current_mhz: Some(2133),
+            ram_rated_mhz: Some(3200),
+            ..Default::default()
+        };
         assert!(classify_ram(&i).is_some());
         i.ram_current_mhz = Some(3200);
         assert!(classify_ram(&i).is_none());
@@ -444,9 +446,11 @@ mod tests {
 
     #[test]
     fn refresh_below_max_is_flagged() {
-        let mut i = HealthInputs::default();
-        i.refresh_current_hz = Some(60);
-        i.refresh_max_hz = Some(144);
+        let mut i = HealthInputs {
+            refresh_current_hz: Some(60),
+            refresh_max_hz: Some(144),
+            ..Default::default()
+        };
         assert!(classify_refresh(&i).is_some());
         i.refresh_current_hz = Some(144);
         assert!(classify_refresh(&i).is_none());
@@ -454,8 +458,10 @@ mod tests {
 
     #[test]
     fn power_plan_severity_matches_plan() {
-        let mut i = HealthInputs::default();
-        i.power_plan = Some("Power saver".into());
+        let mut i = HealthInputs {
+            power_plan: Some("Power saver".into()),
+            ..Default::default()
+        };
         assert_eq!(classify_power_plan(&i).unwrap().severity, "critical");
         i.power_plan = Some("Balanced".into());
         assert_eq!(classify_power_plan(&i).unwrap().severity, "warning");

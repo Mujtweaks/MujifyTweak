@@ -9,10 +9,20 @@ use std::collections::HashMap;
 use std::fs;
 use std::path::PathBuf;
 
-// Owner defaults — compiled into the binary, never shipped in the JS bundle.
-// A value saved in config.json overrides these. Set to "" to require BYOK.
-const DEFAULT_NVIDIA: &str = "nvapi-REDACTED";
-const DEFAULT_TAVILY: &str = "tvly-REDACTED";
+// Owner defaults come from BUILD-TIME env vars (a local .env sourced by the dev
+// shell, or GitHub Actions secrets) — NEVER hardcoded in source, so they can't
+// leak from a public repo. Same discipline as the STATS_TOKEN. If unset at build
+// time these compile to "" and the app requires the user to bring their own key
+// (BYOK) in Settings. A value saved in config.json still overrides these.
+//   Build with:  MUJIFY_NVIDIA_KEY=...  MUJIFY_TAVILY_KEY=...
+const DEFAULT_NVIDIA: &str = match option_env!("MUJIFY_NVIDIA_KEY") {
+    Some(k) => k,
+    None => "",
+};
+const DEFAULT_TAVILY: &str = match option_env!("MUJIFY_TAVILY_KEY") {
+    Some(k) => k,
+    None => "",
+};
 
 fn config_path() -> Option<PathBuf> {
     let base = std::env::var("APPDATA").ok()?;

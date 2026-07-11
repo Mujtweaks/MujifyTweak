@@ -45,6 +45,11 @@ pub enum Op {
     /// Raise the primary display to its highest refresh at the current
     /// resolution, capturing the prior mode for an exact revert.
     MaxRefreshRate,
+    /// Write a set of DWORDs to the display-adapter registry subkey whose
+    /// `DriverDesc` matches one of `vendors` (e.g. "nvidia", "amd") — resolved at
+    /// apply time so it hits the RIGHT GPU on hybrid iGPU+dGPU machines, never a
+    /// hardcoded \0000. No matching adapter → a captured no-op (nothing written).
+    GpuVendorDwords { vendors: &'static [&'static str], values: &'static [(&'static str, u32)] },
     /// Byte-for-byte replace a file's contents, capturing the exact prior bytes
     /// (or absence) for a perfect revert. FOUNDATION ONLY — the future
     /// auto-apply-game-settings phase will use this; no tweak/fix references it
@@ -72,6 +77,8 @@ pub enum UndoOp {
     DisplayMode { prev: Option<DisplayMode> },
     /// Prior file bytes (None → the file didn't exist, so undo deletes it).
     File { path: String, prev: Option<Vec<u8>> },
+    /// DWORDs written to a resolved GPU-adapter subkey, each with its prior value.
+    GpuVendorMulti { hive: RegHive, path: String, entries: Vec<(String, Option<u32>)> },
 }
 
 /// Capture + apply one Op. Returns the UndoOp needed to reverse it.
@@ -164,6 +171,19 @@ pub fn apply_op(m: &dyn SystemMutator, op: &Op) -> Result<UndoOp, String> {
             m.write_file(path, content)?;
             Ok(UndoOp::File { path: path.clone(), prev })
         }
+        Op::GpuVendorDwords { vendors, values } => match resolve_gpu_adapter_path(m, vendors) {
+            Some(path) => {
+                let mut entries = Vec::new();
+                for (name, value) in *values {
+                    let prev = m.get_dword(Hklm, &path, name);
+                    m.set_dword(Hklm, &path, name, *value)?;
+                    entries.push((name.to_string(), prev));
+                }
+                Ok(UndoOp::GpuVendorMulti { hive: Hklm, path, entries })
+            }
+            // No adapter of that vendor present → nothing to write, nothing to undo.
+            None => Ok(UndoOp::None),
+        },
     }
 }
 
@@ -222,6 +242,15 @@ pub fn undo_op(m: &dyn SystemMutator, undo: &UndoOp) -> Result<(), String> {
             Some(bytes) => m.write_file(path, bytes),
             None => m.delete_file(path),
         },
+        UndoOp::GpuVendorMulti { hive, path, entries } => {
+            for (name, prev) in entries {
+                match prev {
+                    Some(v) => m.set_dword(*hive, path, name, *v)?,
+                    None => m.delete_value(*hive, path, name)?,
+                }
+            }
+            Ok(())
+        }
         UndoOp::None => Ok(()),
     }
 }
@@ -238,10 +267,28 @@ const MMCSS_GAMES: &str =
     r"SOFTWARE\Microsoft\Windows NT\CurrentVersion\Multimedia\SystemProfile\Tasks\Games";
 const MMCSS_PROFILE: &str = r"SOFTWARE\Microsoft\Windows NT\CurrentVersion\Multimedia\SystemProfile";
 const TCP_INTERFACES: &str = r"SYSTEM\CurrentControlSet\Services\Tcpip\Parameters\Interfaces";
-/// Primary display adapter's driver key (subkey 0000 = first adapter). Home of
-/// the vendor GPU knobs: NVIDIA PowerMizer, AMD ULPS.
-const DISPLAY_CLASS_0: &str =
-    r"SYSTEM\CurrentControlSet\Control\Class\{4d36e968-e325-11ce-bfc1-08002be10318}\0000";
+/// The display-adapter class key. Each adapter is a numbered subkey (0000,
+/// 0001, …) carrying a `DriverDesc`; the vendor GPU knobs (NVIDIA PowerMizer,
+/// AMD ULPS) live under the subkey matching that adapter — resolved at runtime.
+const DISPLAY_CLASS_ROOT: &str =
+    r"SYSTEM\CurrentControlSet\Control\Class\{4d36e968-e325-11ce-bfc1-08002be10318}";
+
+/// Resolve the registry subkey path for the first display adapter whose
+/// `DriverDesc` matches any of `vendors` (case-insensitive substring). Fixes the
+/// old hardcoded \0000 which, on a hybrid iGPU+dGPU laptop, could apply NVIDIA/
+/// AMD keys to the wrong (integrated) adapter. Read-only lookup via the mutator.
+fn resolve_gpu_adapter_path(m: &dyn SystemMutator, vendors: &[&str]) -> Option<String> {
+    for sub in m.list_subkeys(Hklm, DISPLAY_CLASS_ROOT) {
+        let path = format!("{DISPLAY_CLASS_ROOT}\\{sub}");
+        if let Some(desc) = m.get_sz(Hklm, &path, "DriverDesc") {
+            let d = desc.to_lowercase();
+            if vendors.iter().any(|v| d.contains(&v.to_lowercase())) {
+                return Some(path);
+            }
+        }
+    }
+    None
+}
 
 /// The concrete op list for a tweak id. Unknown ids return empty (nothing runs).
 /// Every op here is fully reversible via its captured UndoOp.
@@ -366,15 +413,21 @@ pub fn ops_for(tweak_id: &str) -> Vec<Op> {
 
         // ---- Vendor: NVIDIA (shown only when an NVIDIA GPU is detected) ----
         "nvidia_disable_telemetry" => vec![Op::DisableService { name: "NvTelemetryContainer" }],
-        "nvidia_max_performance" => vec![
-            dw(Hklm, DISPLAY_CLASS_0, "PowerMizerEnable", 1),
-            dw(Hklm, DISPLAY_CLASS_0, "PowerMizerLevel", 1),
-            dw(Hklm, DISPLAY_CLASS_0, "PowerMizerLevelAC", 1),
-            dw(Hklm, DISPLAY_CLASS_0, "PerfLevelSrc", 0x2222),
-        ],
+        "nvidia_max_performance" => vec![Op::GpuVendorDwords {
+            vendors: &["nvidia", "geforce"],
+            values: &[
+                ("PowerMizerEnable", 1),
+                ("PowerMizerLevel", 1),
+                ("PowerMizerLevelAC", 1),
+                ("PerfLevelSrc", 0x2222),
+            ],
+        }],
 
         // ---- Vendor: AMD (shown only when an AMD GPU is detected) ----
-        "amd_disable_ulps" => vec![dw(Hklm, DISPLAY_CLASS_0, "EnableUlps", 0)],
+        "amd_disable_ulps" => vec![Op::GpuVendorDwords {
+            vendors: &["amd", "radeon"],
+            values: &[("EnableUlps", 0)],
+        }],
 
         _ => Vec::new(),
     }
@@ -539,21 +592,38 @@ mod tests {
     }
 
     #[test]
-    fn vendor_gpu_tweaks_apply_and_revert() {
+    fn vendor_gpu_tweaks_target_the_matching_adapter_and_revert() {
+        let intel = format!("{DISPLAY_CLASS_ROOT}\\0000");
+        let nvidia = format!("{DISPLAY_CLASS_ROOT}\\0001");
+        // Hybrid laptop: iGPU at 0000, dGPU at 0001. The old hardcoded \0000 would
+        // have written NVIDIA keys onto the Intel adapter — prove it hits 0001.
         let m = MockMutator::new();
-        // NVIDIA PowerMizer max performance.
+        m.set_sz(Hklm, &intel, "DriverDesc", "Intel(R) Arc(TM) 140V").unwrap();
+        m.set_sz(Hklm, &nvidia, "DriverDesc", "NVIDIA GeForce RTX 4070").unwrap();
         let undos = apply_all(&m, "nvidia_max_performance");
-        assert_eq!(m.get_dword(Hklm, DISPLAY_CLASS_0, "PowerMizerEnable"), Some(1));
-        assert_eq!(m.get_dword(Hklm, DISPLAY_CLASS_0, "PerfLevelSrc"), Some(0x2222));
+        assert_eq!(m.get_dword(Hklm, &nvidia, "PowerMizerEnable"), Some(1));
+        assert_eq!(m.get_dword(Hklm, &nvidia, "PerfLevelSrc"), Some(0x2222));
+        assert_eq!(m.get_dword(Hklm, &intel, "PowerMizerEnable"), None); // iGPU untouched
         undo_all(&m, &undos);
-        assert_eq!(m.get_dword(Hklm, DISPLAY_CLASS_0, "PowerMizerEnable"), None);
+        assert_eq!(m.get_dword(Hklm, &nvidia, "PowerMizerEnable"), None);
 
-        // AMD ULPS off — prior 1 restored on undo.
-        let m = MockMutator::new().with_dword(Hklm, DISPLAY_CLASS_0, "EnableUlps", 1);
+        // AMD ULPS off on the matched adapter — prior 1 restored on undo.
+        let amd = format!("{DISPLAY_CLASS_ROOT}\\0000");
+        let m = MockMutator::new();
+        m.set_sz(Hklm, &amd, "DriverDesc", "AMD Radeon RX 7800 XT").unwrap();
+        m.set_dword(Hklm, &amd, "EnableUlps", 1).unwrap();
         let undos = apply_all(&m, "amd_disable_ulps");
-        assert_eq!(m.get_dword(Hklm, DISPLAY_CLASS_0, "EnableUlps"), Some(0));
+        assert_eq!(m.get_dword(Hklm, &amd, "EnableUlps"), Some(0));
         undo_all(&m, &undos);
-        assert_eq!(m.get_dword(Hklm, DISPLAY_CLASS_0, "EnableUlps"), Some(1));
+        assert_eq!(m.get_dword(Hklm, &amd, "EnableUlps"), Some(1));
+
+        // No adapter of that vendor → captured no-op (nothing written; undo is safe).
+        let only_intel = format!("{DISPLAY_CLASS_ROOT}\\0000");
+        let m = MockMutator::new();
+        m.set_sz(Hklm, &only_intel, "DriverDesc", "Intel(R) UHD Graphics").unwrap();
+        let undos = apply_all(&m, "nvidia_max_performance");
+        assert_eq!(m.get_dword(Hklm, &only_intel, "PowerMizerEnable"), None);
+        undo_all(&m, &undos);
 
         // NVIDIA telemetry service disabled + restored.
         let m = MockMutator::new().with_service("NvTelemetryContainer", "auto", true);

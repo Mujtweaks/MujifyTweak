@@ -37,7 +37,7 @@ static CURRENT_CHILD: Mutex<Option<CommandChild>> = Mutex::new(None);
 static LATEST_FRAME: Mutex<Option<FrameStats>> = Mutex::new(None);
 
 pub fn latest_frame() -> Option<FrameStats> {
-    LATEST_FRAME.lock().unwrap().clone()
+    LATEST_FRAME.lock().unwrap_or_else(|e| e.into_inner()).clone()
 }
 
 /// Column index of `msBetweenPresents` within a PresentMon v1 CSV header.
@@ -117,7 +117,7 @@ pub fn compute_frame_stats(frame_times: &[f32]) -> Option<FrameStats> {
 
     // Slowest frames first — the worst 1% / 0.1% drive the low-FPS figures.
     let mut sorted_desc = frame_times.to_vec();
-    sorted_desc.sort_by(|a, b| b.partial_cmp(a).unwrap());
+    sorted_desc.sort_by(|a, b| b.total_cmp(a));
 
     let variance = frame_times.iter().map(|v| (v - mean).powi(2)).sum::<f32>() / n;
 
@@ -144,10 +144,10 @@ pub fn on_active_game_change(app: &AppHandle, active: &Option<GameInfo>) {
 }
 
 fn stop_capture() {
-    if let Some(child) = CURRENT_CHILD.lock().unwrap().take() {
+    if let Some(child) = CURRENT_CHILD.lock().unwrap_or_else(|e| e.into_inner()).take() {
         let _ = child.kill();
     }
-    *LATEST_FRAME.lock().unwrap() = None;
+    *LATEST_FRAME.lock().unwrap_or_else(|e| e.into_inner()) = None;
 }
 
 fn start_capture(app: AppHandle, exe: String) {
@@ -177,7 +177,7 @@ fn start_capture(app: AppHandle, exe: String) {
             return;
         }
     };
-    *CURRENT_CHILD.lock().unwrap() = Some(child);
+    *CURRENT_CHILD.lock().unwrap_or_else(|e| e.into_inner()) = Some(child);
 
     tauri::async_runtime::spawn(async move {
         let mut col: Option<usize> = None;
@@ -236,7 +236,7 @@ fn start_capture(app: AppHandle, exe: String) {
                             .to_string(),
                         );
                     }
-                    *LATEST_FRAME.lock().unwrap() = Some(stats.clone());
+                    *LATEST_FRAME.lock().unwrap_or_else(|e| e.into_inner()) = Some(stats.clone());
                     let _ = app.emit("frame_stats", &stats);
                 }
                 last_emit = Instant::now();

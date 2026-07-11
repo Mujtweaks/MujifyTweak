@@ -268,12 +268,14 @@ mod tests {
     use crate::modules::hardware_profiler::HardwareProfile;
 
     fn hw(gpu: &str, cpu: &str, cores: u32) -> HardwareTier {
-        let mut p = HardwareProfile::default();
-        p.gpu_name = gpu.into();
-        p.gpu_vendor = "Test".into();
-        p.cpu_name = cpu.into();
-        p.cpu_cores = cores;
-        p.ram_total_gb = 16.0;
+        let p = HardwareProfile {
+            gpu_name: gpu.into(),
+            gpu_vendor: "Test".into(),
+            cpu_name: cpu.into(),
+            cpu_cores: cores,
+            ram_total_gb: 16.0,
+            ..Default::default()
+        };
         hardware_tier::tier_from(&p, None)
     }
 

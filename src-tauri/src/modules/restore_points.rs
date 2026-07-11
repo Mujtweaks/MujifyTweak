@@ -62,7 +62,7 @@ fn parse_points(stdout: &str) -> Vec<RestorePoint> {
         });
     }
     // Newest first.
-    out.sort_by(|a, b| b.sequence.cmp(&a.sequence));
+    out.sort_by_key(|p| std::cmp::Reverse(p.sequence));
     out
 }
 

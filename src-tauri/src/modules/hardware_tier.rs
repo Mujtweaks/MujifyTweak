@@ -327,12 +327,14 @@ mod tests {
 
     #[test]
     fn tier_from_maps_a_synthetic_profile() {
-        let mut p = HardwareProfile::default();
-        p.gpu_name = "Intel Arc 140V".into();
-        p.gpu_vendor = "Intel".into();
-        p.cpu_name = "Intel Core Ultra 7 258V".into();
-        p.cpu_cores = 8;
-        p.ram_total_gb = 31.5;
+        let p = HardwareProfile {
+            gpu_name: "Intel Arc 140V".into(),
+            gpu_vendor: "Intel".into(),
+            cpu_name: "Intel Core Ultra 7 258V".into(),
+            cpu_cores: 8,
+            ram_total_gb: 31.5,
+            ..Default::default()
+        };
         let t = tier_from(&p, Some(16.0));
         assert_eq!(t.gpu_tier, "integrated");
         assert_eq!(t.cpu_tier, "high");

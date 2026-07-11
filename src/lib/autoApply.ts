@@ -1,78 +1,62 @@
 // Auto-apply per-game profiles — the promised loop, done safely.
 //
-// SAFETY: this only ever changes the system when the user has opted in TWICE:
-//   1. the global master switch (Settings → autoApplyEnabled, OFF by default), and
-//   2. the specific profile's own `autoApply` flag (OFF by default).
-// With either off, this is a complete no-op. When it does act, it goes through
-// the SAME confirmed, anti-cheat-guarded, fully-logged apply_tweaks pipeline as a
-// manual apply — so every change is in the Change Log and reverts precisely. On
-// game exit (or switching games) it reverts exactly what it applied, nothing else.
+// SAFETY: the real gate lives in the Rust backend (auto_apply.rs). It refuses
+// unless BOTH the master switch (persisted server-side, synced from Settings)
+// and the game's own saved profile.auto_apply flag are on — and it reads the
+// tweak list from that saved profile, never from here. So this file cannot make
+// the backend apply anything the user hasn't opted into twice. When it does act,
+// it's the SAME confirmed, anti-cheat-guarded, fully-logged pipeline as a manual
+// apply. On game exit (or switching games) the backend reverts exactly what it
+// applied — tracked in a crash-safe record on disk, not just in memory here.
 import { invoke } from "@tauri-apps/api/core";
 import { isTauri } from "./tauri";
-import { listProfiles } from "./backend";
 import { useSettingsStore } from "../store/settingsStore";
-import { useGameStore } from "../store/gameStore";
 import { toast } from "../store/toastStore";
 import type { ApplyOutcome, GameInfo } from "./types";
 
-// What we auto-applied for the currently-running game, so we can revert exactly
-// those entries (and only those) when it closes.
-let active: { game: string; entryIds: string[] } | null = null;
+// The game we auto-optimized, so we know when to revert and can de-dupe repeat
+// events for the same game. The authoritative record of WHICH entries to revert
+// lives in the backend (survives a crash); this is only for the toast + de-dup.
+let activeGame: string | null = null;
 let busy = false;
 
-async function revertEntries(ids: string[]) {
-  for (const id of ids) {
-    try {
-      await invoke("revert_single", { entryId: id, confirm: true });
-    } catch {
-      /* keep reverting the rest even if one fails */
-    }
-  }
-}
-
-/** Called on every game_changed event. No-op unless the user opted in. */
+/** Called on every game_changed event. No-op unless the user opted in (twice). */
 export async function onGameChangeAutoApply(newGame: GameInfo | null): Promise<void> {
   if (!isTauri || busy) return;
   busy = true;
   try {
     const sameAsActive =
-      active && newGame && active.game.toLowerCase() === newGame.name.toLowerCase();
+      activeGame && newGame && activeGame.toLowerCase() === newGame.name.toLowerCase();
 
-    // Game closed or switched → revert exactly what we auto-applied.
-    if (active && !sameAsActive) {
-      const { entryIds, game } = active;
-      active = null;
-      if (entryIds.length) {
-        await revertEntries(entryIds);
-        toast.info("Auto-revert", `Restored your settings after ${game}.`);
-      }
+    // Game closed or switched → revert exactly what we auto-applied. The backend
+    // reverts from its own crash-safe record, so we don't track entry ids here.
+    if (activeGame && !sameAsActive) {
+      const prev = activeGame;
+      activeGame = null;
+      const reverted = await invoke<number>("auto_revert_profile");
+      if (reverted > 0) toast.info("Auto-revert", `Restored your settings after ${prev}.`);
     }
 
-    // New game launched → auto-apply only when opted in (master + profile flag).
+    // New game launched → let the BACKEND decide (master + profile verified, and
+    // the tweak list read, server-side). We only ask; we can't force anything.
     if (newGame && !sameAsActive) {
-      if (!useSettingsStore.getState().autoApplyEnabled) return; // master off
-      const profiles = await listProfiles();
-      const p = profiles.find(
-        (x) =>
-          x.autoApply &&
-          x.enabledTweaks.length > 0 &&
-          x.gameName.toLowerCase() === newGame.name.toLowerCase(),
-      );
-      if (!p) return; // no opted-in profile for this game
-
-      const antiCheatActive = useGameStore.getState().antiCheatActive;
-      const outcome = await invoke<ApplyOutcome>("apply_tweaks", {
-        ids: p.enabledTweaks,
-        confirm: true,
-        antiCheatActive,
-      });
-      const ids = outcome.applied.map((e) => e.id);
-      if (ids.length) {
-        active = { game: newGame.name, entryIds: ids };
-        toast.success(
-          `Auto-optimized ${newGame.name}`,
-          `${ids.length} tweak${ids.length === 1 ? "" : "s"} applied — reverts automatically when you close the game.`,
-        );
+      // Cheap client short-circuit so we don't call the backend when the master
+      // switch is obviously off. The backend re-checks regardless — never the gate.
+      if (!useSettingsStore.getState().autoApplyEnabled) return;
+      try {
+        const outcome = await invoke<ApplyOutcome>("auto_apply_profile", {
+          gameName: newGame.name,
+        });
+        const n = outcome.applied.length;
+        if (n > 0) {
+          activeGame = newGame.name;
+          toast.success(
+            `Auto-optimized ${newGame.name}`,
+            `${n} tweak${n === 1 ? "" : "s"} applied — reverts automatically when you close the game.`,
+          );
+        }
+      } catch {
+        // Backend refused (master off / no opted-in profile for this game) → no-op.
       }
     }
   } catch (err) {

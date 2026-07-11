@@ -282,7 +282,7 @@ pub async fn run_benchmark(
     let avg = collect(60, Duration::from_secs(1)).await;
     // Stash baseline so a later "post" can diff against it.
     if phase == "baseline" {
-        *LATEST_REPORT.lock().unwrap() = Some(BenchmarkReport {
+        *LATEST_REPORT.lock().unwrap_or_else(|e| e.into_inner()) = Some(BenchmarkReport {
             game_name,
             created_at: chrono::Utc::now().timestamp_millis(),
             baseline: avg.clone(),
@@ -294,7 +294,7 @@ pub async fn run_benchmark(
         });
     } else {
         // Complete the report by diffing against the stored baseline.
-        let mut guard = LATEST_REPORT.lock().unwrap();
+        let mut guard = LATEST_REPORT.lock().unwrap_or_else(|e| e.into_inner());
         if let Some(report) = guard.as_mut() {
             let baseline_ts = report.created_at; // captured at baseline time
             report.post = avg.clone();
@@ -317,7 +317,7 @@ pub async fn run_benchmark(
 /// Read-only — latest report for ReportView (or None → honest empty state).
 #[tauri::command]
 pub fn get_latest_report() -> Option<BenchmarkReport> {
-    LATEST_REPORT.lock().unwrap().clone()
+    LATEST_REPORT.lock().unwrap_or_else(|e| e.into_inner()).clone()
 }
 
 #[cfg(test)]

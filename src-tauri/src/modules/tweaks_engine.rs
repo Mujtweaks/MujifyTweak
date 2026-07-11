@@ -151,10 +151,10 @@ pub fn drifted_from_entries(m: &dyn SystemMutator, entries: &[ChangeLogEntry]) -
                         drifted = true;
                     }
                 }
-                Op::Sz { hive, path, name, value } => {
-                    if m.get_sz(hive, path, name).as_deref() != Some(value) {
-                        drifted = true;
-                    }
+                Op::Sz { hive, path, name, value }
+                    if m.get_sz(hive, path, name).as_deref() != Some(value) =>
+                {
+                    drifted = true;
                 }
                 _ => {} // services / commands / power aren't verified here
             }

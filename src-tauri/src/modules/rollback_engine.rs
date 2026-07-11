@@ -56,6 +56,22 @@ pub fn revert_all(app: AppHandle, confirm: bool) -> Result<usize, String> {
     Ok(count)
 }
 
+/// Revert a specific set of active ChangeLog entries by id — used by the
+/// auto-apply gate on game exit and by crash recovery on startup. Same reverse
+/// logic as a manual undo (RealMutator); silently skips ids already reverted or
+/// unknown. Returns how many were actually reverted.
+pub fn revert_by_ids(app: &AppHandle, ids: &[String]) -> usize {
+    let mutator = RealMutator;
+    let mut count = 0;
+    for id in ids {
+        if revert_entry(&mutator, id).is_ok() {
+            let _ = app.emit("change_log_reverted", id);
+            count += 1;
+        }
+    }
+    count
+}
+
 /// Read-only — current change log for the UI.
 #[tauri::command]
 pub fn get_change_log() -> Vec<change_log::ChangeLogEntry> {

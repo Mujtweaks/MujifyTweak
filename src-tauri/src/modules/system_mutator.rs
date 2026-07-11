@@ -1,13 +1,13 @@
 //! The apply/rollback execution boundary.
 //!
 //! Every system-state change goes through the `SystemMutator` trait. Two impls:
-//!   - `RealMutator`  — actually calls Windows (winreg / powercfg / ipconfig).
-//!                      Only ever reached when the USER explicitly confirms an
-//!                      apply in the UI. Never invoked by tests or by tooling.
-//!   - `MockMutator`  — records calls and simulates state in memory. Touches
-//!                      nothing. This is what `cargo test` exercises, so the
-//!                      apply→log→rollback logic is proven without ever changing
-//!                      the real machine.
+//!
+//! - `RealMutator` — actually calls Windows (winreg / powercfg / ipconfig). Only
+//!   ever reached when the USER explicitly confirms an apply in the UI. Never
+//!   invoked by tests or by tooling.
+//! - `MockMutator` — records calls and simulates state in memory. Touches
+//!   nothing. This is what `cargo test` exercises, so the apply→log→rollback
+//!   logic is proven without ever changing the real machine.
 //!
 //! This split is what lets the engine be genuinely real *and* never run a tweak
 //! on the user's laptop during development.

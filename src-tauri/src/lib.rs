@@ -24,7 +24,8 @@ use tauri::{
 };
 
 use modules::{
-    ai_backend, benchmark, change_journal, change_log, config, debloat, driver_doctor, fix_catalog,
+    ai_backend, auto_apply, benchmark, change_journal, change_log, config, debloat, driver_doctor,
+    fix_catalog,
     game_detector, game_profiler, game_profiles, game_settings, hardware_profiler, hardware_tier,
     health_scan, logger, network_monitor, profile_store, ready_check, restore_points,
     rollback_engine, server_ping, sessions, speed_test, support, system_monitor, tweak_catalog,
@@ -240,6 +241,10 @@ pub fn run() {
             system_monitor::start(handle.clone());
             network_monitor::start(handle.clone());
             game_detector::start(handle.clone());
+            // Crash safety: if a previous session auto-applied a game's profile
+            // but never got to revert it (app closed mid-game), restore now so
+            // nothing is left stuck on. No-op unless there's a stale record.
+            auto_apply::recover_stale(&handle);
             // FPS Drop Detective: snapshot system facts at launch + once a day,
             // journaling what changed (read-only, local).
             change_journal::start();
@@ -284,6 +289,10 @@ pub fn run() {
             profile_store::list_profiles,
             profile_store::save_profile,
             profile_store::delete_profile,
+            auto_apply::set_auto_apply_master,
+            auto_apply::get_auto_apply_master,
+            auto_apply::auto_apply_profile,
+            auto_apply::auto_revert_profile,
             tweaks_engine::apply_tweaks,
             tweaks_engine::check_reset_tweaks,
             rollback_engine::revert_single,
