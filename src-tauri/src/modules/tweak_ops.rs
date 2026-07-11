@@ -406,10 +406,6 @@ pub fn ops_for(tweak_id: &str) -> Vec<Op> {
             dw(Hklm, r"SOFTWARE\Policies\Microsoft\Windows\AppPrivacy", "LetAppsRunInBackground", 2),
         ],
         "disable_storage_sense" => vec![dw(Hklm, r"SOFTWARE\Policies\Microsoft\Windows\StorageSense", "AllowStorageSenseGlobal", 0)],
-        "disable_edge_preload" => vec![
-            dw(Hklm, r"SOFTWARE\Policies\Microsoft\Edge", "StartupBoostEnabled", 0),
-            dw(Hklm, r"SOFTWARE\Policies\Microsoft\Edge", "BackgroundModeEnabled", 0),
-        ],
 
         // ---- Vendor: NVIDIA (shown only when an NVIDIA GPU is detected) ----
         "nvidia_disable_telemetry" => vec![Op::DisableService { name: "NvTelemetryContainer" }],

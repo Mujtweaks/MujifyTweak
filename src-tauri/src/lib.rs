@@ -248,7 +248,13 @@ pub fn run() {
             // FPS Drop Detective: snapshot system facts at launch + once a day,
             // journaling what changed (read-only, local).
             change_journal::start();
-            build_tray(&handle)?;
+            // Tray is a convenience, not load-bearing: if it fails to create (seen
+            // in some elevated/session-0 configs) DON'T abort setup — a returned
+            // Err here would stop the whole app from opening. Log and carry on so
+            // the main window always shows.
+            if let Err(e) = build_tray(&handle) {
+                logger::warn(format!("tray setup failed (continuing without tray): {e}"));
+            }
             Ok(())
         })
         // Close (X) minimizes to the tray instead of quitting; tray → Exit quits.

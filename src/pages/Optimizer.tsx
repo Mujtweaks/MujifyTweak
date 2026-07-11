@@ -52,7 +52,7 @@ function hardwareGroups(gpuVendor: string | undefined): HwGroup[] {
       subtitle: "Free memory back to the game, cut background caching.",
       icon: MemoryStick,
       color: "#6366f1",
-      ids: ["clear_standby", "disable_memory_compression", "disable_sysmain", "large_system_cache"],
+      ids: ["clear_standby", "disable_memory_compression", "disable_sysmain"],
     },
     {
       id: "npu",

@@ -361,11 +361,6 @@ export const TWEAK_DETAILS: Record<string, TweakDetail> = {
     action: "registry",
     changes: "HKLM\\...\\StorageSense → AllowStorageSenseGlobal = 0. Reversible.",
   },
-  disable_edge_preload: {
-    what: "Stops Microsoft Edge preloading itself at boot and running in the background when closed.",
-    action: "registry",
-    changes: "HKLM\\...\\Policies\\Microsoft\\Edge → StartupBoostEnabled = 0, BackgroundModeEnabled = 0. Reversible.",
-  },
 
   // ---------- Vendor-specific ----------
   nvidia_max_performance: {
