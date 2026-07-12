@@ -16,7 +16,7 @@ import type { PageId } from "../lib/nav";
 import { useSystemStore } from "../store/systemStore";
 import { useGameStore } from "../store/gameStore";
 import { displayName, useSettingsStore } from "../store/settingsStore";
-import logo from "../assets/logo.png";
+import logo from "../assets/logo-mark.png";
 
 interface SidebarProps {
   page: PageId;
@@ -89,8 +89,8 @@ export default function Sidebar({ page, onNavigate }: SidebarProps) {
       <div className="absolute inset-y-0 left-0 z-40 flex w-[64px] flex-col overflow-hidden border-r border-edge bg-[#0d0d0d] py-4 transition-[width] duration-200 ease-out group-hover/side:w-[210px] group-hover/side:shadow-[6px_0_28px_rgba(0,0,0,0.45)] motion-reduce:transition-none">
         {/* Logo mark + wordmark (wordmark fades in when expanded) */}
         <div className="mb-4 flex items-center gap-2.5 px-[14px]">
-          <div className="h-9 w-9 shrink-0 overflow-hidden">
-            <img src={logo} alt="Mujify" className="h-9 w-[120px] max-w-none object-cover object-left mix-blend-screen brightness-125" draggable={false} />
+          <div className="grid h-9 w-9 shrink-0 place-items-center">
+            <img src={logo} alt="Mujify" className="h-8 w-8 object-contain mix-blend-screen brightness-125" draggable={false} />
           </div>
           <span className="whitespace-nowrap text-[15px] font-black uppercase tracking-tight text-txt opacity-0 transition-opacity duration-200 group-hover/side:opacity-100">
             Mujify
