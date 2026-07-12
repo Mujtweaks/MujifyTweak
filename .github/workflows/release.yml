@@ -59,6 +59,24 @@ jobs:
       - name: Install frontend deps
         run: npm ci
 
+      # Fail fast with a plain message if the updater signing secret is not
+      # reaching the build. Without this, a missing/misnamed/mis-scoped secret
+      # only surfaces as an opaque "tauri build exit 1" deep into the run.
+      - name: Verify signing secrets are present
+        shell: bash
+        run: |
+          missing=0
+          if [ -z "${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}" ]; then
+            echo "::error::TAURI_SIGNING_PRIVATE_KEY is empty. Set it as a REPOSITORY secret (Settings -> Secrets and variables -> Actions), value = the full contents of the updater private key file. No updater .sig/latest.json can be produced without it."
+            missing=1
+          fi
+          if [ -z "${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}" ]; then
+            echo "::error::TAURI_SIGNING_PRIVATE_KEY_PASSWORD is empty. Set it as a REPOSITORY secret (the key's password)."
+            missing=1
+          fi
+          if [ "$missing" = "1" ]; then exit 1; fi
+          echo "Signing secrets are present (values not printed)."
+
       - name: Build + sign + publish
         uses: tauri-apps/tauri-action@v0
         env:
@@ -70,7 +88,10 @@ jobs:
           releaseName: "Mujify Tweaks ${{ github.ref_name }}"
           releaseBody: "See the assets below to download and install."
           releaseDraft: false
-          # 0.9.0-beta.x is a pre-release; flip to false for the first stable 1.0.
-          prerelease: true
+          # MUST stay false for auto-update to work: the updater endpoint is
+          # `releases/latest/download/latest.json`, and GitHub's /releases/latest
+          # EXCLUDES prereleases — so a prerelease is invisible to installed apps.
+          # The "beta" status still lives in the version string + release name.
+          prerelease: false
           # Emits latest.json (the updater manifest) alongside the NSIS installer.
           includeUpdaterJson: true

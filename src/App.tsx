@@ -25,12 +25,15 @@ import SplashIntro from "./components/SplashIntro";
 import WelcomeModal from "./components/WelcomeModal";
 import WhatsNewModal from "./components/WhatsNewModal";
 import ReadyCheck from "./components/ReadyCheck";
-import { checkResetTweaks, connectBackend, fetchHardware, fetchReleaseNotes, getAppVersion } from "./lib/backend";
+import UpdateBanner from "./components/UpdateBanner";
+import UpdateModal from "./components/UpdateModal";
+import { checkResetTweaks, connectBackend, fetchHardware, fetchReleaseNotes, getAppVersion, getUpdateInfo } from "./lib/backend";
 import { toast } from "./store/toastStore";
 import { startHeartbeat } from "./lib/heartbeat";
 import { initEventBridge, listenNavigate } from "./lib/events";
 import { usePendingStore } from "./store/pendingStore";
 import { NAV_ITEMS, type PageId } from "./lib/nav";
+import type { UpdateInfo } from "./lib/types";
 
 const VALID_PAGES = new Set<string>([...NAV_ITEMS.map((n) => n.id), "changelog", "report", "support"]);
 
@@ -62,6 +65,11 @@ export default function App() {
   };
   // "What's new" — shown once after the first launch on a new version.
   const [whatsNew, setWhatsNew] = useState<{ version: string; notes: string } | null>(null);
+  // Auto-update: checked on EVERY startup (not only via the Settings button). If a
+  // higher version is published, a dismissible banner offers a one-click in-app update.
+  const [update, setUpdate] = useState<UpdateInfo | null>(null);
+  const [updateDismissed, setUpdateDismissed] = useState(false);
+  const [showUpdate, setShowUpdate] = useState(false);
 
   useEffect(() => {
     void connectBackend();
@@ -84,6 +92,11 @@ export default function App() {
         /* ignore storage errors */
       }
     })();
+    // Check for a new release on every launch — show the banner if one exists.
+    // Silent no-op when offline / no update / no channel (getUpdateInfo returns null).
+    void getUpdateInfo().then((info) => {
+      if (info?.available) setUpdate(info);
+    });
     // Windows feature updates can silently reset tweaks — re-detect on launch
     // and let the user re-apply the ones that drifted back to default.
     void checkResetTweaks().then((ids) => {
@@ -180,6 +193,15 @@ export default function App() {
       <Sidebar page={page} onNavigate={navigate} />
       <div className="flex min-w-0 flex-1 flex-col">
         <TopBar page={page} onNavigate={navigate} />
+        {update?.available && !updateDismissed && (
+          <div className="px-6 pt-3">
+            <UpdateBanner
+              version={update.version}
+              onUpdate={() => setShowUpdate(true)}
+              onDismiss={() => setUpdateDismissed(true)}
+            />
+          </div>
+        )}
         <main className="min-h-0 flex-1 overflow-y-auto px-6 py-5">
           <div key={page} className="page-enter">
             {renderPage()}
@@ -193,6 +215,9 @@ export default function App() {
       {!splash && showWelcome && <WelcomeModal onClose={dismissWelcome} />}
       {whatsNew && (
         <WhatsNewModal version={whatsNew.version} notes={whatsNew.notes} onClose={() => setWhatsNew(null)} />
+      )}
+      {showUpdate && update && (
+        <UpdateModal version={update.version} onClose={() => setShowUpdate(false)} />
       )}
     </div>
   );
