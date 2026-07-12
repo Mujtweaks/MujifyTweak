@@ -10,6 +10,7 @@ import Diagnostics from "./pages/Diagnostics";
 import Network from "./pages/Network";
 import Tweaks from "./pages/Tweaks";
 import Fixes from "./pages/Fixes";
+import Cleaner from "./pages/Cleaner";
 import Tools from "./pages/Tools";
 import AIAssistant from "./pages/AIAssistant";
 import ChangeLogView from "./pages/ChangeLogView";
@@ -127,6 +128,8 @@ export default function App() {
         return <Tweaks />;
       case "fixes":
         return <Fixes />;
+      case "cleaner":
+        return <Cleaner />;
       case "tools":
         return <Tools />;
       case "ai":

@@ -77,6 +77,35 @@ export interface BloatApp {
   reinstallable: boolean;
 }
 
+/** Cleaner — one reclaimable junk category (read-only scan). */
+export interface JunkCategory {
+  id: string;
+  label: string;
+  description: string;
+  bytes: number;
+  fileCount: number;
+  regenerable: boolean;
+}
+
+/** Cleaner — a large file found by the finder (read-only). */
+export interface LargeFile {
+  path: string;
+  bytes: number;
+}
+
+/** Cleaner — a group of byte-identical duplicate files (read-only). */
+export interface DupGroup {
+  bytes: number;
+  paths: string[];
+}
+
+/** Cleaner — result of a confirmed clean. */
+export interface CleanResult {
+  bytesFreed: number;
+  filesDeleted: number;
+  partial: string[];
+}
+
 /** One graphics adapter. */
 export interface GpuInfo {
   name: string;

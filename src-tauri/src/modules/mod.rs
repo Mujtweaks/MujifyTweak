@@ -12,6 +12,7 @@ pub mod auto_apply;
 pub mod benchmark;
 pub mod change_journal;
 pub mod change_log;
+pub mod cleaner;
 pub mod config;
 pub mod debloat;
 pub mod driver_doctor;

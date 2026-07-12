@@ -15,7 +15,6 @@ import {
 import { applyFix, scanFixes } from "../lib/backend";
 import { ACTION_LABEL, RISK_DEF, RISK_WORD, type TweakAction } from "../lib/tweakDetails";
 import type { FixInfo } from "../lib/types";
-import DebloatSection from "../components/DebloatSection";
 
 const FIX_CAT: Record<string, { label: string; color: string; icon: LucideIcon }> = {
   gaming: { label: "Gaming", color: "#e3000e", icon: Gamepad2 },
@@ -230,8 +229,6 @@ export default function Fixes() {
           ))}
         </div>
       )}
-
-      <DebloatSection />
 
       {confirm && (
         <FixConfirmModal fix={confirm} applying={applying} onClose={() => setConfirm(null)} onConfirm={() => void doApply()} />

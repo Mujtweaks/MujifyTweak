@@ -14,6 +14,10 @@ import type {
   GameServersResult,
   DeviceIssue,
   BloatApp,
+  JunkCategory,
+  LargeFile,
+  DupGroup,
+  CleanResult,
   RestorePoint,
   FixInfo,
   HardwareProfile,
@@ -352,6 +356,64 @@ export async function removeBloatware(app: BloatApp): Promise<boolean> {
     console.error("remove_bloatware failed:", err);
     toast.errorHelp("Removal failed", String(err));
     return false;
+  }
+}
+
+// ---- Cleaner (all scans read-only; clean is confirm-gated) ----
+
+/** Read-only: reclaimable junk categories with sizes. Changes nothing. */
+export async function scanJunk(): Promise<JunkCategory[]> {
+  if (!isTauri) return [];
+  try {
+    return await invoke<JunkCategory[]>("scan_junk");
+  } catch (err) {
+    console.error("scan_junk failed:", err);
+    return [];
+  }
+}
+
+/** Read-only: files ≥ min_mb under a folder, largest first. */
+export async function scanLargeFiles(root: string, minMb: number): Promise<LargeFile[]> {
+  if (!isTauri) return [];
+  try {
+    return await invoke<LargeFile[]>("scan_large_files", { root, minMb });
+  } catch (err) {
+    console.error("scan_large_files failed:", err);
+    return [];
+  }
+}
+
+/** Read-only: byte-identical duplicate files under a folder. */
+export async function scanDuplicateFiles(root: string): Promise<DupGroup[]> {
+  if (!isTauri) return [];
+  try {
+    return await invoke<DupGroup[]>("scan_duplicate_files", { root });
+  } catch (err) {
+    console.error("scan_duplicate_files failed:", err);
+    return [];
+  }
+}
+
+/** Delete the selected regenerable caches — only ever called on the user's
+ *  explicit confirm. Returns bytes freed (a real, measured figure). */
+export async function cleanJunk(categoryIds: string[]): Promise<CleanResult | null> {
+  if (!isTauri) return null;
+  try {
+    return await invoke<CleanResult>("clean_junk", { categoryIds, confirm: true });
+  } catch (err) {
+    console.error("clean_junk failed:", err);
+    toast.errorHelp("Clean failed", String(err));
+    return null;
+  }
+}
+
+/** Open Explorer with a file selected (read-only navigation). */
+export async function revealInExplorer(path: string): Promise<void> {
+  if (!isTauri) return;
+  try {
+    await invoke("reveal_in_explorer", { path });
+  } catch (err) {
+    console.error("reveal_in_explorer failed:", err);
   }
 }
 
