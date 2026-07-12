@@ -272,10 +272,14 @@ export default function AIAssistant({ onNavigate }: { onNavigate: (page: PageId)
           <span className="mx-auto grid h-16 w-16 place-items-center rounded-2xl bg-accent/10 shadow-[0_0_28px_rgba(227,0,14,0.18)]">
             <Bot size={30} strokeWidth={1.5} className="text-accent" />
           </span>
-          <h1 className="mt-4 text-xl font-bold text-txt">Set up your API key</h1>
-          <p className="mt-2 text-[13px] leading-relaxed text-txt2">Add your free NVIDIA NIM key in Settings to unlock the AI assistant. Stored locally on this PC only.</p>
+          <h1 className="mt-4 text-xl font-bold text-txt">Add your free AI key</h1>
+          <p className="mt-2 text-[13px] leading-relaxed text-txt2">
+            The assistant runs on NVIDIA's <span className="font-semibold text-txt">free</span> NIM API. Grab a
+            key (takes a minute), paste it in Settings, and you're set. It's stored only on this PC — never
+            uploaded.
+          </p>
           <button onClick={() => onNavigate("settings")} className="glint mt-4 rounded-btn bg-accent px-5 py-2.5 text-[13px] font-semibold text-white shadow-[0_4px_20px_rgba(227,0,14,0.3)] hover:bg-accent-hi">
-            Open Settings
+            Add key in Settings
           </button>
         </div>
       </div>

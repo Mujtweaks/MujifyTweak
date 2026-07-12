@@ -1,11 +1,13 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   Bot,
   Cpu,
   Download,
+  ExternalLink,
   FolderOpen,
   Gamepad2,
   Info,
+  KeyRound,
   RefreshCw,
   Settings as SettingsIcon,
   ShieldCheck,
@@ -16,10 +18,73 @@ import { useSystemStore } from "../store/systemStore";
 import { useSettingsStore } from "../store/settingsStore";
 import { useAiStore } from "../store/aiStore";
 import { getUpdateInfo, openLogsFolder } from "../lib/backend";
+import { nvidiaKey, tavilyKey, saveApiKey } from "../lib/aiConfig";
+import { NVIDIA_KEYS_URL, openExternal } from "../lib/links";
 import { toast } from "../store/toastStore";
 import Toggle from "../components/Toggle";
 import UpdateModal from "../components/UpdateModal";
 import type { UpdateInfo } from "../lib/types";
+
+// One API-key row: masked input, save/clear, and an honest set/not-set state —
+// the value is never shown back (we only ever learn whether one exists).
+function ApiKeyRow({
+  label,
+  hint,
+  isSet,
+  onSave,
+  required,
+}: {
+  label: string;
+  hint: string;
+  isSet: boolean;
+  onSave: (value: string) => Promise<void>;
+  required?: boolean;
+}) {
+  const [value, setValue] = useState("");
+  const [busy, setBusy] = useState(false);
+  const save = async (v: string) => {
+    setBusy(true);
+    await onSave(v);
+    setBusy(false);
+    setValue("");
+  };
+  return (
+    <div className="border-b border-edge py-3 last:border-0">
+      <div className="flex items-center justify-between">
+        <p className="text-[13px] font-medium text-txt">{label}</p>
+        <span className={`text-[11px] font-semibold ${isSet ? "text-success" : required ? "text-warning" : "text-txt3"}`}>
+          {isSet ? "● Key set" : required ? "● Not set — AI is off" : "○ Optional — not set"}
+        </span>
+      </div>
+      <p className="mt-0.5 text-[11.5px] text-txt2">{hint}</p>
+      <div className="mt-2 flex items-center gap-2">
+        <input
+          type="password"
+          value={value}
+          onChange={(e) => setValue(e.target.value)}
+          placeholder={isSet ? "Enter a new key to replace it…" : "Paste your key…"}
+          className="flex-1 rounded-btn border border-edge bg-bg px-3 py-2 text-[12.5px] text-txt placeholder:text-txt3 focus:border-accent/40 focus:outline-none"
+        />
+        <button
+          onClick={() => void save(value)}
+          disabled={busy || !value.trim()}
+          className="rounded-btn bg-accent px-4 py-2 text-[12px] font-semibold text-white hover:bg-accent-hi disabled:opacity-40"
+        >
+          {busy ? "Saving…" : "Save"}
+        </button>
+        {isSet && (
+          <button
+            onClick={() => void save("")}
+            disabled={busy}
+            className="rounded-btn border border-edge bg-bg px-3 py-2 text-[12px] font-medium text-txt2 hover:text-txt disabled:opacity-40"
+          >
+            Clear
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
 
 function Section({ icon: Icon, title, children }: { icon: typeof Info; title: string; children: React.ReactNode }) {
   return (
@@ -62,6 +127,18 @@ export default function Settings() {
   const [checking, setChecking] = useState(false);
   const [updateInfo, setUpdateInfo] = useState<UpdateInfo | null>(null);
   const [showUpdate, setShowUpdate] = useState(false);
+
+  // Whether each AI key currently resolves to a value (saved override OR a
+  // compiled-in default). We only ever learn set/not-set, never the value.
+  const [nvSet, setNvSet] = useState(false);
+  const [tvSet, setTvSet] = useState(false);
+  const refreshKeys = async () => {
+    setNvSet(!!(await nvidiaKey()));
+    setTvSet(!!(await tavilyKey()));
+  };
+  useEffect(() => {
+    void refreshKeys();
+  }, []);
 
   const checkUpdates = async () => {
     setChecking(true);
@@ -134,8 +211,8 @@ export default function Settings() {
               <Bot size={14} className="text-accent" /> AI Assistant
             </p>
             <p className="mt-0.5 text-[11.5px] text-txt2">
-              Turn the Mujify AI assistant on or off. It runs on a built-in key — no setup needed.
-              Disabling it clears the current chat and hides the AI page.
+              Turn the Mujify AI assistant on or off. It uses your own free NVIDIA NIM key (set it
+              below). Disabling it clears the current chat and hides the AI page.
             </p>
           </div>
           <Toggle on={aiEnabled} onClick={toggleAi} />
@@ -165,6 +242,43 @@ export default function Settings() {
           </div>
           <Toggle on={autoApplyEnabled} onClick={() => setAutoApplyEnabled(!autoApplyEnabled)} />
         </div>
+      </Section>
+
+      {/* AI Assistant — API keys (bring your own, stored locally) */}
+      <Section icon={KeyRound} title="AI Assistant — API key">
+        <p className="mb-1 text-[12px] leading-relaxed text-txt2">
+          The AI Assistant runs on NVIDIA's free NIM API. Add your own key to turn it on — it's{" "}
+          <span className="font-semibold text-txt">free</span>, takes a minute, and is stored only on this
+          PC (<span className="font-mono text-[11px]">%AppData%\MujifyTweaks\config.json</span>). Nothing is
+          ever uploaded or shared.
+        </p>
+        <button
+          onClick={() => void openExternal(NVIDIA_KEYS_URL)}
+          className="mb-1 inline-flex items-center gap-1.5 text-[12px] font-semibold text-accent hover:underline"
+        >
+          Get a free NVIDIA API key <ExternalLink size={12} />
+        </button>
+        <ApiKeyRow
+          label="NVIDIA NIM key"
+          hint="Required for the AI Assistant. Starts with “nvapi-”."
+          isSet={nvSet}
+          required
+          onSave={async (v) => {
+            await saveApiKey("nvidia", v);
+            await refreshKeys();
+            toast.success(v ? "NVIDIA key saved" : "NVIDIA key cleared", v ? "The AI Assistant is ready." : "The AI Assistant is off until you add a key.");
+          }}
+        />
+        <ApiKeyRow
+          label="Tavily key (web search)"
+          hint="Optional. Only needed if you want the assistant to search the live web. Starts with “tvly-”."
+          isSet={tvSet}
+          onSave={async (v) => {
+            await saveApiKey("tavily", v);
+            await refreshKeys();
+            toast.success(v ? "Tavily key saved" : "Tavily key cleared", v ? "Web search is available in chat." : "Web search is off.");
+          }}
+        />
       </Section>
 
       {/* Privacy */}

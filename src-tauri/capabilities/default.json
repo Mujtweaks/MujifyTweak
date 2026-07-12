@@ -19,7 +19,9 @@
         { "url": "https://mujifytweaks.site.je" },
         { "url": "https://mujifytweaks.site.je/*" },
         { "url": "https://github.com/Mujtweaks/MujifyTweak/releases" },
-        { "url": "https://github.com/Mujtweaks/MujifyTweak/releases/*" }
+        { "url": "https://github.com/Mujtweaks/MujifyTweak/releases/*" },
+        { "url": "https://build.nvidia.com" },
+        { "url": "https://build.nvidia.com/*" }
       ]
     }
   ]

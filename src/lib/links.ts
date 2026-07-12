@@ -7,6 +7,8 @@ export const DISCORD_INVITE = "https://discord.gg/zg4WXbJ9uw";
 export const WEBSITE = "https://mujifytweaks.site.je";
 export const GITHUB_REPO = "https://github.com/Mujtweaks/MujifyTweak";
 export const GITHUB_RELEASES = "https://github.com/Mujtweaks/MujifyTweak/releases";
+// Where a user gets their own free NVIDIA NIM API key (for the AI Assistant).
+export const NVIDIA_KEYS_URL = "https://build.nvidia.com";
 
 // Anonymous "online" ping endpoint (the Cloudflare Worker, kept in the owner's
 // private local store outside this repo — see the owner dashboard notes).
@@ -18,7 +20,7 @@ export const ANALYTICS_ENDPOINT = "https://mujify-stats.cheaplabs2-4b2.workers.d
 // The only URLs the app may open externally (defense-in-depth on top of the
 // Tauri opener capability allowlist). NOTE: if the website domain changes, update
 // it here AND in src-tauri/capabilities/default.json.
-const ALLOWED = [DISCORD_INVITE, WEBSITE, GITHUB_RELEASES];
+const ALLOWED = [DISCORD_INVITE, WEBSITE, GITHUB_RELEASES, NVIDIA_KEYS_URL];
 
 /** Open an external link in the SYSTEM browser — never inside the app window.
  *  Refuses anything not in the allowlist. */
