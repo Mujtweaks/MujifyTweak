@@ -15,16 +15,26 @@
 ; for writing: …\LHMWrapper.exe" (the hardware-monitor sidecar keeps running).
 !macro NSIS_HOOK_PREINSTALL
   DetailPrint "Closing Mujify Tweaks if it's already running…"
+  ; Kill the app FIRST (stops its sidecar watchdog), then the sidecars. Two
+  ; passes with waits, because a sidecar can briefly respawn during app shutdown
+  ; and Windows/AV can hold the .exe handle for a moment after the process dies.
   nsExec::Exec 'taskkill /F /T /IM "mujify-tweaks.exe"'
   Pop $0
-  nsExec::Exec 'taskkill /F /IM "LHMWrapper.exe"'
+  Sleep 600
+  nsExec::Exec 'taskkill /F /T /IM "LHMWrapper.exe"'
   Pop $0
-  nsExec::Exec 'taskkill /F /IM "PresentMonService.exe"'
+  nsExec::Exec 'taskkill /F /T /IM "PresentMonService.exe"'
   Pop $0
-  nsExec::Exec 'taskkill /F /IM "PresentMon.exe"'
+  nsExec::Exec 'taskkill /F /T /IM "PresentMon.exe"'
   Pop $0
-  ; give the OS a moment to release the file locks before we start extracting
-  Sleep 800
+  Sleep 600
+  ; second pass in case anything respawned mid-shutdown
+  nsExec::Exec 'taskkill /F /T /IM "mujify-tweaks.exe"'
+  Pop $0
+  nsExec::Exec 'taskkill /F /T /IM "LHMWrapper.exe"'
+  Pop $0
+  ; final settle so the file locks are fully released before extraction
+  Sleep 1500
 !macroend
 
 !macro NSIS_HOOK_PREUNINSTALL
