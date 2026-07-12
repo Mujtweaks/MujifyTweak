@@ -13,7 +13,8 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { applyFix, scanFixes } from "../lib/backend";
-import { ACTION_LABEL, RISK_DEF, RISK_WORD, type TweakAction } from "../lib/tweakDetails";
+import { ACTION_LABEL, type TweakAction } from "../lib/tweakDetails";
+import { riskMeta } from "../lib/risk";
 import type { FixInfo } from "../lib/types";
 
 const FIX_CAT: Record<string, { label: string; color: string; icon: LucideIcon }> = {
@@ -24,11 +25,6 @@ const FIX_CAT: Record<string, { label: string; color: string; icon: LucideIcon }
   hardware: { label: "Hardware", color: "#f59e0b", icon: Bluetooth },
 };
 const CAT_ORDER = ["gaming", "network", "system", "audio", "hardware"];
-const RISK_TONE: Record<string, string> = {
-  safe: "bg-success/10 text-success",
-  moderate: "bg-warning/10 text-warning",
-  advanced: "bg-purple-500/10 text-purple-400",
-};
 
 function FixCard({ fix, onApply }: { fix: FixInfo; onApply: (f: FixInfo) => void }) {
   const [expanded, setExpanded] = useState(false);
@@ -45,8 +41,8 @@ function FixCard({ fix, onApply }: { fix: FixInfo; onApply: (f: FixInfo) => void
             {cat.label}
           </span>
         </div>
-        <span className={`rounded px-2 py-0.5 text-[10px] font-semibold ${RISK_TONE[fix.risk] ?? "text-txt2"}`}>
-          {RISK_WORD[fix.risk] ?? fix.risk}
+        <span className={`rounded px-2 py-0.5 text-[10px] font-semibold ${riskMeta(fix.risk).tone}`}>
+          {riskMeta(fix.risk).label}
         </span>
       </div>
 
@@ -79,11 +75,11 @@ function FixCard({ fix, onApply }: { fix: FixInfo; onApply: (f: FixInfo) => void
             <span className="rounded bg-panel2 px-2 py-0.5 text-[10px] font-semibold text-txt2">
               {ACTION_LABEL[fix.action as TweakAction] ?? fix.action}
             </span>
-            <span className={`rounded px-2 py-0.5 text-[10px] font-semibold ${RISK_TONE[fix.risk] ?? "text-txt2"}`}>
-              {RISK_WORD[fix.risk] ?? fix.risk}
+            <span className={`rounded px-2 py-0.5 text-[10px] font-semibold ${riskMeta(fix.risk).tone}`}>
+              {riskMeta(fix.risk).label}
             </span>
           </div>
-          <p className="text-[10.5px] leading-snug text-txt3">{RISK_DEF[fix.risk]}</p>
+          <p className="text-[10.5px] leading-snug text-txt3">{riskMeta(fix.risk).def}</p>
           <div>
             <p className="text-[10px] font-semibold uppercase tracking-wide text-txt3">Exactly what changes</p>
             <p className="mt-0.5 break-words font-mono text-[10.5px] leading-relaxed text-txt2">{fix.changes}</p>

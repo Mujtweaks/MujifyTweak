@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Sidebar from "./components/Sidebar";
 import TopBar from "./components/TopBar";
 import GamesBar from "./components/GamesBar";
@@ -29,6 +29,7 @@ import { checkResetTweaks, connectBackend, fetchHardware, fetchReleaseNotes, get
 import { toast } from "./store/toastStore";
 import { startHeartbeat } from "./lib/heartbeat";
 import { initEventBridge, listenNavigate } from "./lib/events";
+import { usePendingStore } from "./store/pendingStore";
 import { NAV_ITEMS, type PageId } from "./lib/nav";
 
 const VALID_PAGES = new Set<string>([...NAV_ITEMS.map((n) => n.id), "changelog", "report", "support"]);
@@ -110,14 +111,37 @@ export default function App() {
     };
   }, []);
 
+  // Navigation guard: if the current page has tweaks selected-but-not-applied,
+  // the first tab switch shakes the pending-changes bar + warns instead of
+  // navigating, so the selection isn't silently lost. A second attempt (within
+  // 5s) proceeds and discards it. Programmatic deep-links (hash/tray) bypass this.
+  const leaveArmed = useRef(false);
+  const navigate = (target: PageId) => {
+    if (target === page) return;
+    const pending = usePendingStore.getState().count;
+    if (pending > 0 && !leaveArmed.current) {
+      usePendingStore.getState().shake();
+      toast.info(
+        `${pending} unsaved tweak${pending === 1 ? "" : "s"} selected`,
+        "Apply them first, or click again to leave and discard the selection.",
+      );
+      leaveArmed.current = true;
+      window.setTimeout(() => (leaveArmed.current = false), 5000);
+      return;
+    }
+    leaveArmed.current = false;
+    usePendingStore.getState().setCount(0);
+    setPage(target);
+  };
+
   const renderPage = () => {
     switch (page) {
       case "home":
-        return <Dashboard onNavigate={setPage} />;
+        return <Dashboard onNavigate={navigate} />;
       case "optimizer":
-        return <Optimizer onNavigate={setPage} />;
+        return <Optimizer onNavigate={navigate} />;
       case "profiles":
-        return <Profiles onNavigate={setPage} />;
+        return <Profiles onNavigate={navigate} />;
       case "profile-editor":
         return <ProfileEditor />;
       case "diagnostics":
@@ -133,7 +157,7 @@ export default function App() {
       case "tools":
         return <Tools />;
       case "ai":
-        return <AIAssistant onNavigate={setPage} />;
+        return <AIAssistant onNavigate={navigate} />;
       case "changelog":
         return <ChangeLogView />;
       case "report":
@@ -145,7 +169,7 @@ export default function App() {
       case "startup":
         return <StartupManager />;
       case "support":
-        return <Support onNavigate={setPage} />;
+        return <Support onNavigate={navigate} />;
       case "settings":
         return <Settings />;
     }
@@ -153,18 +177,18 @@ export default function App() {
 
   return (
     <div className="flex h-screen w-screen overflow-hidden bg-bg text-txt">
-      <Sidebar page={page} onNavigate={setPage} />
+      <Sidebar page={page} onNavigate={navigate} />
       <div className="flex min-w-0 flex-1 flex-col">
-        <TopBar page={page} onNavigate={setPage} />
+        <TopBar page={page} onNavigate={navigate} />
         <main className="min-h-0 flex-1 overflow-y-auto px-6 py-5">
           <div key={page} className="page-enter">
             {renderPage()}
           </div>
         </main>
-        <GamesBar onNavigate={setPage} />
+        <GamesBar onNavigate={navigate} />
       </div>
       <Toaster />
-      <ReadyCheck onNavigate={setPage} />
+      <ReadyCheck onNavigate={navigate} />
       {splash && <SplashIntro onDone={() => setSplash(false)} />}
       {!splash && showWelcome && <WelcomeModal onClose={dismissWelcome} />}
       {whatsNew && (

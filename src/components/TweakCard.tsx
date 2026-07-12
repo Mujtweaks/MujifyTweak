@@ -1,16 +1,11 @@
 import { useState } from "react";
 import { Info, Plus, Sparkles, TrendingUp } from "lucide-react";
 import { CATEGORY_META, impactTier } from "../lib/categories";
-import { ACTION_LABEL, RISK_DEF, RISK_WORD, TWEAK_DETAILS } from "../lib/tweakDetails";
+import { ACTION_LABEL, TWEAK_DETAILS } from "../lib/tweakDetails";
+import { riskMeta } from "../lib/risk";
 import RiskBadge from "./RiskBadge";
 import Toggle from "./Toggle";
 import type { TweakInfo } from "../lib/types";
-
-const RISK_TONE: Record<string, string> = {
-  safe: "bg-success/10 text-success",
-  moderate: "bg-warning/10 text-warning",
-  advanced: "bg-purple-500/10 text-purple-400",
-};
 
 interface TweakCardProps {
   tweak: TweakInfo;
@@ -112,11 +107,11 @@ export default function TweakCard({ tweak, selected, onToggle, onInfo }: TweakCa
             <span className="rounded bg-panel2 px-2 py-0.5 text-[10px] font-semibold text-txt2">
               {detail ? ACTION_LABEL[detail.action] : "Reads current state (scan-only)"}
             </span>
-            <span className={`rounded px-2 py-0.5 text-[10px] font-semibold ${RISK_TONE[tweak.risk] ?? "text-txt2"}`}>
-              {RISK_WORD[tweak.risk] ?? tweak.risk}
+            <span className={`rounded px-2 py-0.5 text-[10px] font-semibold ${riskMeta(tweak.risk).tone}`}>
+              {riskMeta(tweak.risk).label}
             </span>
           </div>
-          <p className="text-[10.5px] leading-snug text-txt3">{RISK_DEF[tweak.risk]}</p>
+          <p className="text-[10.5px] leading-snug text-txt3">{riskMeta(tweak.risk).def}</p>
           {detail && (
             <div>
               <p className="text-[10px] font-semibold uppercase tracking-wide text-txt3">Exactly what changes</p>

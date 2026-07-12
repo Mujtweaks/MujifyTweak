@@ -7,6 +7,7 @@ import { CATEGORY_META, CATEGORY_ORDER } from "../lib/categories";
 import TweakCard from "../components/TweakCard";
 import ApplyConfirmModal from "../components/ApplyConfirmModal";
 import SlidingPills from "../components/SlidingPills";
+import { usePendingStore, useShakeSignal } from "../store/pendingStore";
 import type { TweakCategory, TweakInfo } from "../lib/types";
 
 function Stat({ icon, label, value, sub }: { icon: React.ReactNode; label: string; value: string; sub: string }) {
@@ -42,6 +43,14 @@ export default function Tweaks() {
     if (!scanResult) void runScan();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Publish selected-but-not-applied count so tab navigation warns before losing
+  // it, and shake the apply bar when the user tries to leave with a selection.
+  const shake = useShakeSignal();
+  useEffect(() => {
+    usePendingStore.getState().setCount(selected.size);
+  }, [selected]);
+  useEffect(() => () => usePendingStore.getState().setCount(0), []);
 
   const tweaks = scanResult?.tweaks ?? [];
   const filtered = useMemo(() => {
@@ -122,7 +131,7 @@ export default function Tweaks() {
 
       {/* Apply bar */}
       {selected.size > 0 && (
-        <div className="fixed bottom-[64px] left-[64px] right-0 z-20 flex items-center justify-between border-t border-edge bg-panel/95 px-6 py-3 backdrop-blur">
+        <div className={`fixed bottom-[64px] left-[64px] right-0 z-20 flex items-center justify-between border-t border-edge bg-panel/95 px-6 py-3 backdrop-blur ${shake ? "shake" : ""}`}>
           <span className="text-[12.5px] text-txt2">{selected.size} selected · all free, all reversible</span>
           <button onClick={() => setConfirm(selectedTweaks)} className="glint flex items-center gap-2 rounded-btn bg-accent px-5 py-2.5 text-[13px] font-semibold text-white shadow-[0_4px_20px_rgba(227,0,14,0.3)] hover:bg-accent-hi">
             <Zap size={14} strokeWidth={2.5} fill="currentColor" /> Apply {selected.size} Tweak{selected.size === 1 ? "" : "s"}

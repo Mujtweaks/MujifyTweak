@@ -6,6 +6,7 @@ import { useTweakStore } from "../store/tweakStore";
 import { CATEGORY_META, CATEGORY_ORDER, PRESET_RISK } from "../lib/categories";
 import TweakCard from "../components/TweakCard";
 import ApplyConfirmModal from "../components/ApplyConfirmModal";
+import { usePendingStore, useShakeSignal } from "../store/pendingStore";
 import type { TweakCategory, TweakInfo } from "../lib/types";
 import type { PageId } from "../lib/nav";
 
@@ -83,6 +84,14 @@ export default function Optimizer({ onNavigate: _onNavigate }: { onNavigate: (pa
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Publish the selected-but-not-applied count so tab navigation can warn before
+  // it's lost, and shake the pending-changes bar when that happens.
+  const shake = useShakeSignal();
+  useEffect(() => {
+    usePendingStore.getState().setCount(selected.size);
+  }, [selected]);
+  useEffect(() => () => usePendingStore.getState().setCount(0), []);
+
   const tweaks = scanResult?.tweaks ?? [];
   const byId = useMemo(() => new Map(tweaks.map((t) => [t.id, t])), [tweaks]);
   const inCat = (c: TweakCategory) => tweaks.filter((t) => t.category === c);
@@ -134,7 +143,7 @@ export default function Optimizer({ onNavigate: _onNavigate }: { onNavigate: (pa
           </div>
         )}
         {sel.length > 0 && (
-          <div className="fixed bottom-[64px] left-[64px] right-0 z-20 flex items-center justify-between border-t border-edge bg-panel/95 px-6 py-3 backdrop-blur">
+          <div className={`fixed bottom-[64px] left-[64px] right-0 z-20 flex items-center justify-between border-t border-edge bg-panel/95 px-6 py-3 backdrop-blur ${shake ? "shake" : ""}`}>
             <span className="text-[12.5px] text-txt2">{sel.length} selected in {openGroup.label}</span>
             <button onClick={() => setConfirm(sel)} className="glint flex items-center gap-2 rounded-btn bg-accent px-5 py-2.5 text-[13px] font-semibold text-white shadow-[0_4px_20px_rgba(227,0,14,0.3)] hover:bg-accent-hi">
               <Zap size={14} strokeWidth={2.5} fill="currentColor" /> Apply {sel.length}
@@ -173,7 +182,7 @@ export default function Optimizer({ onNavigate: _onNavigate }: { onNavigate: (pa
           ))}
         </div>
         {sel.length > 0 && (
-          <div className="fixed bottom-[64px] left-[64px] right-0 z-20 flex items-center justify-between border-t border-edge bg-panel/95 px-6 py-3 backdrop-blur">
+          <div className={`fixed bottom-[64px] left-[64px] right-0 z-20 flex items-center justify-between border-t border-edge bg-panel/95 px-6 py-3 backdrop-blur ${shake ? "shake" : ""}`}>
             <span className="text-[12.5px] text-txt2">{sel.length} selected in {meta.label}</span>
             <button onClick={() => setConfirm(sel)} className="glint flex items-center gap-2 rounded-btn bg-accent px-5 py-2.5 text-[13px] font-semibold text-white shadow-[0_4px_20px_rgba(227,0,14,0.3)] hover:bg-accent-hi">
               <Zap size={14} strokeWidth={2.5} fill="currentColor" /> Apply {sel.length}

@@ -71,12 +71,6 @@ export const CATEGORY_ORDER: TweakCategory[] = [
 
 export const CPU_ICON = Cpu;
 
-export const RISK_META: Record<RiskLevel, { label: string; cls: string }> = {
-  safe: { label: "Safe", cls: "text-good border-good/30 bg-good/10" },
-  moderate: { label: "Moderate", cls: "text-warn border-warn/30 bg-warn/10" },
-  advanced: { label: "Advanced", cls: "text-accent border-accent/30 bg-accent/10" },
-};
-
 /** Which risk levels a preset is willing to enable (selection only). */
 export const PRESET_RISK: Record<string, RiskLevel[]> = {
   ultimate: ["safe", "moderate", "advanced"],

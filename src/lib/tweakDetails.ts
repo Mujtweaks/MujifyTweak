@@ -39,17 +39,6 @@ export const ACTION_LABEL: Record<TweakAction, string> = {
 };
 
 /** Risk tiers, defined for the user in industry-standard wording. */
-export const RISK_WORD: Record<string, string> = {
-  safe: "Safe",
-  moderate: "Moderate",
-  advanced: "Advanced",
-};
-export const RISK_DEF: Record<string, string> = {
-  safe: "No impact on normal Windows functionality.",
-  moderate: "May affect specific features you use.",
-  advanced: "Could break certain Windows functions — for experienced users.",
-};
-
 export const TWEAK_DETAILS: Record<string, TweakDetail> = {
   // ---------- System ----------
   power_high_perf: {
