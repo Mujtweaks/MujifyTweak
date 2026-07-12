@@ -111,11 +111,55 @@ fn active_power_plan() -> Option<String> {
 
 static RUNNING: AtomicBool = AtomicBool::new(false);
 
-/// GPU utilization from the 3D/graphics engine — what games actually use and
-/// what Task Manager shows as the headline figure. Filtering to `engtype_3D`
-/// excludes video-encode engines (e.g. a Parsec/DeskIn remote-desktop stream),
-/// which would otherwise dominate the max and misreport GPU load. Falls back to
-/// the overall max if no 3D engine is present.
+/// The engine-node key of a GPU-engine counter instance — everything after the
+/// per-process `pid_<N>_` prefix. Instance names look like
+/// `pid_8036_luid_0x0_0xCB35_phys_0_eng_0_engtype_3D`; the node Task Manager
+/// aggregates to is `luid_..._phys_0_eng_0_engtype_3D` (one physical engine on
+/// one adapter), shared by every process using it.
+fn engine_node_key(name: &str) -> &str {
+    if let Some(rest) = name.strip_prefix("pid_") {
+        if let Some(us) = rest.find('_') {
+            return &rest[us + 1..];
+        }
+    }
+    name
+}
+
+fn is_render_engine(name: &str) -> bool {
+    name.contains("engtype_3D") || name.contains("engtype_Graphics")
+}
+
+/// GPU utilization the way Task Manager computes it: for each render (3D) engine
+/// node, SUM the per-process utilizations, then take the MAX across those nodes.
+///
+/// Two correctness points this encodes:
+///  - Summing across processes (not max of one process) — GPU work is split
+///    across the game, the desktop compositor and other apps; the old max-of-one
+///    under-reported badly.
+///  - We ONLY consider render engines. A video-encode engine (e.g. a Parsec /
+///    DeskIn remote-desktop stream, which this dev machine runs) is a different
+///    node and is excluded by identity — never mistaken for GPU load. If no
+///    render engine is present at all we return `None` (honest "—"), never a
+///    fallback to some other engine that would be a WRONG number.
+fn aggregate_render_utilization(instances: &[(String, f64)]) -> Option<f32> {
+    use std::collections::HashMap;
+    let mut node_sums: HashMap<&str, f64> = HashMap::new();
+    let mut saw_render = false;
+    for (name, util) in instances {
+        if is_render_engine(name) {
+            saw_render = true;
+            *node_sums.entry(engine_node_key(name)).or_insert(0.0) += *util;
+        }
+    }
+    if !saw_render {
+        return None;
+    }
+    let max = node_sums.values().copied().fold(0.0_f64, f64::max);
+    Some(max.min(100.0) as f32)
+}
+
+/// Read the GPU-engine perf counters and aggregate the render-engine load. Empty
+/// query (no GPU counters) → `None`, so the UI shows "—" rather than a fake 0/%.
 fn gpu_utilization(conn: &WMIConnection) -> Option<f32> {
     let rows = query(
         conn,
@@ -124,22 +168,18 @@ fn gpu_utilization(conn: &WMIConnection) -> Option<f32> {
     if rows.is_empty() {
         return None;
     }
-    let util_of = |r: &Row| r.get("UtilizationPercentage").and_then(variant_to_f64);
-    let is_3d = |r: &Row| match r.get("Name") {
-        Some(wmi::Variant::String(s)) => s.contains("engtype_3D") || s.contains("engtype_Graphics"),
-        _ => false,
-    };
-
-    let max_3d = rows
+    let instances: Vec<(String, f64)> = rows
         .iter()
-        .filter(|r| is_3d(r))
-        .filter_map(util_of)
-        .fold(0.0_f64, f64::max);
-    let max_any = rows.iter().filter_map(util_of).fold(0.0_f64, f64::max);
-    // Prefer the 3D engine reading; use overall only if there is no 3D engine.
-    let has_3d = rows.iter().any(is_3d);
-    let max = if has_3d { max_3d } else { max_any };
-    Some(max.min(100.0) as f32)
+        .filter_map(|r| {
+            let name = match r.get("Name") {
+                Some(wmi::Variant::String(s)) => s.clone(),
+                _ => return None,
+            };
+            let util = r.get("UtilizationPercentage").and_then(variant_to_f64)?;
+            Some((name, util))
+        })
+        .collect();
+    aggregate_render_utilization(&instances)
 }
 
 /// Dedicated VRAM in use = max DedicatedUsage across adapters, in MB.
@@ -421,5 +461,71 @@ mod tests {
     fn bottleneck_flags_full_ram() {
         let (b, _) = classify_bottleneck(30.0, Some(40.0), 95.0);
         assert!(b.contains("RAM"));
+    }
+
+    // ---- GPU utilization aggregation (the #8 fix) ----
+
+    #[test]
+    fn gpu_util_sums_render_load_across_processes() {
+        // Game (55%) + desktop compositor (20%) on the SAME 3D engine node → 75%,
+        // the way Task Manager reports it. The old max-of-one logic said 55%.
+        let node = "luid_0x0_0xCB35_phys_0_eng_0_engtype_3D";
+        let inst = vec![
+            (format!("pid_1000_{node}"), 55.0),
+            (format!("pid_2000_{node}"), 20.0),
+        ];
+        assert_eq!(aggregate_render_utilization(&inst), Some(75.0));
+    }
+
+    #[test]
+    fn gpu_util_ignores_remote_desktop_encode_engine() {
+        // A Parsec/DeskIn stream pins the VIDEO-ENCODE engine at 100% while the
+        // real 3D load is 12%. The headline must be 12% — the encode engine is a
+        // different node and must never be mistaken for GPU load.
+        let inst = vec![
+            ("pid_1000_luid_0x0_0xCB35_phys_0_eng_0_engtype_3D".to_string(), 12.0),
+            ("pid_3000_luid_0x0_0xCB35_phys_0_eng_5_engtype_VideoEncode".to_string(), 100.0),
+        ];
+        assert_eq!(aggregate_render_utilization(&inst), Some(12.0));
+    }
+
+    #[test]
+    fn gpu_util_takes_the_busiest_render_node() {
+        // Two physical 3D engines: max across nodes (not a sum of the two).
+        let inst = vec![
+            ("pid_1_luid_0x0_0xA_phys_0_eng_0_engtype_3D".to_string(), 40.0),
+            ("pid_1_luid_0x0_0xA_phys_1_eng_0_engtype_3D".to_string(), 70.0),
+        ];
+        assert_eq!(aggregate_render_utilization(&inst), Some(70.0));
+    }
+
+    #[test]
+    fn gpu_util_is_none_without_a_render_engine() {
+        // Only non-render engines active → honest None ("—"), never a wrong
+        // fallback to the encode/copy figure.
+        let inst = vec![
+            ("pid_1_luid_0x0_0xA_phys_0_eng_5_engtype_VideoEncode".to_string(), 88.0),
+            ("pid_1_luid_0x0_0xA_phys_0_eng_4_engtype_Copy".to_string(), 30.0),
+        ];
+        assert_eq!(aggregate_render_utilization(&inst), None);
+    }
+
+    #[test]
+    fn gpu_util_clamps_counter_jitter_to_100() {
+        let node = "luid_0x0_0xA_phys_0_eng_0_engtype_3D";
+        let inst = vec![
+            (format!("pid_1_{node}"), 60.0),
+            (format!("pid_2_{node}"), 55.0), // sums to 115 (counter timing) → 100
+        ];
+        assert_eq!(aggregate_render_utilization(&inst), Some(100.0));
+    }
+
+    #[test]
+    fn engine_node_key_drops_the_pid_prefix() {
+        // Same physical engine, different processes → identical node key.
+        assert_eq!(
+            engine_node_key("pid_1000_luid_0x0_0xA_phys_0_eng_0_engtype_3D"),
+            engine_node_key("pid_2000_luid_0x0_0xA_phys_0_eng_0_engtype_3D"),
+        );
     }
 }
