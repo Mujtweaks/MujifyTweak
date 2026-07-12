@@ -323,6 +323,7 @@ pub fn run() {
             config::get_api_key,
             config::set_api_key,
             ai_backend::ai_chat,
+            ai_backend::stop_ai,
             ai_backend::save_ai_session,
             ai_backend::load_ai_session,
         ])

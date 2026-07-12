@@ -9,7 +9,18 @@
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::PathBuf;
+use std::sync::atomic::{AtomicBool, Ordering};
 use tauri::Emitter;
+
+/// Set by the UI's Stop button; checked between SSE chunks so an in-flight reply
+/// ends cleanly (drops the connection, emits `ai_done`) without a hard abort.
+static AI_CANCEL: AtomicBool = AtomicBool::new(false);
+
+/// Stop the current AI reply. Cheap + idempotent — a no-op if nothing's running.
+#[tauri::command]
+pub fn stop_ai() {
+    AI_CANCEL.store(true, Ordering::Relaxed);
+}
 
 /// One turn of the conversation as persisted to disk / sent to the model.
 #[derive(Serialize, Deserialize, Clone, Debug)]
@@ -125,6 +136,9 @@ pub async fn ai_chat(
     let key = super::config::get_api_key("nvidia".to_string())
         .ok_or_else(|| "The AI service isn't configured right now.".to_string())?;
 
+    // Fresh turn — clear any stale Stop from a previous reply.
+    AI_CANCEL.store(false, Ordering::Relaxed);
+
     let client = reqwest::Client::new();
 
     // Optional live web search — real Tavily results injected into context so the
@@ -165,7 +179,9 @@ pub async fn ai_chat(
             model: (*model).to_string(),
             messages: nim_messages.clone(),
             stream: true,
-            max_tokens: 1024,
+            // Headroom so a thorough answer isn't cut off mid-sentence (the old
+            // 1024 cap is the "stops randomly" the user saw on longer replies).
+            max_tokens: 2048,
             temperature: 0.7,
         };
         for attempt in 1..=MAX_ATTEMPTS {
@@ -260,6 +276,12 @@ async fn stream_once(
     let mut buf: Vec<u8> = Vec::new();
     let mut emitted = false;
     loop {
+        // User hit Stop — end the reply cleanly (dropping `response` closes the
+        // connection). Not retriable; we're done.
+        if AI_CANCEL.load(Ordering::Relaxed) {
+            let _ = app.emit("ai_done", ());
+            return Ok(());
+        }
         let chunk = match response.chunk().await {
             Ok(Some(c)) => c,
             Ok(None) => break, // stream ended without an explicit [DONE]

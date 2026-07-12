@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { Bot, ChevronsDown, ChevronsUp, Cpu, Globe, RotateCcw, Send, Sparkles, Zap } from "lucide-react";
+import { Bot, ChevronsDown, ChevronsUp, Cpu, Globe, RotateCcw, Send, Sparkles, Square, Zap } from "lucide-react";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import { invoke } from "@tauri-apps/api/core";
 import { nvidiaKey } from "../lib/aiConfig";
@@ -132,6 +132,8 @@ HOW TO TAILOR YOUR ADVICE TO THIS EXACT MACHINE:
 
 RULES:
 - Be specific and actionable. No vague advice.
+- Lead with the diagnosis: from the live usage %, temps, bottleneck and change log above, name the single most likely thing holding THIS machine back, then give the ONE highest-impact fix before any smaller ones. Don't dump ten tweaks — finding the one thing that matters is the whole point of this app.
+- Perspective on impact: on an already-healthy PC, software tweaks realistically add only a few percent. A real 20-60% win almost always comes from fixing a specific misconfiguration — RAM below its rated speed (XMP/EXPO off), thermal throttling, a background CPU hog, or a stale/missing GPU driver. Check for those first and prioritise them.
 - If the user asks you to change something, explain exactly what will change before doing it.
 - Never suggest anything that requires injection, driver modification, or bypassing anti-cheat.
 - Keep replies concise — 2-4 sentences unless the user explicitly asks for more detail.
@@ -407,13 +409,24 @@ export default function AIAssistant({ onNavigate }: { onNavigate: (page: PageId)
               >
                 <Globe size={13} strokeWidth={2} /> Web
               </button>
-              <button
-                onClick={() => void send(input)}
-                disabled={isLoading || !input.trim()}
-                className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-accent text-white hover:bg-accent-hi disabled:opacity-50"
-              >
-                <Send size={15} />
-              </button>
+              {isLoading ? (
+                <button
+                  onClick={() => void invoke("stop_ai")}
+                  title="Stop generating"
+                  aria-label="Stop generating"
+                  className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-txt3/25 text-txt transition-colors hover:bg-txt3/40"
+                >
+                  <Square size={12} fill="currentColor" />
+                </button>
+              ) : (
+                <button
+                  onClick={() => void send(input)}
+                  disabled={!input.trim()}
+                  className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-accent text-white hover:bg-accent-hi disabled:opacity-50"
+                >
+                  <Send size={15} />
+                </button>
+              )}
             </div>
           </div>
         </div>
