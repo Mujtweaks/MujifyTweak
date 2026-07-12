@@ -35,8 +35,8 @@ pub struct GameInfo {
 
 static RUNNING: AtomicBool = AtomicBool::new(false);
 
-/// Steam appids that are tools/runtimes/redistributables, not games — hidden
-/// from the library so they don't show as art-less tiles. (Read-only filter.)
+/// Steam appids that are tools/runtimes/redistributables/desktop-apps, not games
+/// — hidden from the library so they don't show as tiles. (Read-only filter.)
 const NON_GAME_APPIDS: &[&str] = &[
     "228980",  // Steamworks Common Redistributables
     "1070560", // Steam Linux Runtime 1.0 (scout)
@@ -45,7 +45,51 @@ const NON_GAME_APPIDS: &[&str] = &[
     "1493710", // Proton Experimental
     "1826330", // Proton EasyAntiCheat Runtime
     "2180100", // Proton Hotfix
+    "431960",  // Wallpaper Engine (desktop app, not a game)
+    "250820",  // SteamVR (runtime)
+    "1637140", // MyDockFinder (desktop app)
+    "223850",  // Steamworks Common (SDK)
 ];
+
+/// Non-game desktop apps that ship on game stores and would otherwise show as
+/// tiles. Matched as a lowercased substring of the title, across ALL scanners
+/// (so a store's name string still gets filtered even without a known appid).
+const NON_GAME_NAMES: &[&str] = &[
+    "wallpaper engine", "mydockfinder", "steamvr", "3dmark", "pcmark",
+    "aseprite", "obs studio", "blender", "bandicam", "voicemod", "rewasd",
+    "spacedesk", "lively wallpaper", "cheat engine", "wemod", "wallpaper",
+    "dock finder", "rivatuner", "msi afterburner", "razer", "logitech g hub",
+];
+
+/// True if a title is a known non-game desktop app (Wallpaper Engine, docks, …).
+fn is_non_game_name(name: &str) -> bool {
+    let n = name.to_lowercase();
+    NON_GAME_NAMES.iter().any(|x| n.contains(x))
+}
+
+/// Normalized de-dup key: lowercase, separators→space, whitespace collapsed —
+/// so "Watch Dogs", "Watch_Dogs" and "watch-dogs" all count as one title.
+fn norm_name(name: &str) -> String {
+    name.to_lowercase()
+        .replace(['_', '-', ':', '™', '®'], " ")
+        .split_whitespace()
+        .collect::<Vec<_>>()
+        .join(" ")
+}
+
+/// Add a game to the library unless it's a non-game app or a duplicate of one
+/// already found (by normalized name). The single choke-point every scanner
+/// pushes through, so filtering + de-dup can't drift between them.
+fn push_unique(games: &mut Vec<GameInfo>, g: GameInfo) {
+    if g.name.trim().is_empty() || is_non_game_name(&g.name) {
+        return;
+    }
+    let key = norm_name(&g.name);
+    if games.iter().any(|x| norm_name(&x.name) == key) {
+        return;
+    }
+    games.push(g);
+}
 
 fn stem_of(process_name: &str) -> String {
     process_name
@@ -130,6 +174,10 @@ fn game_from_running(exe_path: &str, stem: &str) -> Option<GameInfo> {
         .map(|s| s.to_string())
         .or_else(|| game_name_from_path(exe_path))
         .unwrap_or_else(|| titleize(stem));
+    // A desktop app living in a library folder (e.g. Wallpaper Engine) is not a game.
+    if is_non_game_name(&name) {
+        return None;
+    }
     Some(GameInfo {
         name,
         exe: format!("{stem}.exe"),
@@ -283,21 +331,19 @@ fn scan_steam(games: &mut Vec<GameInfo>) {
                 let title = field("name");
                 let installdir = field("installdir");
                 if let Some(title) = title {
-                    if !games.iter().any(|g| g.name == title) {
-                        // Precise per-game folder (…\common\<installdir>) so the
-                        // engine profiler can scan the right directory, not all of common.
-                        let install_path = match &installdir {
-                            Some(d) => steamapps.join("common").join(d),
-                            None => steamapps.join("common"),
-                        };
-                        games.push(GameInfo {
-                            name: title,
-                            exe: String::new(),
-                            launcher: Some("Steam".into()),
-                            install_path: Some(install_path.to_string_lossy().into()),
-                            app_id: if app_id.is_empty() { None } else { Some(app_id) },
-                        });
-                    }
+                    // Precise per-game folder (…\common\<installdir>) so the
+                    // engine profiler can scan the right directory, not all of common.
+                    let install_path = match &installdir {
+                        Some(d) => steamapps.join("common").join(d),
+                        None => steamapps.join("common"),
+                    };
+                    push_unique(games, GameInfo {
+                        name: title,
+                        exe: String::new(),
+                        launcher: Some("Steam".into()),
+                        install_path: Some(install_path.to_string_lossy().into()),
+                        app_id: if app_id.is_empty() { None } else { Some(app_id) },
+                    });
                 }
             }
         }
@@ -322,22 +368,20 @@ fn scan_epic(games: &mut Vec<GameInfo>) {
             if let Ok(text) = std::fs::read_to_string(entry.path()) {
                 if let Ok(json) = serde_json::from_str::<serde_json::Value>(&text) {
                     if let Some(title) = json.get("DisplayName").and_then(|v| v.as_str()) {
-                        if !games.iter().any(|g| g.name == title) {
-                            games.push(GameInfo {
-                                name: title.to_string(),
-                                exe: json
-                                    .get("LaunchExecutable")
-                                    .and_then(|v| v.as_str())
-                                    .unwrap_or("")
-                                    .to_string(),
-                                launcher: Some("Epic".into()),
-                                install_path: json
-                                    .get("InstallLocation")
-                                    .and_then(|v| v.as_str())
-                                    .map(|s| s.to_string()),
-                                app_id: None,
-                            });
-                        }
+                        push_unique(games, GameInfo {
+                            name: title.to_string(),
+                            exe: json
+                                .get("LaunchExecutable")
+                                .and_then(|v| v.as_str())
+                                .unwrap_or("")
+                                .to_string(),
+                            launcher: Some("Epic".into()),
+                            install_path: json
+                                .get("InstallLocation")
+                                .and_then(|v| v.as_str())
+                                .map(|s| s.to_string()),
+                            app_id: None,
+                        });
                     }
                 }
             }
@@ -358,15 +402,13 @@ fn scan_gog(games: &mut Vec<GameInfo>) {
         let name: Option<String> = k.get_value("gameName").ok();
         let path: Option<String> = k.get_value("path").ok();
         if let Some(name) = name {
-            if !games.iter().any(|g| g.name.eq_ignore_ascii_case(&name)) {
-                games.push(GameInfo {
-                    name,
-                    exe: String::new(),
-                    launcher: Some("GOG".into()),
-                    install_path: path,
-                    app_id: None,
-                });
-            }
+            push_unique(games, GameInfo {
+                name,
+                exe: String::new(),
+                launcher: Some("GOG".into()),
+                install_path: path,
+                app_id: None,
+            });
         }
     }
 }
@@ -390,15 +432,13 @@ fn scan_ubisoft(games: &mut Vec<GameInfo>) {
                 .next()
                 .map(titleize)
                 .unwrap_or_else(|| "Ubisoft Game".into());
-            if !games.iter().any(|g| g.name.eq_ignore_ascii_case(&name)) {
-                games.push(GameInfo {
-                    name,
-                    exe: String::new(),
-                    launcher: Some("Ubisoft".into()),
-                    install_path: Some(dir),
-                    app_id: None,
-                });
-            }
+            push_unique(games, GameInfo {
+                name,
+                exe: String::new(),
+                launcher: Some("Ubisoft".into()),
+                install_path: Some(dir),
+                app_id: None,
+            });
         }
     }
 }
@@ -488,10 +528,9 @@ fn scan_uninstall_registry(games: &mut Vec<GameInfo>) {
             if !is_probable_game(&name, &publisher, &install_location) {
                 continue;
             }
-            if games.iter().any(|g| g.name.eq_ignore_ascii_case(&name)) {
-                continue; // already found by a more precise scanner
-            }
-            games.push(GameInfo {
+            // push_unique handles both "already found by a more precise scanner"
+            // (normalized-name de-dup) and non-game filtering.
+            push_unique(games, GameInfo {
                 name,
                 exe: String::new(),
                 launcher: Some(if publisher.trim().is_empty() { "Installed".into() } else { publisher }),
@@ -534,11 +573,38 @@ mod tests {
     use super::*;
 
     #[test]
-    fn redistributables_are_filtered_but_real_games_are_not() {
-        // The known Steamworks redistributable must be hidden from the library…
+    fn redistributables_and_desktop_apps_are_filtered_but_real_games_are_not() {
+        // Redistributables + desktop apps (Wallpaper Engine) must be hidden…
         assert!(NON_GAME_APPIDS.contains(&"228980"));
-        // …while real games (e.g. Wallpaper Engine 431960) must not be.
-        assert!(!NON_GAME_APPIDS.contains(&"431960"));
+        assert!(NON_GAME_APPIDS.contains(&"431960")); // Wallpaper Engine
+        // …while real games (e.g. Dota 2 = 570, CS2 = 730) must not be.
+        assert!(!NON_GAME_APPIDS.contains(&"570"));
+        assert!(!NON_GAME_APPIDS.contains(&"730"));
+    }
+
+    #[test]
+    fn non_game_desktop_apps_are_filtered_by_name() {
+        assert!(is_non_game_name("Wallpaper Engine"));
+        assert!(is_non_game_name("MyDockFinder"));
+        assert!(is_non_game_name("SteamVR"));
+        // A real game with an innocuous name is not swept in.
+        assert!(!is_non_game_name("Watch Dogs"));
+        assert!(!is_non_game_name("Combat Master"));
+    }
+
+    #[test]
+    fn push_unique_dedupes_across_separator_variants_and_filters_non_games() {
+        let mut games = Vec::new();
+        let mk = |n: &str| GameInfo {
+            name: n.to_string(), exe: String::new(), launcher: None,
+            install_path: None, app_id: None,
+        };
+        push_unique(&mut games, mk("Watch Dogs"));
+        push_unique(&mut games, mk("Watch_Dogs")); // same title, different separator
+        push_unique(&mut games, mk("watch-dogs")); // same again
+        push_unique(&mut games, mk("Wallpaper Engine")); // non-game, must be dropped
+        assert_eq!(games.len(), 1, "Watch Dogs variants collapse to one, no non-games");
+        assert_eq!(games[0].name, "Watch Dogs");
     }
 
     #[test]
