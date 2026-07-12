@@ -1,7 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
-import { FileSearch, FolderOpen, HardDrive, Loader2, Sparkles, Trash2, X } from "lucide-react";
+import { FileSearch, FolderOpen, HardDrive, Loader2, MemoryStick, Sparkles, Trash2, X, Zap } from "lucide-react";
 import {
   cleanJunk,
+  optimizeRam,
+  ramStatus,
   revealInExplorer,
   scanDuplicateFiles,
   scanJunk,
@@ -9,7 +11,7 @@ import {
 } from "../lib/backend";
 import { toast } from "../store/toastStore";
 import DebloatSection from "../components/DebloatSection";
-import type { DupGroup, JunkCategory, LargeFile } from "../lib/types";
+import type { DupGroup, JunkCategory, LargeFile, RamStatus } from "../lib/types";
 
 function fmtBytes(n: number): string {
   if (n <= 0) return "0 B";
@@ -19,6 +21,30 @@ function fmtBytes(n: number): string {
 }
 
 export default function Cleaner() {
+  // ---- RAM optimizer ----
+  const [ram, setRam] = useState<RamStatus | null>(null);
+  const [optimizing, setOptimizing] = useState(false);
+  const loadRam = async () => setRam(await ramStatus());
+  useEffect(() => {
+    void loadRam();
+    const t = setInterval(() => void loadRam(), 4000);
+    return () => clearInterval(t);
+  }, []);
+  const doOptimizeRam = async () => {
+    setOptimizing(true);
+    const res = await optimizeRam();
+    setOptimizing(false);
+    if (res) {
+      toast.success(
+        res.freedMb > 0 ? `Freed ${res.freedMb.toLocaleString()} MB of RAM` : "RAM already lean",
+        res.freedMb > 0
+          ? `${res.afterAvailableMb.toLocaleString()} MB now available (trimmed ${res.processesTrimmed} processes).`
+          : "Nothing meaningful to reclaim right now — your memory is already tight-packed.",
+      );
+      void loadRam();
+    }
+  };
+
   // ---- Junk scan ----
   const [junk, setJunk] = useState<JunkCategory[] | null>(null);
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -99,6 +125,48 @@ export default function Cleaner() {
           only regenerable caches are ever touched.
         </p>
       </div>
+
+      {/* ---- RAM optimizer ---- */}
+      <section className="rounded-2xl border border-edge bg-card p-5">
+        <div className="flex items-center justify-between gap-4">
+          <div className="flex items-center gap-2.5">
+            <span className="grid h-10 w-10 place-items-center rounded-xl bg-indigo-500/15">
+              <MemoryStick size={20} strokeWidth={1.75} className="text-indigo-400" />
+            </span>
+            <div>
+              <h2 className="text-[16px] font-bold text-txt">Free up memory</h2>
+              <p className="text-[11.5px] text-txt2">
+                {ram
+                  ? `${ram.availableMb.toLocaleString()} MB free of ${ram.totalMb.toLocaleString()} MB`
+                  : "Reading memory…"}
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={() => void doOptimizeRam()}
+            disabled={optimizing || !ram}
+            className="glint flex items-center gap-2 rounded-btn bg-accent px-5 py-2.5 text-[13px] font-semibold text-white shadow-[0_4px_20px_rgba(227,0,14,0.3)] hover:bg-accent-hi disabled:opacity-40"
+          >
+            {optimizing ? <Loader2 size={14} className="animate-spin" /> : <Zap size={14} strokeWidth={2.5} fill="currentColor" />}
+            {optimizing ? "Optimizing…" : "Optimize RAM"}
+          </button>
+        </div>
+        {ram && (
+          <>
+            <div className="mt-4 h-2 overflow-hidden rounded-full bg-bg">
+              <div
+                className={`h-full rounded-full transition-all ${ram.usedPercent > 85 ? "bg-accent" : ram.usedPercent > 65 ? "bg-warning" : "bg-success"}`}
+                style={{ width: `${Math.min(ram.usedPercent, 100)}%` }}
+              />
+            </div>
+            <p className="mt-1.5 text-[11px] leading-snug text-txt3">
+              {ram.usedMb.toLocaleString()} MB in use ({ram.usedPercent.toFixed(0)}%). Trimming hands cached pages
+              back to Windows — a running game may hitch for a second as it re-pages, so do this before you launch,
+              not mid-match.
+            </p>
+          </>
+        )}
+      </section>
 
       {/* ---- Junk / cache scan ---- */}
       <section>

@@ -13,7 +13,7 @@
 use serde::Serialize;
 
 use super::system_mutator::{RealMutator, RegHive, SystemMutator};
-use super::{power_util, system_monitor, wmi_util};
+use super::{hardware_profiler, power_util, system_monitor, wmi_util};
 
 #[derive(Serialize, Clone)]
 #[serde(rename_all = "camelCase")]
@@ -45,6 +45,8 @@ pub struct SystemHealthReport {
 pub struct HealthInputs {
     pub ram_current_mhz: Option<u32>,
     pub ram_rated_mhz: Option<u32>,
+    /// "intel" | "amd" | other — picks the right memory-profile name (XMP/EXPO).
+    pub cpu_vendor: Option<String>,
     pub refresh_current_hz: Option<u32>,
     pub refresh_max_hz: Option<u32>,
     pub gpu_driver_age_days: Option<i64>,
@@ -69,13 +71,29 @@ fn finding(id: &str, title: &str, detail: &str, severity: &str, fps_cost: &str, 
 
 // ---- Pure classifiers (unit-tested) ----
 
+/// Intel's memory-overclock profile is XMP; AMD's is EXPO (older boards: DOCP).
+/// Naming the user's actual one makes the BIOS instructions findable.
+fn memory_profile_name(cpu_vendor: Option<&str>) -> &'static str {
+    match cpu_vendor.map(|v| v.to_lowercase()) {
+        Some(v) if v.contains("intel") => "XMP",
+        Some(v) if v.contains("amd") => "EXPO",
+        _ => "XMP/EXPO",
+    }
+}
+
 fn classify_ram(i: &HealthInputs) -> Option<HealthFinding> {
     let (cur, rated) = (i.ram_current_mhz?, i.ram_rated_mhz?);
     if rated > 0 && cur > 0 && (cur as f32) < (rated as f32) * 0.95 {
+        let p = memory_profile_name(i.cpu_vendor.as_deref());
         Some(finding(
             "ram_xmp",
             "RAM is running below its rated speed",
-            &format!("Running at {cur} MHz but rated for {rated} MHz — XMP/EXPO is almost certainly off in BIOS."),
+            &format!(
+                "Running at {cur} MHz but rated for {rated} MHz — {p} is off in BIOS. \
+                 To enable it: restart, open BIOS/UEFI (usually Del or F2 during boot), \
+                 find the {p} / memory profile setting, select the rated profile, then save & exit. \
+                 Mujify can't change this for you — it's a BIOS-only setting, by design."
+            ),
             "critical",
             "10-30% (RAM-sensitive games)",
             "bios",
@@ -410,6 +428,15 @@ pub fn scan_system_health(
         inp.gpu_driver_age_days = age;
         inp.has_discrete_gpu = discrete;
     }
+    // Vendor drives the XMP-vs-EXPO wording in the RAM finding.
+    let cpu = hardware_profiler::get_hardware_profile().cpu_name.to_lowercase();
+    inp.cpu_vendor = Some(if cpu.contains("intel") {
+        "intel".into()
+    } else if cpu.contains("amd") {
+        "amd".into()
+    } else {
+        String::new()
+    });
     inp.power_plan = power_util::active_power_plan_name();
     inp.top_process = gather_top_process();
     inp.cpu_temp_c = system_monitor::latest().and_then(|s| s.cpu_temp_c);
@@ -442,6 +469,24 @@ mod tests {
         assert!(classify_ram(&i).is_some());
         i.ram_current_mhz = Some(3200);
         assert!(classify_ram(&i).is_none());
+    }
+
+    #[test]
+    fn memory_profile_name_matches_the_cpu_vendor() {
+        assert_eq!(memory_profile_name(Some("Intel")), "XMP");
+        assert_eq!(memory_profile_name(Some("amd ryzen")), "EXPO");
+        assert_eq!(memory_profile_name(None), "XMP/EXPO");
+        // The advisory text names the vendor's actual profile + says it's BIOS-only.
+        let i = HealthInputs {
+            ram_current_mhz: Some(4800),
+            ram_rated_mhz: Some(8533),
+            cpu_vendor: Some("intel".into()),
+            ..Default::default()
+        };
+        let f = classify_ram(&i).unwrap();
+        assert_eq!(f.fixable, "bios");
+        assert!(f.detail.contains("XMP"));
+        assert!(f.detail.contains("BIOS-only"));
     }
 
     #[test]

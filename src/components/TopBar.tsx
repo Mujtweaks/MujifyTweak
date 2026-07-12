@@ -70,8 +70,12 @@ export default function TopBar({ page, onNavigate }: TopBarProps) {
       </div>
 
       <div className="flex items-center gap-0.5 pl-1">
-        <button onClick={() => void openExternal(DISCORD_INVITE)} title="Free live support" className="grid h-9 w-9 place-items-center rounded-btn text-txt3 transition-colors hover:bg-white/5 hover:text-txt">
-          <DiscordIcon className="h-4 w-4 [&_path]:fill-current" />
+        <button
+          onClick={() => void openExternal(DISCORD_INVITE)}
+          title="Join the Discord — free live help"
+          className="wiggle mr-1 flex items-center gap-1.5 rounded-btn bg-[#5865F2] px-3 py-1.5 text-[12.5px] font-bold text-white transition-colors hover:bg-[#4752c4]"
+        >
+          <DiscordIcon className="h-4 w-4 [&_path]:fill-current" /> Join
         </button>
         <button onClick={() => onNavigate("changelog")} title="Recent changes" className="grid h-9 w-9 place-items-center rounded-btn text-txt3 transition-colors hover:bg-white/5 hover:text-txt">
           <Bell size={16} strokeWidth={1.75} />

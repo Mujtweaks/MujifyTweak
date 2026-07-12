@@ -30,6 +30,7 @@ pub mod logger;
 pub mod network_monitor;
 pub mod power_util;
 pub mod profile_store;
+pub mod ram_optimizer;
 pub mod ready_check;
 pub mod restore_points;
 pub mod rollback_engine;

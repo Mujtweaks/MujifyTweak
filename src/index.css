@@ -168,6 +168,54 @@ textarea {
   animation: glowPulse 2.4s ease-in-out infinite;
 }
 
+/* Periodic attention wiggle — the Discord "Join" CTA. Motion sits in the last
+   ~12% of the cycle so it nudges every few seconds instead of shaking nonstop. */
+@keyframes wiggle {
+  0%,
+  88%,
+  100% {
+    transform: rotate(0deg);
+  }
+  90% {
+    transform: rotate(-7deg);
+  }
+  93% {
+    transform: rotate(6deg);
+  }
+  96% {
+    transform: rotate(-4deg);
+  }
+  98% {
+    transform: rotate(2deg);
+  }
+}
+.wiggle {
+  animation: wiggle 4.5s ease-in-out infinite;
+}
+
+/* One-shot horizontal shake — unsaved changes / invalid action. */
+@keyframes shake {
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+  20% {
+    transform: translateX(-6px);
+  }
+  40% {
+    transform: translateX(6px);
+  }
+  60% {
+    transform: translateX(-4px);
+  }
+  80% {
+    transform: translateX(4px);
+  }
+}
+.shake {
+  animation: shake 0.4s ease-in-out;
+}
+
 /* Slow branded rotation for the updater "installing" state. */
 @keyframes spinSlow {
   to {

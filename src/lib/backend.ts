@@ -18,6 +18,8 @@ import type {
   LargeFile,
   DupGroup,
   CleanResult,
+  RamStatus,
+  RamOptimizeResult,
   RestorePoint,
   FixInfo,
   HardwareProfile,
@@ -414,6 +416,32 @@ export async function revealInExplorer(path: string): Promise<void> {
     await invoke("reveal_in_explorer", { path });
   } catch (err) {
     console.error("reveal_in_explorer failed:", err);
+  }
+}
+
+// ---- RAM Optimizer (status read-only; optimize confirm-gated) ----
+
+/** Read-only live memory status. */
+export async function ramStatus(): Promise<RamStatus | null> {
+  if (!isTauri) return null;
+  try {
+    return await invoke<RamStatus>("ram_status");
+  } catch (err) {
+    console.error("ram_status failed:", err);
+    return null;
+  }
+}
+
+/** Trim process working sets and report the REAL freed-memory delta. Only ever
+ *  called on the user's explicit click. */
+export async function optimizeRam(): Promise<RamOptimizeResult | null> {
+  if (!isTauri) return null;
+  try {
+    return await invoke<RamOptimizeResult>("optimize_ram", { confirm: true });
+  } catch (err) {
+    console.error("optimize_ram failed:", err);
+    toast.errorHelp("RAM optimize failed", String(err));
+    return null;
   }
 }
 

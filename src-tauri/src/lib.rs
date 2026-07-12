@@ -27,7 +27,7 @@ use modules::{
     ai_backend, auto_apply, benchmark, change_journal, change_log, cleaner, config, debloat,
     driver_doctor, fix_catalog,
     game_detector, game_profiler, game_profiles, game_settings, hardware_profiler, hardware_tier,
-    health_scan, logger, network_monitor, profile_store, ready_check, restore_points,
+    health_scan, logger, network_monitor, profile_store, ram_optimizer, ready_check, restore_points,
     rollback_engine, server_ping, sessions, speed_test, support, system_monitor, tweak_catalog,
     tweaks_engine,
 };
@@ -293,6 +293,8 @@ pub fn run() {
             cleaner::scan_duplicate_files,
             cleaner::clean_junk,
             cleaner::reveal_in_explorer,
+            ram_optimizer::ram_status,
+            ram_optimizer::optimize_ram,
             restore_points::list_restore_points,
             restore_points::restore_protection_enabled,
             restore_points::create_restore_point,

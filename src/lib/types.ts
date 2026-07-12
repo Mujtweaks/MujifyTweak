@@ -106,6 +106,22 @@ export interface CleanResult {
   partial: string[];
 }
 
+/** RAM Optimizer — live physical-memory status (read-only). */
+export interface RamStatus {
+  totalMb: number;
+  usedMb: number;
+  availableMb: number;
+  usedPercent: number;
+}
+
+/** RAM Optimizer — real freed-memory result after a confirmed trim. */
+export interface RamOptimizeResult {
+  freedMb: number;
+  beforeAvailableMb: number;
+  afterAvailableMb: number;
+  processesTrimmed: number;
+}
+
 /** One graphics adapter. */
 export interface GpuInfo {
   name: string;
