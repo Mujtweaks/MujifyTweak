@@ -460,7 +460,8 @@ const GAME_PUBLISHERS: &[&str] = &[
     "mojang", "mojang studios", "amazon games", "wb games", "warner bros. games",
     "paradox interactive", "focus entertainment", "team17", "devolver digital",
     "thq nordic", "koei tecmo", "respawn entertainment", "insomniac games",
-    "id software", "eidos", "annapurna interactive",
+    "id software", "eidos", "annapurna interactive", "roblox", "mojang",
+    "hoyoverse", "mihoyo", "innersloth", "krafton", "pubg", "epic games",
 ];
 
 /// Uninstall-entry DisplayNames that are launchers/clients themselves (exact
@@ -553,6 +554,37 @@ fn scan_uninstall_registry(games: &mut Vec<GameInfo>) {
     scan_one(&hkcu, r"SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall", games);
 }
 
+/// Popular games installed OUTSIDE the standard launchers — Roblox, Minecraft
+/// (Java + Bedrock/UWP), etc. — detected by their well-known install folder
+/// existing. They don't appear in Steam/Epic/GOG manifests or the uninstall
+/// registry with a recognisable publisher, so they'd be missed otherwise.
+/// (display name, env var, subpath that proves it's installed). Read-only.
+const STANDALONE_GAMES: &[(&str, &str, &str)] = &[
+    ("Roblox", "LOCALAPPDATA", r"Roblox\Versions"),
+    ("Minecraft", "APPDATA", r".minecraft"),
+    ("Minecraft", "LOCALAPPDATA", r"Packages\Microsoft.MinecraftUWP_8wekyb3d8bbwe"),
+    ("Minecraft Legends", "LOCALAPPDATA", r"Packages\Microsoft.MinecraftEducationEdition_8wekyb3d8bbwe"),
+    ("Fortnite", "PROGRAMFILES", r"Epic Games\Fortnite"),
+    ("VALORANT", "PROGRAMFILES", r"Riot Games\VALORANT"),
+    ("League of Legends", "PROGRAMFILES", r"Riot Games\League of Legends"),
+];
+
+fn scan_standalone(games: &mut Vec<GameInfo>) {
+    for (name, var, sub) in STANDALONE_GAMES {
+        let Ok(base) = std::env::var(var) else { continue };
+        let path = PathBuf::from(base).join(sub);
+        if path.exists() {
+            push_unique(games, GameInfo {
+                name: (*name).to_string(),
+                exe: String::new(),
+                launcher: Some("Installed".into()),
+                install_path: Some(path.to_string_lossy().into()),
+                app_id: None,
+            });
+        }
+    }
+}
+
 /// Read-only scan across installed libraries. No launches, no modifications.
 /// Steam + Epic + GOG + Ubisoft are read directly for precise metadata (install
 /// path, Steam appid for header art); the Uninstall-registry catch-all then adds
@@ -569,6 +601,7 @@ pub fn get_installed_games() -> Vec<GameInfo> {
     scan_gog(&mut games);
     scan_ubisoft(&mut games);
     scan_uninstall_registry(&mut games);
+    scan_standalone(&mut games);
     games.sort_by_key(|g| g.name.to_lowercase());
     games.truncate(300);
     games
@@ -627,6 +660,17 @@ mod tests {
         // …while real games (e.g. Dota 2 = 570, CS2 = 730) must not be.
         assert!(!NON_GAME_APPIDS.contains(&"570"));
         assert!(!NON_GAME_APPIDS.contains(&"730"));
+    }
+
+    #[test]
+    fn standalone_and_publisher_coverage_includes_common_games() {
+        // The launcher-less games users kept saying were missing must be covered.
+        let names: Vec<&str> = STANDALONE_GAMES.iter().map(|(n, _, _)| *n).collect();
+        assert!(names.contains(&"Roblox"));
+        assert!(names.contains(&"Minecraft"));
+        // Their publishers are recognised too (for the uninstall-registry path).
+        assert!(is_probable_game("Roblox", "Roblox Corporation", ""));
+        assert!(is_probable_game("Minecraft Launcher", "Mojang", ""));
     }
 
     #[test]
