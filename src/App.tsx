@@ -160,9 +160,9 @@ export default function App() {
       case "profile-editor":
         return <ProfileEditor />;
       case "overview":
-        return <Overview />;
+        return <Overview onNavigate={navigate} />;
       case "gpu":
-        return <Gpu />;
+        return <Gpu onNavigate={navigate} />;
       case "diagnostics":
         return <Diagnostics />;
       case "network":
