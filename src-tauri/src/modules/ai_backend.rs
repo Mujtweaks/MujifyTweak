@@ -133,8 +133,12 @@ pub async fn ai_chat(
     system_prompt: String,
     web_search: bool,
 ) -> Result<(), String> {
-    let key = super::config::get_api_key("nvidia".to_string())
-        .ok_or_else(|| "The AI service isn't configured right now.".to_string())?;
+    // The user's own key (the owner default baked into a personal build, OR a
+    // Settings override) goes DIRECT to NVIDIA. If there's none — which is the
+    // case for the public build, which ships NO key — we route through Mujify's
+    // proxy Worker, which adds the key server-side. So the public app has a
+    // working AI without the key ever living inside the installer.
+    let key = super::config::get_api_key("nvidia".to_string());
 
     // Fresh turn — clear any stale Stop from a previous reply.
     AI_CANCEL.store(false, Ordering::Relaxed);
@@ -185,7 +189,7 @@ pub async fn ai_chat(
             temperature: 0.7,
         };
         for attempt in 1..=MAX_ATTEMPTS {
-            match stream_once(&app, &client, &key, &body).await {
+            match stream_once(&app, &client, key.as_deref(), &body).await {
                 Ok(()) => return Ok(()),
                 // A rejected model → try the next model in the list (if any).
                 Err(e) if e.try_next_model && mi + 1 < NIM_MODELS.len() => {
@@ -236,14 +240,21 @@ fn busy_msg() -> String {
 async fn stream_once(
     app: &tauri::AppHandle,
     client: &reqwest::Client,
-    key: &str,
+    key: Option<&str>,
     body: &NimRequest,
 ) -> Result<(), AiErr> {
-    let mut response = client
-        .post("https://integrate.api.nvidia.com/v1/chat/completions")
-        .header("Authorization", format!("Bearer {key}"))
+    // With a key → straight to NVIDIA. Without → the Mujify proxy Worker, which
+    // supplies the key server-side (public build). Same streaming SSE either way.
+    const NVIDIA_URL: &str = "https://integrate.api.nvidia.com/v1/chat/completions";
+    const PROXY_URL: &str = "https://mujify-stats.cheaplabs2-4b2.workers.dev/ai";
+    let mut builder = client
+        .post(if key.is_some() { NVIDIA_URL } else { PROXY_URL })
         .header("Content-Type", "application/json")
-        .json(body)
+        .json(body);
+    if let Some(k) = key {
+        builder = builder.header("Authorization", format!("Bearer {k}"));
+    }
+    let mut response = builder
         .send()
         .await
         .map_err(|e| AiErr {
