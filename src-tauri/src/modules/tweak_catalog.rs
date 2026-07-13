@@ -178,76 +178,17 @@ const CATALOG: &[TweakDef] = &[
     TweakDef { id: "disable_consumer_features", title: "Disable Auto-Installed Promo Apps", description: "Stops Windows from silently installing promoted/suggested apps (Candy Crush and friends) on your account.", category: Appearance, risk: Safe, impact: 2 },
 ];
 
-/// Read-only: is the active power plan already High/Ultimate Performance?
-fn high_perf_active() -> bool {
-    super::power_util::active_power_plan_name()
-        .map(|n| {
-            let n = n.to_lowercase();
-            n.contains("high performance") || n.contains("ultimate")
-        })
-        .unwrap_or(false)
-}
-
-fn game_bar_disabled() -> bool {
-    use winreg::enums::HKEY_CURRENT_USER;
-    use winreg::RegKey;
-    RegKey::predef(HKEY_CURRENT_USER)
-        .open_subkey(r"Software\Microsoft\GameBar")
-        .and_then(|k| k.get_value::<u32, _>("AppCaptureEnabled"))
-        .map(|v| v == 0)
-        .unwrap_or(false)
-}
-
-fn mouse_accel_off() -> bool {
-    use winreg::enums::HKEY_CURRENT_USER;
-    use winreg::RegKey;
-    // Acceleration is only truly off when MouseSpeed AND both thresholds are 0.
-    let Ok(key) = RegKey::predef(HKEY_CURRENT_USER).open_subkey(r"Control Panel\Mouse") else {
-        return false;
-    };
-    let is_zero = |name: &str| {
-        key.get_value::<String, _>(name)
-            .map(|v| v.trim() == "0")
-            .unwrap_or(false)
-    };
-    is_zero("MouseSpeed") && is_zero("MouseThreshold1") && is_zero("MouseThreshold2")
-}
-
-/// Read-only: is Recall snapshotting already disabled by policy? True when any
-/// of the documented policy values is set (per-user or machine-wide).
-fn recall_disabled() -> bool {
-    use winreg::enums::{HKEY_CURRENT_USER, HKEY_LOCAL_MACHINE};
-    use winreg::RegKey;
-    let dw = |hive, path: &str, name: &str| {
-        RegKey::predef(hive)
-            .open_subkey(path)
-            .and_then(|k| k.get_value::<u32, _>(name))
-            .ok()
-    };
-    dw(HKEY_CURRENT_USER, r"Software\Policies\Microsoft\Windows\WindowsAI", "DisableAIDataAnalysis") == Some(1)
-        || dw(HKEY_LOCAL_MACHINE, r"SOFTWARE\Policies\Microsoft\Windows\WindowsAI", "DisableAIDataAnalysis") == Some(1)
-        || dw(HKEY_LOCAL_MACHINE, r"SOFTWARE\Policies\Microsoft\Windows\WindowsAI", "AllowRecallEnablement") == Some(0)
-}
-
 /// Scan current state and report per-tweak applied/available + category rollups.
 /// Reads only — nothing is changed on the system.
 #[tauri::command]
 pub fn scan_tweaks(is_laptop: Option<bool>) -> ScanResult {
-    let hp = high_perf_active();
-    let gb = game_bar_disabled();
-    let ma = mouse_accel_off();
-    let rc = recall_disabled();
-
     let tweaks: Vec<TweakInfo> = CATALOG
         .iter()
         .map(|d| {
-            let applied = match d.id {
-                "power_high_perf" | "power_ultimate" => hp,
-                "disable_game_bar" | "disable_gamedvr" => gb,
-                "mouse_accel_off" => ma,
-                "disable_recall" => rc,
-                _ => false,
-            };
+            // Real detection for EVERY tweak: reads the live registry/system state
+            // its ops target and reports whether it's already present — instead of
+            // the old hardcoded 6-tweak check. Scan-only tweaks report not-applied.
+            let applied = super::tweak_ops::is_applied(d.id);
             let available = !(d.id == "power_ultimate" && is_laptop == Some(true));
             TweakInfo {
                 id: d.id.to_string(),

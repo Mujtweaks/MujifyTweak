@@ -13,7 +13,7 @@
 
 use serde::{Deserialize, Serialize};
 
-use super::system_mutator::{DisplayMode, RegHive, ServiceState, SystemMutator};
+use super::system_mutator::{DisplayMode, RealMutator, RegHive, ServiceState, SystemMutator};
 
 /// Windows "High performance" power scheme — a well-known fixed GUID.
 pub const HIGH_PERF_GUID: &str = "8c5e7fda-e8bf-4a96-9a85-a6e23a8c635c";
@@ -446,6 +446,77 @@ pub fn is_appliable(tweak_id: &str) -> bool {
     !ops_for(tweak_id).is_empty()
 }
 
+/// Best-effort detection: is this tweak's target state ALREADY present on the
+/// system? Driven by the very same ops the tweak would write — we read each op's
+/// target and check it already matches. Ops that aren't a persistent, readable
+/// state (one-shot commands, file edits, GPU-vendor writes resolved at apply
+/// time, service changes) are not checked; a tweak made ONLY of those reports
+/// not-applied rather than guessing. `checked` guards against a tweak of purely
+/// undetectable ops returning a vacuous "true".
+pub fn is_applied_with(m: &dyn SystemMutator, id: &str) -> bool {
+    let ops = ops_for(id);
+    if ops.is_empty() {
+        return false;
+    }
+    let mut checked = false;
+    for op in &ops {
+        match op {
+            Op::Dword { hive, path, name, value } => {
+                checked = true;
+                if m.get_dword(*hive, path, name) != Some(*value) {
+                    return false;
+                }
+            }
+            Op::Sz { hive, path, name, value } => {
+                checked = true;
+                if m.get_sz(*hive, path, name).as_deref() != Some(*value) {
+                    return false;
+                }
+            }
+            Op::PowerPlan { guid } => {
+                checked = true;
+                match m.active_power_plan_guid() {
+                    Some(active) if active.eq_ignore_ascii_case(guid) => {}
+                    _ => return false,
+                }
+            }
+            Op::DwordAllInterfaces { name, value } => {
+                let subs = m.list_subkeys(Hklm, TCP_INTERFACES);
+                if subs.is_empty() {
+                    return false;
+                }
+                checked = true;
+                for sub in subs {
+                    let path = format!(r"{TCP_INTERFACES}\{sub}");
+                    if m.get_dword(Hklm, &path, name) != Some(*value) {
+                        return false;
+                    }
+                }
+            }
+            Op::MemoryCompression { enable } => {
+                checked = true;
+                if m.get_memory_compression() != Some(*enable) {
+                    return false;
+                }
+            }
+            Op::CoreParking { min_percent } => {
+                checked = true;
+                if m.get_core_parking_min() != Some(*min_percent) {
+                    return false;
+                }
+            }
+            // Not a persistent, readable state — can't confirm "applied" from here.
+            _ => {}
+        }
+    }
+    checked
+}
+
+/// Live-system convenience wrapper over [`is_applied_with`].
+pub fn is_applied(id: &str) -> bool {
+    is_applied_with(&RealMutator, id)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -506,6 +577,24 @@ mod tests {
         for id in ["visual_fx_performance", "disable_transparency", "dark_mode", "hide_task_view", "taskbar_end_task", "disable_bing_search", "disable_consumer_features"] {
             assert!(is_appliable(id), "{id} should be appliable");
         }
+    }
+
+    #[test]
+    fn is_applied_detects_live_state_from_ops() {
+        let m = MockMutator::new();
+        // Fresh system: not applied.
+        assert!(!is_applied_with(&m, "win32_priority"));
+        // After applying, detection sees the exact value it wrote.
+        let _ = apply_all(&m, "win32_priority");
+        assert!(is_applied_with(&m, "win32_priority"));
+        // Multi-value tweak: applied only when ALL its values are present.
+        assert!(!is_applied_with(&m, "dark_mode"));
+        let _ = apply_all(&m, "dark_mode");
+        assert!(is_applied_with(&m, "dark_mode"));
+        // Scan-only tweak (no ops) is never "applied".
+        assert!(!is_applied_with(&m, "timer_resolution"));
+        // A tweak whose only op is a one-shot Command isn't a detectable state.
+        assert!(!is_applied_with(&m, "flush_dns"));
     }
 
     #[test]
