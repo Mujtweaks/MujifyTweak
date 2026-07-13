@@ -65,6 +65,10 @@ const NON_GAME_NAMES: &[&str] = &[
     "radeon software", "amd software", "adrenalin", "armoury crate",
     "nahimic", "realtek", "microsoft.", "windows.", "gaming services",
     "xbox", "game bar", "nvidia control", "displayfusion",
+    // Dev tools / editors that ship next to games but aren't games themselves.
+    // "roblox studio" catches the Start-menu shortcut "Roblox Studio for <user>".
+    "roblox studio", "unreal engine", "unity hub", "godot", "rpg maker",
+    "visual studio", "vscode", "vs code", " sdk", "development kit",
 ];
 
 /// True if a title is a known non-game desktop app (Wallpaper Engine, docks, …).
@@ -681,6 +685,11 @@ mod tests {
         // A real game with an innocuous name is not swept in.
         assert!(!is_non_game_name("Watch Dogs"));
         assert!(!is_non_game_name("Combat Master"));
+        // Roblox Studio (the dev editor, Start-menu "Roblox Studio for <user>") is
+        // NOT a game — but the Roblox player still is.
+        assert!(is_non_game_name("Roblox Studio for syeda"));
+        assert!(is_non_game_name("Unreal Engine 5.4"));
+        assert!(!is_non_game_name("Roblox"));
     }
 
     #[test]

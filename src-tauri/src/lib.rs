@@ -306,8 +306,10 @@ pub fn run() {
                     let marker = std::path::PathBuf::from(appdata)
                         .join("MujifyTweaks")
                         .join("autostart_initialized");
-                    if !marker.exists() {
-                        let _ = handle.autolaunch().enable();
+                    // Only record the one-time default once enabling actually
+                    // succeeds — otherwise a transient failure would permanently
+                    // skip the default. Retries on the next launch until it sticks.
+                    if !marker.exists() && handle.autolaunch().enable().is_ok() {
                         let _ = std::fs::create_dir_all(marker.parent().unwrap());
                         let _ = std::fs::write(&marker, "1");
                     }

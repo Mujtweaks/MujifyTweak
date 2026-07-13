@@ -84,10 +84,12 @@ export default function TweakCard({ tweak, selected, onToggle, onInfo }: TweakCa
           {tweak.applied ? (
             <span className="rounded-full bg-success/15 px-3 py-1 text-[11px] font-semibold text-success">Active</span>
           ) : scanOnly ? (
-            <>
-              <span className="text-[10px] font-medium uppercase tracking-wide text-txt3">Scan-only</span>
-              <Toggle on={false} onClick={() => {}} disabled />
-            </>
+            <span
+              title="Not a manual switch — this one is applied live while a game runs, or set in your GPU driver / in-game settings. Open the details (i) to see how."
+              className="rounded-full bg-panel2 px-3 py-1 text-[10px] font-semibold uppercase tracking-wide text-txt2"
+            >
+              Auto · in-game
+            </span>
           ) : (
             <>
               {!advanced && <span className="text-[11px] font-semibold uppercase tracking-wide text-txt3">Activate</span>}

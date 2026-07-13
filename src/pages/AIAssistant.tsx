@@ -95,7 +95,7 @@ function buildSystemPrompt(
   changeLog: ChangeLogEntry[],
   driverIssues: DeviceIssue[],
 ): string {
-  const name = userName?.trim() || "the user";
+  const name = userName?.trim() || "";
   const gpuList: string =
     hw?.gpus?.length > 1
       ? hw.gpus.map((g: any) => `${g.name} (${g.vendor})`).join(" + ")
@@ -104,7 +104,7 @@ function buildSystemPrompt(
   return `You are Mujify AI, an expert Windows PC optimizer built into the Mujify Tweaks app.
 
 WHO YOU'RE TALKING TO:
-The user's name is "${name}". Address them by name when it feels natural. If they ask "what's my name", answer with "${name}".
+${name ? `The user's name is "${name}". Use it occasionally when it feels natural. If they ask "what's my name", answer with "${name}".` : `You do NOT know the user's name — never invent one and NEVER address them as "the user". Just say "Hi" / "Hey" with no name. If they ask their name, say you don't have it set and point to Settings.`}
 
 THIS MACHINE (real, detected):
 Form factor: ${hw?.chassis ?? (hw?.isLaptop ? "Laptop" : "Desktop")} — currently ${power}
@@ -132,6 +132,9 @@ HOW TO TAILOR YOUR ADVICE TO THIS EXACT MACHINE:
 
 RULES:
 - ANSWER THE ACTUAL QUESTION, plainly. If the user asks "what is 1+1", the entire reply is "2." NEVER offer a lettered menu of choices ("would you like to A) … B) … C) …"), never say "back to your laptop", never re-offer the same options, and NEVER repeat yourself. One direct answer, then stop.
+- NEVER repeat a greeting or re-introduce yourself if the conversation already has messages. Greet AT MOST once, on the very first turn. Do not restate anything you already said earlier in this chat.
+- You CANNOT apply, change, or revert anything yourself — you only advise. Never say "I've applied", "I disabled", "I've optimized", "done" or claim any change was made. Tell the user which Mujify button/tab to click; the CHANGES ALREADY MADE list above is the ONLY source of truth for what's actually been changed.
+- You CAN use live web search when the user's question needs current info (the app runs a real search and gives you the results). If asked "can you use the web", answer yes briefly — don't ramble.
 - MATCH THE USER. If they just greet you or make small talk, reply in ONE short friendly line and ask what they need — do NOT dump an unsolicited system analysis, score, or "top recommendation". Only diagnose or recommend tweaks when they actually ask about performance, a problem, or optimizing. Never open with a report they didn't ask for.
 - You work THROUGH the Mujify app — it applies AND reverses every tweak itself, one click, fully reversible. So recommend Mujify's OWN tweaks by name and point to the tab that has them (Optimizer, Tweaks, Fixes, Network, Cleaner). NEVER give manual Windows steps (Control Panel, Power Options, "create a power plan", regedit) — the whole point is the user does NOT do it by hand. Say "apply High Performance Power Plan in the Optimizer", never "open Power Options and make a plan".
 - When they DO ask for a diagnosis: name the single most likely thing holding THIS machine back (from the live usage %, temps, bottleneck, change log), then the ONE highest-impact Mujify fix. Don't list ten.
@@ -157,10 +160,26 @@ export default function AIAssistant({ onNavigate }: { onNavigate: (page: PageId)
 
   const [keyReady, setKeyReady] = useState<boolean | null>(null);
   const [input, setInput] = useState("");
+  // Track scroll position so the jump buttons follow the user: the "up" arrow
+  // only shows once you've scrolled down, the "down" arrow only while you're
+  // above the latest message. They fade in/out instead of sitting there static.
+  const [scrollPos, setScrollPos] = useState({ atTop: true, atBottom: true });
+  const onChatScroll = () => {
+    const el = scrollRef.current;
+    if (!el) return;
+    const atTop = el.scrollTop <= 8;
+    const atBottom = el.scrollHeight - el.scrollTop - el.clientHeight <= 12;
+    setScrollPos((p) => (p.atTop === atTop && p.atBottom === atBottom ? p : { atTop, atBottom }));
+  };
   const [webSearch, setWebSearch] = useState(false);
   const endRef = useRef<HTMLDivElement>(null);
   const topRef = useRef<HTMLDivElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
+  // Live typewriter buffer for the CURRENT reply. Held in a ref (not effect-local
+  // closures) so `send()` can hard-reset it before every new message — otherwise
+  // chunks accumulate across messages and the model's prior reply gets re-echoed
+  // as a prefix (the "greeting spam" bug).
+  const streamBuf = useRef({ target: "", shown: 0, done: false });
   // Use scrollIntoView on anchor divs — reliable no matter which parent is the
   // actual scroll container (the old scrollRef.scrollTo did nothing here).
   const scrollToTop = () => topRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -182,24 +201,27 @@ export default function AIAssistant({ onNavigate }: { onNavigate: (page: PageId)
     // uneven bursts, so instead of painting each burst we keep the full received
     // text as `target` and let `shown` catch up to it a few characters per frame.
     // The display advances at a steady, smooth pace regardless of burst timing.
-    let target = "";
-    let shown = 0;
-    let done = false;
+    const buf = streamBuf.current;
     let rafId: number | null = null;
     const tick = () => {
       rafId = null;
-      if (shown < target.length) {
+      if (buf.shown < buf.target.length) {
         // reveal faster when far behind so we never lag the model, but always
         // a smooth minimum drip so short replies still animate.
-        const remaining = target.length - shown;
-        shown += Math.max(3, Math.ceil(remaining / 8));
-        if (shown > target.length) shown = target.length;
-        useAiStore.getState().setStreamingContent(() => target.slice(0, shown));
+        const remaining = buf.target.length - buf.shown;
+        buf.shown += Math.max(3, Math.ceil(remaining / 8));
+        if (buf.shown > buf.target.length) buf.shown = buf.target.length;
+        useAiStore.getState().setStreamingContent(() => buf.target.slice(0, buf.shown));
       }
-      if (shown < target.length) {
+      if (buf.shown < buf.target.length) {
         rafId = requestAnimationFrame(tick);
-      } else if (done) {
+      } else if (buf.done) {
         useAiStore.getState().finalizeStreaming();
+        // Hard-reset the buffer so the NEXT reply starts from empty instead of
+        // inheriting this one's text (root cause of the message-spam loop).
+        buf.target = "";
+        buf.shown = 0;
+        buf.done = false;
       }
     };
     const ensureTick = () => {
@@ -207,11 +229,11 @@ export default function AIAssistant({ onNavigate }: { onNavigate: (page: PageId)
     };
     void (async () => {
       const uc = await listen<string>("ai_chunk", (e) => {
-        target += e.payload;
+        buf.target += e.payload;
         ensureTick();
       });
       const ud = await listen("ai_done", () => {
-        done = true;
+        buf.done = true;
         ensureTick(); // let the reveal finish catching up, then finalize
       });
       if (!active) {
@@ -240,6 +262,10 @@ export default function AIAssistant({ onNavigate }: { onNavigate: (page: PageId)
     if (!q || isLoading) return;
     setInput("");
     setLoading(true);
+    // Start every reply from a clean buffer — never inherit the previous stream.
+    streamBuf.current.target = "";
+    streamBuf.current.shown = 0;
+    streamBuf.current.done = false;
 
     // Persist the user turn immediately (survives tab switches / restart).
     pushMessage({ role: "user", content: q, timestamp: Date.now() });
@@ -339,7 +365,7 @@ export default function AIAssistant({ onNavigate }: { onNavigate: (page: PageId)
       <div className="grid min-h-0 flex-1 grid-cols-[1fr_300px] gap-4">
         {/* Chat */}
         <div className="relative flex min-h-0 flex-col rounded-2xl border border-edge bg-card">
-          <div ref={scrollRef} className="flex-1 space-y-3 overflow-y-auto p-5">
+          <div ref={scrollRef} onScroll={onChatScroll} className="flex-1 space-y-3 overflow-y-auto p-5">
             <div ref={topRef} />
             {messages.length === 0 && !streamingContent && (
               <div className="grid h-full place-items-center text-center">
@@ -395,24 +421,25 @@ export default function AIAssistant({ onNavigate }: { onNavigate: (page: PageId)
             <div ref={endRef} />
           </div>
 
-          {/* One-click jump to the top / latest of the conversation */}
+          {/* Jump buttons that follow the scroll: up appears once you've scrolled
+              down, down appears while you're above the latest message. */}
           {(messages.length > 2 || streamingContent) && (
-            <div className="absolute bottom-[74px] right-4 z-10 flex flex-col gap-1.5">
+            <div className="pointer-events-none absolute bottom-[74px] right-4 z-10 flex flex-col gap-1.5">
               <button
                 onClick={scrollToTop}
                 title="Jump to top"
                 aria-label="Jump to top of chat"
-                className="grid h-8 w-8 place-items-center rounded-full border border-edge bg-panel/90 text-txt2 shadow-lg backdrop-blur transition-colors hover:text-txt"
+                className={`pointer-events-auto grid h-9 w-9 place-items-center rounded-full border border-edge bg-panel/90 text-txt2 shadow-lg backdrop-blur transition-all duration-200 hover:text-txt ${scrollPos.atTop ? "pointer-events-none translate-y-1 opacity-0" : "opacity-100"}`}
               >
-                <ChevronsUp size={16} />
+                <ChevronsUp size={17} />
               </button>
               <button
                 onClick={scrollToBottom}
                 title="Jump to latest"
                 aria-label="Jump to latest message"
-                className="grid h-8 w-8 place-items-center rounded-full border border-edge bg-panel/90 text-txt2 shadow-lg backdrop-blur transition-colors hover:text-txt"
+                className={`pointer-events-auto grid h-9 w-9 place-items-center rounded-full border border-accent/40 bg-accent text-white shadow-lg shadow-accent/20 transition-all duration-200 hover:bg-accent-hi ${scrollPos.atBottom ? "pointer-events-none translate-y-1 opacity-0" : "opacity-100"}`}
               >
-                <ChevronsDown size={16} />
+                <ChevronsDown size={17} />
               </button>
             </div>
           )}

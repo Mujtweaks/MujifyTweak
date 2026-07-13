@@ -59,13 +59,38 @@ fn start_temp_sidecar(app: AppHandle) {
             return;
         }
     };
+    super::logger::info("sidecar: LHMWrapper started".to_string());
     tauri::async_runtime::spawn(async move {
+        // Log the FIRST reading + any stderr so a persistent null temp is
+        // diagnosable (usually the LHM ring0 driver being blocked by Windows
+        // Memory Integrity / an AV) instead of a silent black box.
+        let mut logged_first = false;
         while let Some(event) = rx.recv().await {
-            if let CommandEvent::Stdout(bytes) = event {
-                let line = String::from_utf8_lossy(&bytes);
-                if let Ok(t) = serde_json::from_str::<TempLine>(line.trim()) {
-                    *LATEST_TEMPS.lock().unwrap_or_else(|e| e.into_inner()) = (t.cpu_temp_c, t.gpu_temp_c);
+            match event {
+                CommandEvent::Stdout(bytes) => {
+                    let line = String::from_utf8_lossy(&bytes);
+                    if let Ok(t) = serde_json::from_str::<TempLine>(line.trim()) {
+                        if !logged_first {
+                            logged_first = true;
+                            super::logger::info(format!(
+                                "sidecar: first temp reading cpu={:?}°C gpu={:?}°C (null = sensor driver blocked, often by Memory Integrity)",
+                                t.cpu_temp_c, t.gpu_temp_c
+                            ));
+                        }
+                        *LATEST_TEMPS.lock().unwrap_or_else(|e| e.into_inner()) = (t.cpu_temp_c, t.gpu_temp_c);
+                    }
                 }
+                CommandEvent::Stderr(bytes) => {
+                    let l = String::from_utf8_lossy(&bytes);
+                    let l = l.trim();
+                    if !l.is_empty() {
+                        super::logger::warn(format!("sidecar LHMWrapper stderr: {l}"));
+                    }
+                }
+                CommandEvent::Terminated(payload) => {
+                    super::logger::warn(format!("sidecar: LHMWrapper exited ({payload:?}) — temps will stay unavailable"));
+                }
+                _ => {}
             }
         }
     });
