@@ -109,7 +109,15 @@ fn freed_mb(before_avail: u64, after_avail: u64) -> u64 {
 /// Trim working sets and report the REAL freed-memory delta. GATED behind
 /// `confirm` (set only by the UI); never called by tests or tooling.
 #[tauri::command]
-pub fn optimize_ram(confirm: bool) -> Result<RamOptimizeResult, String> {
+pub async fn optimize_ram(confirm: bool) -> Result<RamOptimizeResult, String> {
+    // Trimming every process's working set is heavy — off the UI thread so it
+    // can't freeze the app.
+    tokio::task::spawn_blocking(move || optimize_ram_impl(confirm))
+        .await
+        .map_err(|e| e.to_string())?
+}
+
+fn optimize_ram_impl(confirm: bool) -> Result<RamOptimizeResult, String> {
     if !confirm {
         return Err("Refused: RAM optimization requires explicit confirmation.".into());
     }
@@ -137,7 +145,7 @@ mod tests {
     #[test]
     fn optimize_refuses_without_confirmation() {
         // The gate must hold before any process handle is opened.
-        assert!(optimize_ram(false).is_err());
+        assert!(optimize_ram_impl(false).is_err());
     }
 
     #[test]

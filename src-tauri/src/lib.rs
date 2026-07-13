@@ -41,15 +41,29 @@ fn show_main(app: &tauri::AppHandle) {
 }
 
 /// Tray icon with Open / Quick Optimize / Exit. Left-click opens the window.
+/// Live tray tooltip: how many optimizations are currently applied (real count
+/// from the change log — the same source the Change Log page uses).
+fn tray_tooltip() -> String {
+    let active = rollback_engine::get_change_log()
+        .iter()
+        .filter(|e| !e.undone)
+        .count();
+    match active {
+        0 => "Mujify Tweaks — no optimizations applied".to_string(),
+        1 => "Mujify Tweaks — 1 optimization active".to_string(),
+        n => format!("Mujify Tweaks — {n} optimizations active"),
+    }
+}
+
 fn build_tray(app: &tauri::AppHandle) -> tauri::Result<()> {
     let open = MenuItem::with_id(app, "open", "Open Mujify Tweaks", true, None::<&str>)?;
     let quick = MenuItem::with_id(app, "quick_optimize", "Quick Optimize", true, None::<&str>)?;
     let quit = MenuItem::with_id(app, "quit", "Exit", true, None::<&str>)?;
     let menu = Menu::with_items(app, &[&open, &quick, &quit])?;
 
-    let mut builder = TrayIconBuilder::new()
+    let mut builder = TrayIconBuilder::with_id("mujify-tray")
         .menu(&menu)
-        .tooltip("Mujify Tweaks")
+        .tooltip(tray_tooltip())
         .on_menu_event(|app, event| match event.id.as_ref() {
             "open" => show_main(app),
             "quick_optimize" => {
@@ -73,6 +87,17 @@ fn build_tray(app: &tauri::AppHandle) -> tauri::Result<()> {
         builder = builder.icon(icon.clone());
     }
     builder.build(app)?;
+
+    // Keep the tray tooltip's "N optimizations active" count live.
+    let handle = app.clone();
+    tauri::async_runtime::spawn(async move {
+        loop {
+            tokio::time::sleep(std::time::Duration::from_secs(5)).await;
+            if let Some(tray) = handle.tray_by_id("mujify-tray") {
+                let _ = tray.set_tooltip(Some(tray_tooltip()));
+            }
+        }
+    });
     Ok(())
 }
 

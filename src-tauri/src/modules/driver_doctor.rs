@@ -168,7 +168,14 @@ Write-Output ("RP=" + $rp)
 /// say so — a driver change with no rollback safety net is not something we do
 /// silently.
 #[tauri::command]
-pub fn repair_drivers(confirm: bool) -> Result<String, String> {
+pub async fn repair_drivers(confirm: bool) -> Result<String, String> {
+    // Restore point + pnputil rescan is slow — off the UI thread.
+    tokio::task::spawn_blocking(move || repair_drivers_impl(confirm))
+        .await
+        .map_err(|e| e.to_string())?
+}
+
+fn repair_drivers_impl(confirm: bool) -> Result<String, String> {
     if !confirm {
         return Err("Refused: driver repair requires explicit confirmation.".into());
     }

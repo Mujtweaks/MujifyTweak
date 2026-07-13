@@ -66,9 +66,14 @@ fn parse_points(stdout: &str) -> Vec<RestorePoint> {
     out
 }
 
-/// Read-only: every System Restore point currently on the machine.
+/// Read-only: every System Restore point currently on the machine. Off the UI
+/// thread — the WMI/PowerShell query can take a few seconds.
 #[tauri::command]
-pub fn list_restore_points() -> Vec<RestorePoint> {
+pub async fn list_restore_points() -> Vec<RestorePoint> {
+    tokio::task::spawn_blocking(list_restore_points_impl).await.unwrap_or_default()
+}
+
+fn list_restore_points_impl() -> Vec<RestorePoint> {
     let out = Command::new("powershell")
         .args([
             "-NoProfile",
@@ -109,7 +114,15 @@ pub fn restore_protection_enabled() -> bool {
 /// (Windows silently skips a new point if one was made in the last 24h, and
 /// no-ops entirely if System Restore is disabled) and reports honestly.
 #[tauri::command]
-pub fn create_restore_point(description: String, confirm: bool) -> Result<String, String> {
+pub async fn create_restore_point(description: String, confirm: bool) -> Result<String, String> {
+    // Creating a restore point can take 10–30s — off the UI thread so the app
+    // never freezes while Windows works.
+    tokio::task::spawn_blocking(move || create_restore_point_impl(description, confirm))
+        .await
+        .map_err(|e| e.to_string())?
+}
+
+fn create_restore_point_impl(description: String, confirm: bool) -> Result<String, String> {
     if !confirm {
         return Err("Refused: creating a restore point requires confirmation.".into());
     }
@@ -118,7 +131,7 @@ pub fn create_restore_point(description: String, confirm: bool) -> Result<String
     // Sanitize: single-quote the description, escaping embedded quotes.
     let safe = desc.replace('\'', "''");
 
-    let before = list_restore_points().first().map(|p| p.sequence).unwrap_or(0);
+    let before = list_restore_points_impl().first().map(|p| p.sequence).unwrap_or(0);
     // Windows throttles restore points to one per 24h by default
     // (SystemRestorePointCreationFrequency). Set it to 0 so Create works on
     // demand every time — a benign, pro-safety change (more restore points, not
@@ -133,7 +146,7 @@ pub fn create_restore_point(description: String, confirm: bool) -> Result<String
         .output()
         .map_err(|e| e.to_string())?;
 
-    let after = list_restore_points();
+    let after = list_restore_points_impl();
     match after.first() {
         Some(p) if p.sequence > before => Ok(format!("Restore point \"{desc}\" created.")),
         Some(_) => Err(
@@ -152,7 +165,13 @@ pub fn create_restore_point(description: String, confirm: bool) -> Result<String
 /// is accepted for a future per-point path but Windows exposes no clean per-point
 /// delete, so it's honestly all-or-nothing today. `confirm` MUST be true.
 #[tauri::command]
-pub fn delete_all_restore_points(confirm: bool) -> Result<String, String> {
+pub async fn delete_all_restore_points(confirm: bool) -> Result<String, String> {
+    tokio::task::spawn_blocking(move || delete_all_restore_points_impl(confirm))
+        .await
+        .map_err(|e| e.to_string())?
+}
+
+fn delete_all_restore_points_impl(confirm: bool) -> Result<String, String> {
     if !confirm {
         return Err("Refused: deleting restore points requires confirmation.".into());
     }
@@ -166,7 +185,7 @@ pub fn delete_all_restore_points(confirm: bool) -> Result<String, String> {
     } else {
         let err = String::from_utf8_lossy(&out.stderr);
         // vssadmin returns non-zero when there were simply none to delete.
-        if list_restore_points().is_empty() {
+        if list_restore_points_impl().is_empty() {
             Ok("No restore points to delete.".into())
         } else {
             Err(format!("Delete failed: {}", err.trim()))

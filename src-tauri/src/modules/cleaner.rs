@@ -142,8 +142,14 @@ fn dir_bytes_and_count(root: &Path) -> (u64, u32) {
 }
 
 /// Read-only junk scan — categories with reclaimable size. Changes nothing.
+/// Off the UI thread (summing a big temp folder can take a moment) so the
+/// re-scan-on-focus never freezes the app.
 #[tauri::command]
-pub fn scan_junk() -> Vec<JunkCategory> {
+pub async fn scan_junk() -> Vec<JunkCategory> {
+    tokio::task::spawn_blocking(scan_junk_impl).await.unwrap_or_default()
+}
+
+fn scan_junk_impl() -> Vec<JunkCategory> {
     category_specs()
         .into_iter()
         .map(|(id, label, description, regenerable, roots)| {
@@ -164,8 +170,15 @@ pub fn scan_junk() -> Vec<JunkCategory> {
 }
 
 /// Read-only: files at or above `min_mb` under `root`, largest first (cap 200).
+/// Off the UI thread — a deep folder walk must never freeze the app.
 #[tauri::command]
-pub fn scan_large_files(root: String, min_mb: u64) -> Vec<LargeFile> {
+pub async fn scan_large_files(root: String, min_mb: u64) -> Vec<LargeFile> {
+    tokio::task::spawn_blocking(move || scan_large_files_impl(root, min_mb))
+        .await
+        .unwrap_or_default()
+}
+
+fn scan_large_files_impl(root: String, min_mb: u64) -> Vec<LargeFile> {
     let min = min_mb.saturating_mul(1_048_576).max(1);
     let mut files: Vec<LargeFile> = WalkDir::new(&root)
         .into_iter()
@@ -210,8 +223,18 @@ fn hash_file(path: &Path) -> Option<u64> {
 
 /// Read-only: byte-identical duplicate files under `root`. Groups by size, then
 /// hashes only the collisions. Largest wasted-space groups first (cap 100).
+///
+/// Runs the (heavy — reads+hashes whole files) work on a blocking worker thread
+/// via `spawn_blocking`, so a big scan NEVER freezes the UI / goes "not
+/// responding". Sync commands run on the main thread; this must not.
 #[tauri::command]
-pub fn scan_duplicate_files(root: String) -> Vec<DupGroup> {
+pub async fn scan_duplicate_files(root: String) -> Vec<DupGroup> {
+    tokio::task::spawn_blocking(move || scan_duplicate_files_impl(root))
+        .await
+        .unwrap_or_default()
+}
+
+fn scan_duplicate_files_impl(root: String) -> Vec<DupGroup> {
     let files: Vec<(PathBuf, u64)> = WalkDir::new(&root)
         .into_iter()
         .filter_map(|e| e.ok())
@@ -247,7 +270,13 @@ pub fn scan_duplicate_files(root: String) -> Vec<DupGroup> {
 /// caches it removes are rebuilt automatically. Best-effort: a locked/in-use file
 /// is skipped (its category is reported in `partial`), never fatal.
 #[tauri::command]
-pub fn clean_junk(category_ids: Vec<String>, confirm: bool) -> Result<CleanResult, String> {
+pub async fn clean_junk(category_ids: Vec<String>, confirm: bool) -> Result<CleanResult, String> {
+    tokio::task::spawn_blocking(move || clean_junk_impl(category_ids, confirm))
+        .await
+        .map_err(|e| e.to_string())?
+}
+
+fn clean_junk_impl(category_ids: Vec<String>, confirm: bool) -> Result<CleanResult, String> {
     if !confirm {
         return Err("Refused: cleaning requires explicit confirmation.".into());
     }
@@ -308,7 +337,7 @@ mod tests {
     #[test]
     fn clean_refuses_without_confirmation() {
         // The gate must hold before any filesystem work happens.
-        assert!(clean_junk(vec!["temp".into()], false).is_err());
+        assert!(clean_junk_impl(vec!["temp".into()], false).is_err());
     }
 
     #[test]
@@ -346,7 +375,7 @@ mod tests {
     #[test]
     fn scan_junk_reports_known_categories_and_changes_nothing() {
         // Read-only: always returns the three category ids, sizes ≥ 0.
-        let cats = scan_junk();
+        let cats = scan_junk_impl();
         let ids: Vec<&str> = cats.iter().map(|c| c.id.as_str()).collect();
         assert!(ids.contains(&"temp"));
         assert!(ids.contains(&"shader"));

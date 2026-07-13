@@ -81,7 +81,12 @@ fn classify(pkg_name: &str) -> Option<(&'static str, &'static str)> {
 
 /// Read-only: installed Appx packages that are on the removable allowlist.
 #[tauri::command]
-pub fn scan_bloatware() -> Vec<BloatApp> {
+pub async fn scan_bloatware() -> Vec<BloatApp> {
+    // Get-AppxPackage via PowerShell blocks for a moment — off the UI thread.
+    tokio::task::spawn_blocking(scan_bloatware_impl).await.unwrap_or_default()
+}
+
+fn scan_bloatware_impl() -> Vec<BloatApp> {
     // One line per package: "<Name>|<PackageFullName>".
     let out = Command::new("powershell")
         .args([
@@ -124,7 +129,19 @@ pub fn scan_bloatware() -> Vec<BloatApp> {
 /// not on the allowlist (defence in depth). Non-reversible (reinstall from the
 /// Store); logged so it shows in the Change Log.
 #[tauri::command]
-pub fn remove_bloatware(
+pub async fn remove_bloatware(
+    app: tauri::AppHandle,
+    friendly: String,
+    package_full_name: String,
+    confirm: bool,
+) -> Result<(), String> {
+    // Remove-AppxPackage via PowerShell blocks — off the UI thread.
+    tokio::task::spawn_blocking(move || remove_bloatware_impl(app, friendly, package_full_name, confirm))
+        .await
+        .map_err(|e| e.to_string())?
+}
+
+fn remove_bloatware_impl(
     app: tauri::AppHandle,
     friendly: String,
     package_full_name: String,
