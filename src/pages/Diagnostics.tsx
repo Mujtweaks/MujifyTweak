@@ -1,6 +1,5 @@
 import { useState } from "react";
 import {
-  Activity,
   CheckCircle2,
   Cpu,
   FileDown,
@@ -15,7 +14,10 @@ import {
   Thermometer,
   type LucideIcon,
 } from "lucide-react";
+import { invoke } from "@tauri-apps/api/core";
 import { useSystemStore } from "../store/systemStore";
+import { scanDeviceHealth, getChangeLog } from "../lib/backend";
+import { toast } from "../store/toastStore";
 import Sparkline from "../components/Sparkline";
 import DriverHealth from "../components/DriverHealth";
 import HealthScan from "../components/HealthScan";
@@ -95,7 +97,44 @@ function MonitorRow({
 export default function Diagnostics() {
   const stats = useSystemStore((s) => s.stats);
   const hardware = useSystemStore((s) => s.hardware);
-  const [notice, setNotice] = useState<string | null>(null);
+  const [exporting, setExporting] = useState(false);
+
+  // Build a real HTML system report from live data and save it to Documents.
+  const exportReport = async () => {
+    setExporting(true);
+    try {
+      const [devices, changes] = await Promise.all([scanDeviceHealth(), getChangeLog()]);
+      const esc = (s: string) => s.replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c] ?? c));
+      const row = (k: string, v: string | null | undefined) =>
+        `<tr><td>${esc(k)}</td><td>${esc(v ?? "—")}</td></tr>`;
+      const html = `<!doctype html><meta charset="utf-8"><title>Mujify System Report</title>
+<style>body{font:14px/1.6 system-ui,Segoe UI,Arial;background:#0d0d0d;color:#e7e7e7;max-width:820px;margin:40px auto;padding:0 24px}
+h1{color:#e3000e}h2{margin-top:32px;border-bottom:1px solid #2a2a2a;padding-bottom:6px}
+table{border-collapse:collapse;width:100%}td{padding:6px 10px;border-bottom:1px solid #1e1e1e}td:first-child{color:#8a8a8a;width:220px}
+.muted{color:#8a8a8a;font-size:12px}.ok{color:#22c55e}.warn{color:#f59e0b}</style>
+<h1>Mujify System Report</h1><p class="muted">Generated ${esc(new Date().toLocaleString())} · Mujify Score ${score ?? "—"}/100</p>
+<h2>Hardware</h2><table>
+${row("CPU", hardware ? `${hardware.cpuName} (${hardware.cpuCores}C/${hardware.cpuThreads}T)` : null)}
+${row("GPU", hardware?.gpuName)}${row("GPU driver", hardware?.gpuDriverVersion)}
+${row("Memory", hardware ? `${hardware.ramTotalGb.toFixed(0)} GB${hardware.ramType ? " " + hardware.ramType : ""}${hardware.ramSpeedMhz ? " @ " + hardware.ramSpeedMhz + " MHz" : ""}` : null)}
+${row("Storage", hardware?.storageSummary)}${row("Motherboard", hardware?.motherboard)}
+${row("OS", hardware ? `${hardware.osEdition ?? "Windows"}${hardware.osBuild ? " (build " + hardware.osBuild + ")" : ""}` : null)}</table>
+<h2>Live snapshot</h2><table>
+${row("CPU usage", stats ? stats.cpuUsagePercent.toFixed(0) + " %" : null)}${row("CPU temp", stats?.cpuTempC != null ? stats.cpuTempC.toFixed(0) + " °C" : null)}
+${row("GPU usage", stats?.gpuUsagePercent != null ? stats.gpuUsagePercent.toFixed(0) + " %" : null)}${row("GPU temp", stats?.gpuTempC != null ? stats.gpuTempC.toFixed(0) + " °C" : null)}
+${row("Memory in use", stats ? stats.ramUsedGb.toFixed(1) + " / " + stats.ramTotalGb.toFixed(0) + " GB (" + stats.ramUsagePercent.toFixed(0) + "%)" : null)}
+${row("Bottleneck", stats?.bottleneckDetail || stats?.bottleneck)}${row("Power plan", stats?.activePowerPlan)}</table>
+<h2>Device &amp; driver health</h2>${devices.length === 0 ? '<p class="ok">No device problems detected.</p>' : "<table>" + devices.map((d) => row(esc(d.name), `${d.errorText} (code ${d.errorCode})`)).join("") + "</table>"}
+<h2>Applied tweaks (${changes.filter((c) => !c.undone).length} active)</h2>${changes.length === 0 ? '<p class="muted">Nothing applied yet.</p>' : "<table>" + changes.slice(-40).reverse().map((c) => row(new Date(c.timestamp).toLocaleString(), `${c.description}${c.undone ? " — reverted" : ""}`)).join("") + "</table>"}
+<p class="muted" style="margin-top:40px">Every value above is real, read live from your PC by Mujify Tweaks. Nothing here was estimated.</p>`;
+      const path = await invoke<string>("save_report", { html });
+      toast.success("Report exported", `Saved to ${path}`);
+    } catch (e) {
+      toast.error("Export failed", String(e));
+    } finally {
+      setExporting(false);
+    }
+  };
 
   const score = stats?.systemScore ?? null;
   const health = score !== null ? healthWord(score) : null;
@@ -142,27 +181,15 @@ export default function Diagnostics() {
         </div>
         <div className="flex gap-2.5">
           <button
-            onClick={() => setNotice("Full ETW/DPC deep scan arrives with LatencyMonitor (v1.5). Live monitoring below is already real.")}
-            className="flex items-center gap-2 rounded-xl border border-edge bg-panel px-3.5 py-2 text-[12px] font-medium text-txt transition-colors hover:border-edge2"
-          >
-            <Activity size={14} strokeWidth={2} className="text-txt2" />
-            Run Full Scan
-          </button>
-          <button
-            onClick={() => setNotice("Report export (PNG/HTML) ships with the Before/After report (Checkpoints 13–15).")}
-            className="flex items-center gap-2 rounded-xl bg-gradient-to-b from-accent to-[#a3000a] px-3.5 py-2 text-[12px] font-semibold text-white shadow-[0_0_18px_rgba(227,0,14,0.3)]"
+            onClick={() => void exportReport()}
+            disabled={exporting}
+            className="flex items-center gap-2 rounded-xl bg-gradient-to-b from-accent to-[#a3000a] px-3.5 py-2 text-[12px] font-semibold text-white shadow-[0_0_18px_rgba(227,0,14,0.3)] disabled:opacity-60"
           >
             <FileDown size={14} strokeWidth={2} />
-            Export Report
+            {exporting ? "Exporting…" : "Export Report"}
           </button>
         </div>
       </div>
-
-      {notice && (
-        <p className="rounded-lg border border-accent/25 bg-accent/5 px-3 py-2 text-[11.5px] text-txt2">
-          {notice}
-        </p>
-      )}
 
       {/* Bottleneck / Health Scan — the diagnosis centerpiece */}
       <HealthScan />

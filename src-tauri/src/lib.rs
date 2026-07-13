@@ -125,6 +125,20 @@ fn set_autostart_enabled(app: tauri::AppHandle, enabled: bool) -> Result<(), Str
     if enabled { al.enable() } else { al.disable() }.map_err(|e| e.to_string())
 }
 
+/// Save a system report (HTML built by the frontend from real data) to the user's
+/// Documents folder and return the full path. Read-only w.r.t. the system — it
+/// only writes the one report file the user asked for.
+#[tauri::command]
+fn save_report(html: String) -> Result<String, String> {
+    let base = std::env::var("USERPROFILE").map_err(|_| "Couldn't find your user folder.".to_string())?;
+    let dir = std::path::PathBuf::from(base).join("Documents");
+    std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
+    let ts = chrono::Local::now().format("%Y-%m-%d_%H%M%S");
+    let path = dir.join(format!("Mujify-System-Report-{ts}.html"));
+    std::fs::write(&path, html).map_err(|e| e.to_string())?;
+    Ok(path.to_string_lossy().to_string())
+}
+
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 struct UpdateInfo {
@@ -307,6 +321,7 @@ pub fn run() {
             install_update,
             get_autostart_enabled,
             set_autostart_enabled,
+            save_report,
             hardware_profiler::get_hardware_profile,
             hardware_tier::get_hardware_tier,
             game_detector::get_installed_games,
