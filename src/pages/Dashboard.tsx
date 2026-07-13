@@ -1,4 +1,5 @@
 import { BrainCircuit, Cpu, HardDrive, Laptop, MemoryStick, Monitor, type LucideIcon } from "lucide-react";
+import BoosterCard from "../components/BoosterCard";
 import ScoreGauge from "../components/ScoreGauge";
 import ActionCards from "../components/ActionCards";
 import StatGauges from "../components/StatGauges";
@@ -69,6 +70,7 @@ export default function Dashboard({ onNavigate }: { onNavigate: (page: PageId) =
 
       <div className="grid min-h-0 flex-1 grid-cols-[1.62fr_1fr] gap-4">
         <section className="flex min-h-0 flex-col gap-4">
+          <BoosterCard />
           <ScoreGauge />
           <ActionCards onNavigate={onNavigate} />
           <StatGauges />
