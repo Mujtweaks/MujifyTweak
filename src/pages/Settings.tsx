@@ -9,11 +9,13 @@ import {
   Info,
   KeyRound,
   RefreshCw,
+  Rocket,
   Settings as SettingsIcon,
   ShieldCheck,
   Wifi,
   Zap,
 } from "lucide-react";
+import { invoke } from "@tauri-apps/api/core";
 import { useSystemStore } from "../store/systemStore";
 import { useSettingsStore } from "../store/settingsStore";
 import { useAiStore } from "../store/aiStore";
@@ -140,6 +142,24 @@ export default function Settings() {
     void refreshKeys();
   }, []);
 
+  // Start-on-startup — backed by the OS autostart entry (defaults ON at first run).
+  const [autostartOn, setAutostartOn] = useState(true);
+  useEffect(() => {
+    void invoke<boolean>("get_autostart_enabled").then(setAutostartOn).catch(() => {});
+  }, []);
+  const toggleAutostart = async () => {
+    const next = !autostartOn;
+    setAutostartOn(next);
+    try {
+      await invoke("set_autostart_enabled", { enabled: next });
+      toast.info(next ? "Start on startup enabled" : "Start on startup disabled",
+        next ? "Mujify will launch when Windows starts." : "Mujify won't auto-launch anymore.");
+    } catch {
+      setAutostartOn(!next); // revert on failure
+      toast.error("Couldn't change startup setting", "Try running Mujify as administrator.");
+    }
+  };
+
   const checkUpdates = async () => {
     setChecking(true);
     setUpdateStatus(null);
@@ -241,6 +261,18 @@ export default function Settings() {
             </p>
           </div>
           <Toggle on={autoApplyEnabled} onClick={() => setAutoApplyEnabled(!autoApplyEnabled)} />
+        </div>
+        <div className="flex items-center justify-between border-t border-edge py-3">
+          <div className="pr-4">
+            <p className="flex items-center gap-2 text-[13px] font-medium text-txt">
+              <Rocket size={14} className="text-accent" /> Start on startup
+            </p>
+            <p className="mt-0.5 text-[11.5px] text-txt2">
+              Launch Mujify automatically when Windows starts (opens minimized to the tray). On by default — turn
+              it off here anytime.
+            </p>
+          </div>
+          <Toggle on={autostartOn} onClick={() => void toggleAutostart()} />
         </div>
       </Section>
 

@@ -110,6 +110,21 @@ async fn check_for_updates(app: tauri::AppHandle) -> Result<String, String> {
     }
 }
 
+/// Is "start Mujify on Windows startup" currently enabled?
+#[tauri::command]
+fn get_autostart_enabled(app: tauri::AppHandle) -> bool {
+    use tauri_plugin_autostart::ManagerExt;
+    app.autolaunch().is_enabled().unwrap_or(false)
+}
+
+/// Turn "start on startup" on or off (Settings toggle).
+#[tauri::command]
+fn set_autostart_enabled(app: tauri::AppHandle, enabled: bool) -> Result<(), String> {
+    use tauri_plugin_autostart::ManagerExt;
+    let al = app.autolaunch();
+    if enabled { al.enable() } else { al.disable() }.map_err(|e| e.to_string())
+}
+
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 struct UpdateInfo {
@@ -237,8 +252,28 @@ pub fn run() {
         .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_autostart::init(
+            tauri_plugin_autostart::MacosLauncher::LaunchAgent,
+            Some(vec!["--minimized"]),
+        ))
         .setup(|app| {
             let handle = app.handle().clone();
+            // Start-on-startup defaults ON: enable it once on first launch, then
+            // respect the user's choice forever (a marker file records that we've
+            // done the one-time default so a later "off" in Settings sticks).
+            {
+                use tauri_plugin_autostart::ManagerExt;
+                if let Ok(appdata) = std::env::var("APPDATA") {
+                    let marker = std::path::PathBuf::from(appdata)
+                        .join("MujifyTweaks")
+                        .join("autostart_initialized");
+                    if !marker.exists() {
+                        let _ = handle.autolaunch().enable();
+                        let _ = std::fs::create_dir_all(marker.parent().unwrap());
+                        let _ = std::fs::write(&marker, "1");
+                    }
+                }
+            }
             system_monitor::start(handle.clone());
             network_monitor::start(handle.clone());
             game_detector::start(handle.clone());
@@ -270,6 +305,8 @@ pub fn run() {
             check_for_updates,
             get_update_info,
             install_update,
+            get_autostart_enabled,
+            set_autostart_enabled,
             hardware_profiler::get_hardware_profile,
             hardware_tier::get_hardware_tier,
             game_detector::get_installed_games,
