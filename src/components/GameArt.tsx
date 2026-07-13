@@ -1,4 +1,6 @@
 import { useEffect, useState } from "react";
+import { invoke } from "@tauri-apps/api/core";
+import { isTauri } from "../lib/tauri";
 
 interface GameArtProps {
   name: string;
@@ -6,6 +8,10 @@ interface GameArtProps {
   className?: string;
   rounded?: string;
 }
+
+// name -> Steam appid cache (""=looked up, no match). Resolve each title once so
+// non-Steam games (Epic/Xbox/standalone) still get real cover art, not a letter.
+const artCache = new Map<string, string>();
 
 // Real Steam art, tried in order: portrait library card (matches the 3:4 tile),
 // then the landscape header, then the header on Akamai as a last resort. All on
@@ -29,18 +35,41 @@ export default function GameArt({
 }: GameArtProps) {
   const [urlIndex, setUrlIndex] = useState(0);
   const [failed, setFailed] = useState(false);
+  const [resolved, setResolved] = useState<string | null>(appId ?? null);
 
-  // If this tile instance is reused for a different game, restart the chain.
+  // Restart the chain when the game changes, and for non-Steam games (no appid)
+  // resolve one from the title so they get real art instead of a letter tile.
   useEffect(() => {
     setUrlIndex(0);
     setFailed(false);
-  }, [appId]);
+    if (appId) {
+      setResolved(appId);
+      return;
+    }
+    const cached = artCache.get(name);
+    if (cached !== undefined) {
+      setResolved(cached || null);
+      return;
+    }
+    if (!isTauri) return;
+    let alive = true;
+    void invoke<string | null>("resolve_steam_appid", { name })
+      .then((id) => {
+        artCache.set(name, id ?? "");
+        if (alive) setResolved(id ?? null);
+      })
+      .catch(() => {});
+    return () => {
+      alive = false;
+    };
+  }, [name, appId]);
 
   const hues = [0, 210, 140, 275, 32, 190];
   const hue = hues[(name.charCodeAt(0) || 0) % hues.length];
+  const effectiveId = appId ?? resolved;
 
-  if (appId && !failed) {
-    const urls = steamUrls(appId);
+  if (effectiveId && !failed) {
+    const urls = steamUrls(effectiveId);
     return (
       <img
         src={urls[urlIndex] ?? ""}

@@ -568,6 +568,47 @@ pub fn get_installed_games() -> Vec<GameInfo> {
     games
 }
 
+/// Resolve a game title to a Steam appid via Steam's public store search, so the
+/// UI can show REAL cover art for non-Steam games (Epic/Xbox/standalone) that
+/// don't carry an appid. Read-only network lookup from Rust (no CSP limits); the
+/// image itself then loads from the already-allowed Steam CDN. Returns None on
+/// any failure — the UI just keeps its placeholder, never a wrong cover.
+#[tauri::command]
+pub async fn resolve_steam_appid(name: String) -> Option<String> {
+    let q = name.trim();
+    if q.is_empty() {
+        return None;
+    }
+    let url = reqwest::Url::parse_with_params(
+        "https://store.steampowered.com/api/storesearch/",
+        &[("term", q), ("cc", "us"), ("l", "en")],
+    )
+    .ok()?;
+    let client = reqwest::Client::new();
+    let resp = client
+        .get(url)
+        .timeout(std::time::Duration::from_secs(6))
+        .send()
+        .await
+        .ok()?;
+    if !resp.status().is_success() {
+        return None;
+    }
+    let v: serde_json::Value = resp.json().await.ok()?;
+    let items = v.get("items")?.as_array()?;
+    // Only accept a confident match: the top result's name should look like the
+    // query (case-insensitive contains either way) so we don't slap the wrong
+    // cover on a game. Otherwise keep the placeholder.
+    let first = items.first()?;
+    let hit_name = first.get("name")?.as_str()?.to_lowercase();
+    let ql = q.to_lowercase();
+    let close = hit_name.contains(&ql) || ql.contains(&hit_name);
+    if !close {
+        return None;
+    }
+    first.get("id")?.as_u64().map(|id| id.to_string())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

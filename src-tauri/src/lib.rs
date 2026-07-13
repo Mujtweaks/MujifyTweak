@@ -310,6 +310,7 @@ pub fn run() {
             hardware_profiler::get_hardware_profile,
             hardware_tier::get_hardware_tier,
             game_detector::get_installed_games,
+            game_detector::resolve_steam_appid,
             game_profiles::get_recommended_tweaks,
             game_profiler::get_game_profile,
             game_settings::get_settings_advice,
