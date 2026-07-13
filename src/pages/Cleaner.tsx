@@ -51,14 +51,23 @@ export default function Cleaner() {
   const [confirming, setConfirming] = useState(false);
   const [cleaning, setCleaning] = useState(false);
 
+  const [rescanning, setRescanning] = useState(false);
   const loadJunk = async () => {
+    setRescanning(true);
     const j = await scanJunk();
     setJunk(j);
+    setRescanning(false);
     // Pre-select the regenerable categories that actually have something to clean.
     setSelected(new Set(j.filter((c) => c.regenerable && c.bytes > 0).map((c) => c.id)));
   };
   useEffect(() => {
     void loadJunk();
+    // Temp folders change constantly — re-scan whenever the app regains focus so
+    // the number is always live and matches what File Explorer would show, never
+    // a stale figure from an earlier scan.
+    const onFocus = () => void loadJunk();
+    window.addEventListener("focus", onFocus);
+    return () => window.removeEventListener("focus", onFocus);
   }, []);
 
   const totalSelected = useMemo(
@@ -174,12 +183,19 @@ export default function Cleaner() {
           <span className="grid h-9 w-9 place-items-center rounded-xl bg-accent/15">
             <Sparkles size={18} strokeWidth={1.75} className="text-accent" />
           </span>
-          <div>
+          <div className="flex-1">
             <h2 className="text-[16px] font-bold text-txt">Deep clean</h2>
             <p className="text-[11.5px] text-txt2">
-              Temp files, GPU shader caches and crash dumps — all rebuilt automatically when needed.
+              Temp files, GPU shader caches and crash dumps — all rebuilt automatically when needed. Live sizes, re-scanned each time you open this.
             </p>
           </div>
+          <button
+            onClick={() => void loadJunk()}
+            disabled={rescanning}
+            className="flex shrink-0 items-center gap-1.5 rounded-btn border border-edge bg-bg px-3 py-1.5 text-[12px] font-medium text-txt2 hover:border-edge2 hover:text-txt disabled:opacity-50"
+          >
+            <Loader2 size={13} className={rescanning ? "animate-spin" : ""} /> {rescanning ? "Scanning…" : "Rescan"}
+          </button>
         </div>
 
         {junk === null ? (

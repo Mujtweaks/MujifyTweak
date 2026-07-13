@@ -69,6 +69,12 @@ struct NimRequest {
     stream: bool,
     max_tokens: u32,
     temperature: f32,
+    /// Penalise repeating the same tokens/phrases — stops the model looping the
+    /// same "A/B/C" block over and over (the spam the user saw).
+    frequency_penalty: f32,
+    /// Penalise reusing topics it's already covered, nudging it to actually
+    /// answer instead of re-offering the same menu.
+    presence_penalty: f32,
 }
 
 #[derive(Serialize)]
@@ -186,7 +192,11 @@ pub async fn ai_chat(
             // Headroom so a thorough answer isn't cut off mid-sentence (the old
             // 1024 cap is the "stops randomly" the user saw on longer replies).
             max_tokens: 2048,
-            temperature: 0.7,
+            // Lower temperature + repetition penalties to kill the looping/spam
+            // and keep answers focused instead of re-offering the same menu.
+            temperature: 0.5,
+            frequency_penalty: 0.5,
+            presence_penalty: 0.4,
         };
         for attempt in 1..=MAX_ATTEMPTS {
             match stream_once(&app, &client, key.as_deref(), &body).await {

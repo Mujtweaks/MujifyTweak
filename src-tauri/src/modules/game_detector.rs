@@ -59,6 +59,12 @@ const NON_GAME_NAMES: &[&str] = &[
     "aseprite", "obs studio", "blender", "bandicam", "voicemod", "rewasd",
     "spacedesk", "lively wallpaper", "cheat engine", "wemod", "wallpaper",
     "dock finder", "rivatuner", "msi afterburner", "razer", "logitech g hub",
+    // GPU/driver/vendor software & UWP system packages — never games.
+    "appup", "intel arc", "intelarc", "arc control", "arc software",
+    "graphics command", "intel graphics", "geforce", "nvidia app",
+    "radeon software", "amd software", "adrenalin", "armoury crate",
+    "nahimic", "realtek", "microsoft.", "windows.", "gaming services",
+    "xbox", "game bar", "nvidia control", "displayfusion",
 ];
 
 /// True if a title is a known non-game desktop app (Wallpaper Engine, docks, …).
