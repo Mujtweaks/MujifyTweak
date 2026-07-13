@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
-import { Check, Gamepad2, Plus, Search, Zap } from "lucide-react";
+import { Check, FolderOpen, Gamepad2, Plus, Search, Zap } from "lucide-react";
+import { open } from "@tauri-apps/plugin-dialog";
 import { fetchInstalledGames, listProfiles, saveProfile } from "../lib/backend";
 import { useGameStore } from "../store/gameStore";
 import GameArt from "../components/GameArt";
@@ -65,6 +66,23 @@ export default function Profiles({ onNavigate }: { onNavigate: (page: PageId) =>
     setNewName("");
     setNewPath("");
     await reload();
+  };
+
+  // Open the native folder picker and fill in the install path (and, if empty,
+  // default the game name to the folder's own name).
+  const browseForFolder = async () => {
+    try {
+      const dir = await open({ directory: true, title: "Select the game's install folder" });
+      if (typeof dir === "string" && dir) {
+        setNewPath(dir);
+        if (!newName.trim()) {
+          const seg = dir.replace(/[/\\]+$/, "").split(/[/\\]/).pop() ?? "";
+          if (seg) setNewName(seg);
+        }
+      }
+    } catch {
+      /* user cancelled the dialog — no-op */
+    }
   };
 
   return (
@@ -139,13 +157,23 @@ export default function Profiles({ onNavigate }: { onNavigate: (page: PageId) =>
               className="mt-1 w-full rounded-btn border border-edge bg-card px-3 py-2 text-[13px] text-txt placeholder:text-txt3 focus:border-accent/50 focus:outline-none"
             />
             <label className="mt-3 block text-[11px] font-semibold uppercase tracking-wide text-txt3">Install folder <span className="text-txt3/70">(optional)</span></label>
-            <input
-              value={newPath}
-              onChange={(e) => setNewPath(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && void addManualGame()}
-              placeholder="e.g. D:\\Games\\Watch Dogs 2"
-              className="mt-1 w-full rounded-btn border border-edge bg-card px-3 py-2 text-[13px] text-txt placeholder:text-txt3 focus:border-accent/50 focus:outline-none"
-            />
+            <div className="mt-1 flex gap-2">
+              <input
+                value={newPath}
+                onChange={(e) => setNewPath(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && void addManualGame()}
+                placeholder="e.g. D:\\Games\\Watch Dogs 2"
+                className="w-full rounded-btn border border-edge bg-card px-3 py-2 text-[13px] text-txt placeholder:text-txt3 focus:border-accent/50 focus:outline-none"
+              />
+              <button
+                type="button"
+                onClick={() => void browseForFolder()}
+                title="Browse for the game's folder"
+                className="flex shrink-0 items-center gap-1.5 rounded-btn border border-edge bg-card px-3 py-2 text-[12px] font-medium text-txt2 hover:border-accent/40 hover:text-txt"
+              >
+                <FolderOpen size={14} /> Browse
+              </button>
+            </div>
             <p className="mt-1.5 text-[10.5px] text-txt3">Adding the folder lets Mujify detect the game engine for a tailored profile.</p>
             <div className="mt-5 flex justify-end gap-2">
               <button onClick={() => setShowAdd(false)} className="rounded-btn border border-edge bg-card px-4 py-2 text-[12px] font-medium text-txt2 hover:text-txt">Cancel</button>

@@ -177,11 +177,26 @@ export default function AIAssistant({ onNavigate }: { onNavigate: (page: PageId)
     let unlistenChunk: UnlistenFn | undefined;
     let unlistenDone: UnlistenFn | undefined;
     let active = true;
+    // Coalesce tokens: buffer incoming deltas and flush once per animation frame
+    // instead of re-rendering on every token — that per-token churn is what made
+    // the reply look like it was "breaking words and lagging". Capped at ~60fps.
+    let buffer = "";
+    let rafId: number | null = null;
+    const flush = () => {
+      rafId = null;
+      if (!buffer) return;
+      const chunk = buffer;
+      buffer = "";
+      useAiStore.getState().setStreamingContent((prev) => prev + chunk);
+    };
     void (async () => {
       const uc = await listen<string>("ai_chunk", (e) => {
-        useAiStore.getState().setStreamingContent((prev) => prev + e.payload);
+        buffer += e.payload;
+        if (rafId === null) rafId = requestAnimationFrame(flush);
       });
       const ud = await listen("ai_done", () => {
+        if (rafId !== null) cancelAnimationFrame(rafId);
+        flush(); // drain whatever's left before finalizing
         useAiStore.getState().finalizeStreaming();
       });
       if (!active) {
@@ -194,6 +209,7 @@ export default function AIAssistant({ onNavigate }: { onNavigate: (page: PageId)
     })();
     return () => {
       active = false;
+      if (rafId !== null) cancelAnimationFrame(rafId);
       unlistenChunk?.();
       unlistenDone?.();
     };
