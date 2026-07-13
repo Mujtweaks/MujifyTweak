@@ -175,27 +175,41 @@ export default function AIAssistant({ onNavigate }: { onNavigate: (page: PageId)
     let unlistenChunk: UnlistenFn | undefined;
     let unlistenDone: UnlistenFn | undefined;
     let active = true;
-    // Coalesce tokens: buffer incoming deltas and flush once per animation frame
-    // instead of re-rendering on every token — that per-token churn is what made
-    // the reply look like it was "breaking words and lagging". Capped at ~60fps.
-    let buffer = "";
+    // Smooth "typewriter" reveal (ChatGPT-style): the network delivers tokens in
+    // uneven bursts, so instead of painting each burst we keep the full received
+    // text as `target` and let `shown` catch up to it a few characters per frame.
+    // The display advances at a steady, smooth pace regardless of burst timing.
+    let target = "";
+    let shown = 0;
+    let done = false;
     let rafId: number | null = null;
-    const flush = () => {
+    const tick = () => {
       rafId = null;
-      if (!buffer) return;
-      const chunk = buffer;
-      buffer = "";
-      useAiStore.getState().setStreamingContent((prev) => prev + chunk);
+      if (shown < target.length) {
+        // reveal faster when far behind so we never lag the model, but always
+        // a smooth minimum drip so short replies still animate.
+        const remaining = target.length - shown;
+        shown += Math.max(3, Math.ceil(remaining / 8));
+        if (shown > target.length) shown = target.length;
+        useAiStore.getState().setStreamingContent(() => target.slice(0, shown));
+      }
+      if (shown < target.length) {
+        rafId = requestAnimationFrame(tick);
+      } else if (done) {
+        useAiStore.getState().finalizeStreaming();
+      }
+    };
+    const ensureTick = () => {
+      if (rafId === null) rafId = requestAnimationFrame(tick);
     };
     void (async () => {
       const uc = await listen<string>("ai_chunk", (e) => {
-        buffer += e.payload;
-        if (rafId === null) rafId = requestAnimationFrame(flush);
+        target += e.payload;
+        ensureTick();
       });
       const ud = await listen("ai_done", () => {
-        if (rafId !== null) cancelAnimationFrame(rafId);
-        flush(); // drain whatever's left before finalizing
-        useAiStore.getState().finalizeStreaming();
+        done = true;
+        ensureTick(); // let the reveal finish catching up, then finalize
       });
       if (!active) {
         uc();
