@@ -6,6 +6,7 @@ import {
   Gauge,
   Globe,
   LayoutDashboard,
+  MonitorCog,
   LifeBuoy,
   Rocket,
   Settings,
@@ -42,6 +43,7 @@ const GROUP_2: Item[] = [
   { id: "fixes", label: "Fixes", icon: Wrench },
   { id: "cleaner", label: "Cleaner", icon: Sparkles },
   { id: "network", label: "Network", icon: Globe },
+  { id: "gpu", label: "GPU", icon: MonitorCog },
   { id: "diagnostics", label: "Diagnostics", icon: Activity },
   { id: "ai", label: "AI Assistant", icon: Bot },
 ];

@@ -19,6 +19,7 @@ export type PageId =
   | "profiles"
   | "profile-editor"
   | "diagnostics"
+  | "gpu"
   | "network"
   | "tweaks"
   | "fixes"
@@ -47,6 +48,7 @@ export const PAGE_TITLES: Record<PageId, string> = {
   profiles: "Games",
   "profile-editor": "Profile",
   diagnostics: "Diagnostics",
+  gpu: "GPU",
   network: "Network",
   tweaks: "Tweaks",
   fixes: "Fixes",
