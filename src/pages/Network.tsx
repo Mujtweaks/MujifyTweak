@@ -13,6 +13,7 @@ import {
   Router,
   Server,
   Shield,
+  Signal,
   Wifi,
   Zap,
   type LucideIcon,
@@ -29,7 +30,7 @@ import { getNetworkInfo, scanTweaks } from "../lib/backend";
 import { useSystemStore } from "../store/systemStore";
 import { useTweakStore } from "../store/tweakStore";
 import ApplyConfirmModal from "../components/ApplyConfirmModal";
-import TweakCard from "../components/TweakCard";
+import PingOptimizer from "../components/PingOptimizer";
 import ServerPing from "../components/ServerPing";
 import SpeedTest from "../components/SpeedTest";
 import type { NetSample, NetworkInfo, TweakInfo } from "../lib/types";
@@ -164,6 +165,7 @@ export default function Network() {
   const [info, setInfo] = useState<NetworkInfo | null>(null);
   const [now, setNow] = useState(Date.now());
   const [confirmTweaks, setConfirmTweaks] = useState<TweakInfo[] | null>(null);
+  const [pingOpen, setPingOpen] = useState(false);
 
   useEffect(() => {
     void getNetworkInfo().then(setInfo);
@@ -336,23 +338,29 @@ export default function Network() {
           </div>
         </div>
         <button onClick={optimizeNetwork} className="mt-3 flex items-center gap-1.5 text-[12px] font-medium text-accent hover:text-accent-hi">
-          Review network tweaks <ChevronRight size={14} />
+          Apply all network tweaks <ChevronRight size={14} />
         </button>
       </div>
 
-      {/* Network tweak cards */}
-      {scanResult && (
-        <div>
-          <h2 className="mb-3 text-[16px] font-bold text-txt">Network & Ping Tweaks</h2>
-          <div className="grid grid-cols-2 gap-4">
-            {scanResult.tweaks
-              .filter((t) => t.category === "network")
-              .map((t) => (
-                <TweakCard key={t.id} tweak={t} selected={false} onToggle={(tw) => setConfirmTweaks([tw])} />
-              ))}
-          </div>
+      {/* Ping Optimizer — find the fastest game server + tune the route to it.
+          (Individual network tweaks live in the Tweaks tab; this tab is tools.) */}
+      <button
+        onClick={() => setPingOpen(true)}
+        className="glint flex w-full items-center gap-3 rounded-2xl border border-edge bg-card px-5 py-4 text-left transition-colors hover:border-accent/40"
+      >
+        <span className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-accent/10">
+          <Signal size={20} strokeWidth={1.75} className="text-accent" />
+        </span>
+        <div className="min-w-0 flex-1">
+          <p className="text-[14px] font-bold text-txt">Ping Optimizer</p>
+          <p className="text-[12px] text-txt2">Find your fastest game server and optimize your connection to it.</p>
         </div>
-      )}
+        <span className="flex shrink-0 items-center gap-1.5 rounded-btn bg-accent px-4 py-2 text-[12.5px] font-semibold text-white">
+          <Zap size={14} strokeWidth={2.5} fill="currentColor" /> Open
+        </span>
+      </button>
+
+      {pingOpen && <PingOptimizer onClose={() => setPingOpen(false)} />}
 
       {confirmTweaks && (
         <ApplyConfirmModal

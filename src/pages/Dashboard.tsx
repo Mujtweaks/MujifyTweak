@@ -1,12 +1,10 @@
-import { useState } from "react";
-import { BrainCircuit, Cpu, HardDrive, Laptop, MemoryStick, Monitor, Signal, Zap, type LucideIcon } from "lucide-react";
+import { BrainCircuit, Cpu, HardDrive, Laptop, MemoryStick, Monitor, type LucideIcon } from "lucide-react";
 import ScoreGauge from "../components/ScoreGauge";
 import ActionCards from "../components/ActionCards";
 import StatGauges from "../components/StatGauges";
 import PerformanceChart from "../components/PerformanceChart";
 import RecentActivity from "../components/RecentActivity";
 import RestorePointCard from "../components/RestorePointCard";
-import PingOptimizer from "../components/PingOptimizer";
 import DetectiveCard from "../components/DetectiveCard";
 import { useSystemStore } from "../store/systemStore";
 import type { PageId } from "../lib/nav";
@@ -63,7 +61,6 @@ function HardwareStrip() {
 }
 
 export default function Dashboard({ onNavigate }: { onNavigate: (page: PageId) => void }) {
-  const [pingOpen, setPingOpen] = useState(false);
 
   return (
     <div className="flex h-full flex-col gap-4">
@@ -84,24 +81,6 @@ export default function Dashboard({ onNavigate }: { onNavigate: (page: PageId) =
         </section>
       </div>
 
-      {/* Ping Optimizer launcher */}
-      <button
-        onClick={() => setPingOpen(true)}
-        className="glint flex shrink-0 items-center gap-3 rounded-card border border-edge bg-card px-5 py-3 text-left transition-colors hover:border-accent/40"
-      >
-        <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-accent/10">
-          <Signal size={18} strokeWidth={1.75} className="text-accent" />
-        </span>
-        <div className="min-w-0 flex-1">
-          <p className="text-[13px] font-bold text-txt">Ping Optimizer</p>
-          <p className="text-[11px] text-txt2">Find your fastest game server and optimize your connection to it.</p>
-        </div>
-        <span className="flex shrink-0 items-center gap-1.5 rounded-btn bg-accent px-3.5 py-2 text-[12px] font-semibold text-white">
-          <Zap size={13} strokeWidth={2.5} fill="currentColor" /> Open
-        </span>
-      </button>
-
-      {pingOpen && <PingOptimizer onClose={() => setPingOpen(false)} />}
     </div>
   );
 }
