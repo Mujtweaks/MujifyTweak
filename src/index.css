@@ -212,8 +212,23 @@ textarea {
     transform: translateX(4px);
   }
 }
+/* Unsaved-changes shake now pulses a red glow + border so it's unmistakable. */
+@keyframes shake-glow {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(227, 0, 14, 0);
+    border-color: rgba(227, 0, 14, 0.5);
+  }
+  30%,
+  70% {
+    box-shadow: 0 0 24px 2px rgba(227, 0, 14, 0.55);
+    border-color: rgba(227, 0, 14, 0.9);
+  }
+}
 .shake {
-  animation: shake 0.4s ease-in-out;
+  animation:
+    shake 0.4s ease-in-out,
+    shake-glow 0.6s ease-in-out;
 }
 
 /* ---- Apply animation (the satisfying feedback when tweaks are applied) ---- */

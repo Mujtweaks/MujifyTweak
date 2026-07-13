@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { open } from "@tauri-apps/plugin-dialog";
 import { FileSearch, FolderOpen, HardDrive, Loader2, MemoryStick, Sparkles, Trash2, X, Zap } from "lucide-react";
 import {
   cleanJunk,
@@ -108,6 +109,15 @@ export default function Cleaner() {
     setLargeBusy(true);
     setLarge(await scanLargeFiles(largeRoot.trim(), minMb));
     setLargeBusy(false);
+  };
+  // Native folder picker so you don't have to type the path.
+  const pickFolder = async (setter: (v: string) => void) => {
+    try {
+      const d = await open({ directory: true, title: "Select a folder to scan" });
+      if (typeof d === "string" && d) setter(d);
+    } catch {
+      /* cancelled */
+    }
   };
 
   // ---- Duplicate finder ----
@@ -263,9 +273,12 @@ export default function Cleaner() {
           <input
             value={largeRoot}
             onChange={(e) => setLargeRoot(e.target.value)}
-            placeholder="Folder to scan, e.g. C:\Users\you\Downloads"
+            placeholder="Browse or type a folder to scan →"
             className="flex-1 rounded-btn border border-edge bg-card px-3 py-2 text-[12.5px] text-txt placeholder:text-txt3 focus:border-accent/40 focus:outline-none"
           />
+          <button onClick={() => void pickFolder(setLargeRoot)} title="Browse for a folder" className="flex shrink-0 items-center gap-1.5 rounded-btn border border-edge bg-bg px-3 py-2 text-[12px] font-medium text-txt2 hover:border-accent/40 hover:text-txt">
+            <FolderOpen size={14} /> Browse
+          </button>
           <select
             value={minMb}
             onChange={(e) => setMinMb(Number(e.target.value))}
@@ -320,9 +333,12 @@ export default function Cleaner() {
           <input
             value={dupRoot}
             onChange={(e) => setDupRoot(e.target.value)}
-            placeholder="Folder to scan for duplicates"
+            placeholder="Browse or type a folder to scan for duplicates →"
             className="flex-1 rounded-btn border border-edge bg-card px-3 py-2 text-[12.5px] text-txt placeholder:text-txt3 focus:border-accent/40 focus:outline-none"
           />
+          <button onClick={() => void pickFolder(setDupRoot)} title="Browse for a folder" className="flex shrink-0 items-center gap-1.5 rounded-btn border border-edge bg-bg px-3 py-2 text-[12px] font-medium text-txt2 hover:border-accent/40 hover:text-txt">
+            <FolderOpen size={14} /> Browse
+          </button>
           <button
             onClick={() => void runDups()}
             disabled={dupBusy || !dupRoot.trim()}

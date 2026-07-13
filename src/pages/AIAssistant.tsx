@@ -159,10 +159,12 @@ export default function AIAssistant({ onNavigate }: { onNavigate: (page: PageId)
   const [input, setInput] = useState("");
   const [webSearch, setWebSearch] = useState(false);
   const endRef = useRef<HTMLDivElement>(null);
+  const topRef = useRef<HTMLDivElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
-  const scrollToTop = () => scrollRef.current?.scrollTo({ top: 0, behavior: "smooth" });
-  const scrollToBottom = () =>
-    scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
+  // Use scrollIntoView on anchor divs — reliable no matter which parent is the
+  // actual scroll container (the old scrollRef.scrollTo did nothing here).
+  const scrollToTop = () => topRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+  const scrollToBottom = () => endRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
 
   // Restore the saved conversation and check the API key on mount.
   useEffect(() => {
@@ -338,6 +340,7 @@ export default function AIAssistant({ onNavigate }: { onNavigate: (page: PageId)
         {/* Chat */}
         <div className="relative flex min-h-0 flex-col rounded-2xl border border-edge bg-card">
           <div ref={scrollRef} className="flex-1 space-y-3 overflow-y-auto p-5">
+            <div ref={topRef} />
             {messages.length === 0 && !streamingContent && (
               <div className="grid h-full place-items-center text-center">
                 <div>

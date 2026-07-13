@@ -70,14 +70,21 @@ export default function Profiles({ onNavigate }: { onNavigate: (page: PageId) =>
 
   // Open the native folder picker and fill in the install path (and, if empty,
   // default the game name to the folder's own name).
-  const browseForFolder = async () => {
+  // Browse straight to the game's .exe (or shortcut) — most natural for "add a
+  // game". We store the folder it lives in and default the name from the exe.
+  const browseForGame = async () => {
     try {
-      const dir = await open({ directory: true, title: "Select the game's install folder" });
-      if (typeof dir === "string" && dir) {
-        setNewPath(dir);
+      const file = await open({
+        multiple: false,
+        title: "Select the game's .exe or shortcut",
+        filters: [{ name: "Game or shortcut", extensions: ["exe", "lnk", "url"] }],
+      });
+      if (typeof file === "string" && file) {
+        setNewPath(file);
         if (!newName.trim()) {
-          const seg = dir.replace(/[/\\]+$/, "").split(/[/\\]/).pop() ?? "";
-          if (seg) setNewName(seg);
+          const base = file.replace(/[/\\]+$/, "").split(/[/\\]/).pop() ?? "";
+          const nm = base.replace(/\.(exe|lnk|url)$/i, "").replace(/[_-]+/g, " ").trim();
+          if (nm) setNewName(nm);
         }
       }
     } catch {
@@ -156,19 +163,19 @@ export default function Profiles({ onNavigate }: { onNavigate: (page: PageId) =>
               placeholder="e.g. Watch Dogs 2"
               className="mt-1 w-full rounded-btn border border-edge bg-card px-3 py-2 text-[13px] text-txt placeholder:text-txt3 focus:border-accent/50 focus:outline-none"
             />
-            <label className="mt-3 block text-[11px] font-semibold uppercase tracking-wide text-txt3">Install folder <span className="text-txt3/70">(optional)</span></label>
+            <label className="mt-3 block text-[11px] font-semibold uppercase tracking-wide text-txt3">Game .exe or folder <span className="text-txt3/70">(optional)</span></label>
             <div className="mt-1 flex gap-2">
               <input
                 value={newPath}
                 onChange={(e) => setNewPath(e.target.value)}
                 onKeyDown={(e) => e.key === "Enter" && void addManualGame()}
-                placeholder="e.g. D:\\Games\\Watch Dogs 2"
+                placeholder="Browse to the game's .exe →"
                 className="w-full rounded-btn border border-edge bg-card px-3 py-2 text-[13px] text-txt placeholder:text-txt3 focus:border-accent/50 focus:outline-none"
               />
               <button
                 type="button"
-                onClick={() => void browseForFolder()}
-                title="Browse for the game's folder"
+                onClick={() => void browseForGame()}
+                title="Browse for the game's .exe or shortcut"
                 className="flex shrink-0 items-center gap-1.5 rounded-btn border border-edge bg-card px-3 py-2 text-[12px] font-medium text-txt2 hover:border-accent/40 hover:text-txt"
               >
                 <FolderOpen size={14} /> Browse
