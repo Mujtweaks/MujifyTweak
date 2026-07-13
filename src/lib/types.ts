@@ -195,7 +195,8 @@ export type TweakCategory =
   | "network"
   | "graphics"
   | "privacy"
-  | "gaming";
+  | "gaming"
+  | "appearance";
 
 export interface TweakInfo {
   id: string;

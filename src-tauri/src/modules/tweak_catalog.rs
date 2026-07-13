@@ -26,6 +26,7 @@ pub enum Category {
     Graphics,
     Privacy,
     Gaming,
+    Appearance,
 }
 
 #[derive(Serialize, Clone)]
@@ -166,6 +167,15 @@ const CATALOG: &[TweakDef] = &[
     TweakDef { id: "fps_cap", title: "Smart FPS Cap", description: "Caps FPS just under your refresh to cut latency when sync is on.", category: Gaming, risk: Safe, impact: 3 },
     TweakDef { id: "keyboard_delay", title: "Minimize Keyboard Repeat Delay", description: "Sets the fastest keyboard repeat/response for input.", category: Gaming, risk: Safe, impact: 2 },
     TweakDef { id: "disable_sticky_keys", title: "Disable Sticky Keys", description: "Prevents the Sticky Keys prompt from interrupting games.", category: Gaming, risk: Safe, impact: 1 },
+
+    // ---------- Appearance (make Windows lean & snappy) ----------
+    TweakDef { id: "visual_fx_performance", title: "Best-Performance Visual Effects", description: "Switches Windows visual effects to “Adjust for best performance” — drops animations and shadows so the desktop feels instant. Fully reversible.", category: Appearance, risk: Safe, impact: 3 },
+    TweakDef { id: "disable_transparency", title: "Disable Transparency Effects", description: "Turns off the translucent taskbar/menus (Acrylic/Mica) — a small GPU/compositor saving and a cleaner look.", category: Appearance, risk: Safe, impact: 2 },
+    TweakDef { id: "dark_mode", title: "Enable Dark Mode", description: "Switches apps and the system UI to the dark theme.", category: Appearance, risk: Safe, impact: 1 },
+    TweakDef { id: "hide_task_view", title: "Hide Task View Button", description: "Removes the Task View (virtual-desktops) button from the taskbar for a cleaner bar.", category: Appearance, risk: Safe, impact: 1 },
+    TweakDef { id: "taskbar_end_task", title: "Add “End Task” to Taskbar", description: "Enables right-click → End Task on taskbar apps, so you can kill a frozen game without opening Task Manager.", category: Appearance, risk: Safe, impact: 2 },
+    TweakDef { id: "disable_bing_search", title: "Disable Bing in Start Search", description: "Stops Start-menu search from querying Bing/web — local results only, faster and more private.", category: Appearance, risk: Safe, impact: 2 },
+    TweakDef { id: "disable_consumer_features", title: "Disable Auto-Installed Promo Apps", description: "Stops Windows from silently installing promoted/suggested apps (Candy Crush and friends) on your account.", category: Appearance, risk: Safe, impact: 2 },
 ];
 
 /// Read-only: is the active power plan already High/Ultimate Performance?
@@ -253,7 +263,7 @@ pub fn scan_tweaks(is_laptop: Option<bool>) -> ScanResult {
         })
         .collect();
 
-    let cats = [System, Performance, Network, Graphics, Privacy, Gaming];
+    let cats = [System, Performance, Network, Graphics, Privacy, Gaming, Appearance];
     let categories: Vec<CategorySummary> = cats
         .iter()
         .map(|&c| {

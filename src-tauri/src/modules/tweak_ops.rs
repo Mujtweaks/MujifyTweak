@@ -299,6 +299,17 @@ pub fn ops_for(tweak_id: &str) -> Vec<Op> {
         "disable_power_throttling" => vec![dw(Hklm, r"SYSTEM\CurrentControlSet\Control\Power\PowerThrottling", "PowerThrottlingOff", 1)],
         "win32_priority" => vec![dw(Hklm, r"SYSTEM\CurrentControlSet\Control\PriorityControl", "Win32PrioritySeparation", 38)],
         "large_system_cache" => vec![dw(Hklm, MMCSS_PROFILE, "SystemResponsiveness", 10)],
+        // ---- Appearance (WinUtil-style, all reversible HKCU dwords) ----
+        "visual_fx_performance" => vec![dw(Hkcu, r"Software\Microsoft\Windows\CurrentVersion\Explorer\VisualEffects", "VisualFXSetting", 2)],
+        "disable_transparency" => vec![dw(Hkcu, r"Software\Microsoft\Windows\CurrentVersion\Themes\Personalize", "EnableTransparency", 0)],
+        "dark_mode" => vec![
+            dw(Hkcu, r"Software\Microsoft\Windows\CurrentVersion\Themes\Personalize", "AppsUseLightTheme", 0),
+            dw(Hkcu, r"Software\Microsoft\Windows\CurrentVersion\Themes\Personalize", "SystemUsesLightTheme", 0),
+        ],
+        "hide_task_view" => vec![dw(Hkcu, r"Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced", "ShowTaskViewButton", 0)],
+        "taskbar_end_task" => vec![dw(Hkcu, r"Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced\TaskbarDeveloperSettings", "TaskbarEndTask", 1)],
+        "disable_bing_search" => vec![dw(Hkcu, r"Software\Microsoft\Windows\CurrentVersion\Search", "BingSearchEnabled", 0)],
+        "disable_consumer_features" => vec![dw(Hklm, r"SOFTWARE\Policies\Microsoft\Windows\CloudContent", "DisableWindowsConsumerFeatures", 1)],
         "mmcss_gaming" => vec![
             dw(Hklm, MMCSS_GAMES, "GPU Priority", 8),
             dw(Hklm, MMCSS_GAMES, "Priority", 6),
@@ -475,6 +486,26 @@ mod tests {
         assert_eq!(m.get_dword(Hklm, r"SYSTEM\CurrentControlSet\Control\PriorityControl", "Win32PrioritySeparation"), Some(38));
         undo_all(&m, &undos);
         assert_eq!(m.get_dword(Hklm, r"SYSTEM\CurrentControlSet\Control\PriorityControl", "Win32PrioritySeparation"), Some(2));
+    }
+
+    #[test]
+    fn appearance_tweaks_apply_and_fully_revert() {
+        let m = MockMutator::new();
+        // Best-performance visual effects
+        let u = apply_all(&m, "visual_fx_performance");
+        assert_eq!(m.get_dword(Hkcu, r"Software\Microsoft\Windows\CurrentVersion\Explorer\VisualEffects", "VisualFXSetting"), Some(2));
+        undo_all(&m, &u);
+        assert_eq!(m.get_dword(Hkcu, r"Software\Microsoft\Windows\CurrentVersion\Explorer\VisualEffects", "VisualFXSetting"), None);
+        // Dark mode is a two-value tweak; both must apply and both must revert.
+        let u = apply_all(&m, "dark_mode");
+        assert_eq!(m.get_dword(Hkcu, r"Software\Microsoft\Windows\CurrentVersion\Themes\Personalize", "AppsUseLightTheme"), Some(0));
+        assert_eq!(m.get_dword(Hkcu, r"Software\Microsoft\Windows\CurrentVersion\Themes\Personalize", "SystemUsesLightTheme"), Some(0));
+        undo_all(&m, &u);
+        assert_eq!(m.get_dword(Hkcu, r"Software\Microsoft\Windows\CurrentVersion\Themes\Personalize", "AppsUseLightTheme"), None);
+        // Every appearance tweak must be appliable (have real ops).
+        for id in ["visual_fx_performance", "disable_transparency", "dark_mode", "hide_task_view", "taskbar_end_task", "disable_bing_search", "disable_consumer_features"] {
+            assert!(is_appliable(id), "{id} should be appliable");
+        }
     }
 
     #[test]

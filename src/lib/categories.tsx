@@ -5,6 +5,7 @@ import {
   Globe,
   Lock,
   Monitor,
+  Palette,
   Settings2,
   type LucideIcon,
 } from "lucide-react";
@@ -50,6 +51,12 @@ export const CATEGORY_META: Record<
     icon: Gamepad2,
     color: "#22c55e",
   },
+  appearance: {
+    label: "Appearance",
+    subtitle: "Best-performance visuals, minimal Windows",
+    icon: Palette,
+    color: "#ec4899",
+  },
 };
 
 /** Honest impact tier for a tweak's 1–5 rating. We never fabricate a "boost %" —
@@ -67,6 +74,7 @@ export const CATEGORY_ORDER: TweakCategory[] = [
   "graphics",
   "privacy",
   "gaming",
+  "appearance",
 ];
 
 export const CPU_ICON = Cpu;
