@@ -3,6 +3,7 @@ import {
   Activity,
   Bot,
   Gamepad2,
+  Gauge,
   Globe,
   LayoutDashboard,
   LifeBuoy,
@@ -32,6 +33,7 @@ interface Item {
 
 const GROUP_1: Item[] = [
   { id: "home", label: "Home", icon: LayoutDashboard },
+  { id: "overview", label: "Overview", icon: Gauge },
   { id: "profiles", label: "Games", icon: Gamepad2 },
 ];
 const GROUP_2: Item[] = [

@@ -14,6 +14,7 @@ import {
 
 export type PageId =
   | "home"
+  | "overview"
   | "optimizer"
   | "profiles"
   | "profile-editor"
@@ -41,6 +42,7 @@ export interface NavItem {
 /** Uppercase page titles shown in the TopBar (sidebar is icon-only). */
 export const PAGE_TITLES: Record<PageId, string> = {
   home: "Home",
+  overview: "System Overview",
   optimizer: "Optimizer",
   profiles: "Games",
   "profile-editor": "Profile",

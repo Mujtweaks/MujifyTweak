@@ -7,6 +7,7 @@ import Optimizer from "./pages/Optimizer";
 import Profiles from "./pages/Profiles";
 import ProfileEditor from "./pages/ProfileEditor";
 import Diagnostics from "./pages/Diagnostics";
+import Overview from "./pages/Overview";
 import Network from "./pages/Network";
 import Tweaks from "./pages/Tweaks";
 import Fixes from "./pages/Fixes";
@@ -157,6 +158,8 @@ export default function App() {
         return <Profiles onNavigate={navigate} />;
       case "profile-editor":
         return <ProfileEditor />;
+      case "overview":
+        return <Overview />;
       case "diagnostics":
         return <Diagnostics />;
       case "network":
