@@ -120,10 +120,10 @@ const CATALOG: &[TweakDef] = &[
     TweakDef { id: "disable_hpet", title: "Disable HPET", description: "Legacy timer tweak — community consensus moved away years ago; can even hurt on modern CPUs. Experimental.", category: Performance, risk: Advanced, impact: 2 },
     TweakDef { id: "cpu_affinity_pcore", title: "Pin Games to Performance Cores", description: "Steers the game to P-cores on hybrid CPUs (auto-skips where it would hurt).", category: Performance, risk: Advanced, impact: 4 },
     TweakDef { id: "disable_power_throttling", title: "Disable Power Throttling", description: "Stops Windows from throttling foreground apps to save power.", category: Performance, risk: Moderate, impact: 4 },
-    TweakDef { id: "win32_priority", title: "Optimize Win32 Priority Separation", description: "Tunes the scheduler quantum to favor foreground game threads.", category: Performance, risk: Moderate, impact: 3 },
+    TweakDef { id: "win32_priority", title: "Optimize Win32 Priority Separation", description: "Sets Win32PrioritySeparation to 0x26 (38) — short, variable quantums that strongly favour the foreground game for the highest FPS. (For reference: 0x2A = max responsiveness/snappier Windows, 0x18 = favour background tasks.)", category: Performance, risk: Moderate, impact: 3 },
     TweakDef { id: "game_priority", title: "Above-Normal Game Priority", description: "Raises the running game's process priority so it gets scheduler preference.", category: Performance, risk: Safe, impact: 3 },
     TweakDef { id: "mmcss_gaming", title: "MMCSS Gaming Profile", description: "Gives games a larger GPU/CPU scheduling share via the multimedia scheduler.", category: Performance, risk: Moderate, impact: 3 },
-    TweakDef { id: "large_system_cache", title: "Optimize System Responsiveness", description: "Sets SystemResponsiveness to 0 so 100% of CPU can go to the game.", category: Performance, risk: Moderate, impact: 3 },
+    TweakDef { id: "large_system_cache", title: "Optimize System Responsiveness", description: "Sets SystemResponsiveness to 10 so Windows reserves less CPU for background multimedia and gives more to your game (10 is the recommended gaming value; Windows default is 20).", category: Performance, risk: Moderate, impact: 3 },
 
     // ---------- Network ----------
     TweakDef { id: "disable_nagle", title: "Disable Nagle's Algorithm", description: "Sends small game packets immediately instead of batching them — lower input lag.", category: Network, risk: Moderate, impact: 4 },

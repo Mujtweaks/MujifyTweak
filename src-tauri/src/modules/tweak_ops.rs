@@ -298,7 +298,7 @@ pub fn ops_for(tweak_id: &str) -> Vec<Op> {
         "power_high_perf" => vec![Op::PowerPlan { guid: HIGH_PERF_GUID }],
         "disable_power_throttling" => vec![dw(Hklm, r"SYSTEM\CurrentControlSet\Control\Power\PowerThrottling", "PowerThrottlingOff", 1)],
         "win32_priority" => vec![dw(Hklm, r"SYSTEM\CurrentControlSet\Control\PriorityControl", "Win32PrioritySeparation", 38)],
-        "large_system_cache" => vec![dw(Hklm, MMCSS_PROFILE, "SystemResponsiveness", 0)],
+        "large_system_cache" => vec![dw(Hklm, MMCSS_PROFILE, "SystemResponsiveness", 10)],
         "mmcss_gaming" => vec![
             dw(Hklm, MMCSS_GAMES, "GPU Priority", 8),
             dw(Hklm, MMCSS_GAMES, "Priority", 6),
