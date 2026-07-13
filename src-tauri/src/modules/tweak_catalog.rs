@@ -109,6 +109,10 @@ const CATALOG: &[TweakDef] = &[
     TweakDef { id: "disable_widgets", title: "Disable Widgets / News & Interests", description: "Turns off the taskbar Widgets board and its background feed process.", category: System, risk: Safe, impact: 2 },
     TweakDef { id: "disable_background_apps", title: "Disable Background Apps", description: "Stops UWP/Store apps from running and updating in the background.", category: System, risk: Moderate, impact: 3 },
     TweakDef { id: "disable_storage_sense", title: "Disable Storage Sense", description: "Stops the automatic disk-cleanup task from running in the background.", category: System, risk: Safe, impact: 1 },
+    TweakDef { id: "num_lock_startup", title: "Num Lock On at Startup", description: "Enables Num Lock automatically at sign-in so the numpad works right away.", category: System, risk: Safe, impact: 1 },
+    TweakDef { id: "verbose_logon", title: "Verbose Sign-in Messages", description: "Shows detailed “what Windows is doing” status text during sign-in/shutdown — handy for spotting what's slowing boot.", category: System, risk: Safe, impact: 1 },
+    TweakDef { id: "detailed_bsod", title: "Detailed Blue-Screen Info", description: "Makes the blue-screen show the full technical detail (driver/stop code) instead of just a sad face — far easier to diagnose crashes.", category: System, risk: Safe, impact: 1 },
+    TweakDef { id: "utc_time", title: "Use UTC for Hardware Clock", description: "Stores the BIOS clock in UTC so the time stays correct when dual-booting Linux. Skip on a Windows-only PC.", category: System, risk: Moderate, impact: 1 },
     TweakDef { id: "clear_standby", title: "Clear Standby Memory", description: "A one-shot action, not a toggle — run it from “Free up memory” in the Cleaner tab to flush the standby list back to the game.", category: System, risk: Safe, impact: 3 },
     TweakDef { id: "disable_memory_compression", title: "Disable Memory Compression", description: "Reduces CPU overhead from compressing RAM pages on high-memory systems.", category: System, risk: Moderate, impact: 3 },
     TweakDef { id: "disable_hvci", title: "Disable Memory Integrity (Core Isolation)", description: "Turns off HVCI/VBS Memory Integrity to reclaim its gaming performance cost. This LOWERS a security protection and needs a restart to take effect — a deliberate tradeoff, not a blanket recommendation.", category: System, risk: Advanced, impact: 3 },
@@ -133,7 +137,11 @@ const CATALOG: &[TweakDef] = &[
     TweakDef { id: "tcp_optimize", title: "TCP Auto-Tuning", description: "Tunes TCP window auto-tuning and scaling for gaming traffic.", category: Network, risk: Moderate, impact: 3 },
     TweakDef { id: "tcp_ack_frequency", title: "TCP ACK Frequency", description: "Acknowledges packets immediately rather than delaying — pairs with Nagle off.", category: Network, risk: Moderate, impact: 3 },
     TweakDef { id: "flush_dns", title: "Flush DNS Cache", description: "Clears stale DNS entries before an online session.", category: Network, risk: Safe, impact: 2 },
-    TweakDef { id: "dns_cloudflare", title: "Fast DNS (1.1.1.1)", description: "Points DNS at Cloudflare for faster, private name resolution.", category: Network, risk: Safe, impact: 2 },
+    TweakDef { id: "dns_cloudflare", title: "Fast DNS — Cloudflare (1.1.1.1)", description: "Points DNS at Cloudflare for faster, private name resolution.", category: Network, risk: Safe, impact: 2 },
+    TweakDef { id: "dns_google", title: "Fast DNS — Google (8.8.8.8)", description: "Points DNS at Google Public DNS — fast and globally reachable.", category: Network, risk: Safe, impact: 2 },
+    TweakDef { id: "dns_quad9", title: "Secure DNS — Quad9 (9.9.9.9)", description: "Quad9 blocks known malicious domains at the DNS layer — safer name resolution.", category: Network, risk: Safe, impact: 2 },
+    TweakDef { id: "dns_opendns", title: "DNS — OpenDNS", description: "Cisco OpenDNS resolvers with optional filtering and good uptime.", category: Network, risk: Safe, impact: 2 },
+    TweakDef { id: "dns_adguard", title: "Ad-Blocking DNS — AdGuard", description: "AdGuard DNS filters ads and trackers network-wide before they load. Great for cleaner browsing.", category: Network, risk: Safe, impact: 2 },
     TweakDef { id: "disable_teredo", title: "Disable Teredo / ISATAP", description: "Removes legacy IPv6 tunneling that can add latency and instability.", category: Network, risk: Safe, impact: 2 },
     TweakDef { id: "disable_delivery_optimization", title: "Disable Update P2P Sharing", description: "Stops Delivery Optimization uploading Windows updates to other PCs over your connection.", category: Network, risk: Safe, impact: 2 },
 
@@ -146,6 +154,7 @@ const CATALOG: &[TweakDef] = &[
     TweakDef { id: "gpu_priority", title: "GPU Scheduling Priority", description: "Raises the GPU priority of games via the multimedia scheduler tasks.", category: Graphics, risk: Moderate, impact: 3 },
     TweakDef { id: "shader_cache", title: "Increase Shader Cache Size", description: "Lets the driver keep more compiled shaders to reduce traversal stutter.", category: Graphics, risk: Safe, impact: 2 },
     TweakDef { id: "disable_vsync_hint", title: "Disable Windowed VSync Hint", description: "Removes the DWM VSync hint that can cap windowed frame rates.", category: Graphics, risk: Moderate, impact: 2 },
+    TweakDef { id: "disable_mpo", title: "Disable Multiplane Overlay (MPO)", description: "Turns off DWM Multiplane Overlay — the fix for screen flicker, black flashes and stutter that some NVIDIA/AMD setups get with G-Sync/FreeSync. Needs a restart. Fully reversible.", category: Graphics, risk: Moderate, impact: 3 },
     // Vendor-specific — the UI shows each only when that GPU brand is detected.
     TweakDef { id: "nvidia_max_performance", title: "NVIDIA: Prefer Maximum Performance", description: "Sets the NVIDIA PowerMizer policy to hold high clocks instead of down-clocking during games.", category: Graphics, risk: Moderate, impact: 4 },
     TweakDef { id: "nvidia_disable_telemetry", title: "NVIDIA: Disable Telemetry", description: "Disables the NVIDIA telemetry background service.", category: Graphics, risk: Safe, impact: 2 },
@@ -160,6 +169,7 @@ const CATALOG: &[TweakDef] = &[
     TweakDef { id: "disable_activity_history", title: "Disable Activity History", description: "Stops Windows from recording and syncing your activity timeline.", category: Privacy, risk: Safe, impact: 2 },
     TweakDef { id: "disable_location", title: "Disable Location Tracking", description: "Turns off the system location service and its background polling.", category: Privacy, risk: Safe, impact: 2 },
     TweakDef { id: "disable_feedback", title: "Disable Feedback Requests", description: "Stops Windows from periodically asking for feedback.", category: Privacy, risk: Safe, impact: 1 },
+    TweakDef { id: "disable_wpbt", title: "Block Firmware App Injection (WPBT)", description: "Stops the motherboard firmware from silently installing vendor software into Windows on every boot (the WPBT mechanism). A real security & bloat win. Reversible.", category: Privacy, risk: Moderate, impact: 2 },
 
     // ---------- Gaming ----------
     TweakDef { id: "mouse_accel_off", title: "Disable Mouse Acceleration", description: "Makes cursor and aim movement 1:1 for consistent aim.", category: Gaming, risk: Safe, impact: 4 },
@@ -182,6 +192,9 @@ const CATALOG: &[TweakDef] = &[
     TweakDef { id: "disable_lock_screen", title: "Disable Lock Screen", description: "Skips the lock-screen image and goes straight to the sign-in prompt.", category: Appearance, risk: Safe, impact: 1 },
     TweakDef { id: "enable_long_paths", title: "Enable Long File Paths", description: "Lets Windows and apps use paths longer than 260 characters — avoids weird errors with deep game/mod folders.", category: System, risk: Safe, impact: 1 },
     TweakDef { id: "disable_notification_center", title: "Disable Notification Center", description: "Turns off the Action/Notification Center flyout and its calendar popup — fewer background interruptions while gaming.", category: Privacy, risk: Safe, impact: 2 },
+    TweakDef { id: "taskbar_align_left", title: "Move Taskbar Icons Left", description: "Aligns taskbar icons to the left (classic Windows 10 style) instead of centered.", category: Appearance, risk: Safe, impact: 1 },
+    TweakDef { id: "hide_start_recommendations", title: "Hide Start “Recommended”", description: "Removes the Recommended (recent files/apps) section from the Start menu for a cleaner, more private Start.", category: Appearance, risk: Safe, impact: 1 },
+    TweakDef { id: "scrollbars_always", title: "Always Show Scrollbars", description: "Keeps scrollbars visible instead of auto-hiding them — easier to grab, no layout shift.", category: Appearance, risk: Safe, impact: 1 },
 ];
 
 /// Scan current state and report per-tweak applied/available + category rollups.

@@ -424,6 +424,26 @@ pub fn ops_for(tweak_id: &str) -> Vec<Op> {
         ],
         "disable_storage_sense" => vec![dw(Hklm, r"SOFTWARE\Policies\Microsoft\Windows\StorageSense", "AllowStorageSenseGlobal", 0)],
 
+        // ---- WinUtil-parity batch (all pure registry → captured prior, exact revert) ----
+        // Appearance / taskbar
+        "taskbar_align_left" => vec![dw(Hkcu, r"Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced", "TaskbarAl", 0)],
+        "hide_start_recommendations" => vec![dw(Hklm, r"SOFTWARE\Policies\Microsoft\Windows\Explorer", "HideRecommendedSection", 1)],
+        "scrollbars_always" => vec![dw(Hkcu, r"Control Panel\Accessibility", "DynamicScrollbars", 0)],
+        // System / diagnostics
+        "num_lock_startup" => vec![sz(Hkcu, r"Control Panel\Keyboard", "InitialKeyboardIndicators", "2")],
+        "verbose_logon" => vec![dw(Hklm, r"SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\System", "VerboseStatus", 1)],
+        "detailed_bsod" => vec![dw(Hklm, r"SYSTEM\CurrentControlSet\Control\CrashControl", "DisplayParameters", 1)],
+        "utc_time" => vec![dw(Hklm, r"SYSTEM\CurrentControlSet\Control\TimeZoneInformation", "RealTimeIsUniversal", 1)],
+        // Graphics — Multiplane Overlay off (fixes G-Sync/flicker/stutter on some GPUs)
+        "disable_mpo" => vec![dw(Hklm, r"SOFTWARE\Microsoft\Windows\Dwm", "OverlayTestMode", 5)],
+        // Security — block firmware-injected vendor software (WPBT)
+        "disable_wpbt" => vec![dw(Hklm, r"SYSTEM\CurrentControlSet\Control\Session Manager", "DisableWpbtExecution", 1)],
+        // Network — DNS provider presets (mutually-exclusive; each captures prior NameServer)
+        "dns_google" => vec![Op::SzAllInterfaces { name: "NameServer", value: "8.8.8.8,8.8.4.4" }],
+        "dns_quad9" => vec![Op::SzAllInterfaces { name: "NameServer", value: "9.9.9.9,149.112.112.112" }],
+        "dns_opendns" => vec![Op::SzAllInterfaces { name: "NameServer", value: "208.67.222.222,208.67.220.220" }],
+        "dns_adguard" => vec![Op::SzAllInterfaces { name: "NameServer", value: "94.140.14.14,94.140.15.15" }],
+
         // ---- Vendor: NVIDIA (shown only when an NVIDIA GPU is detected) ----
         "nvidia_disable_telemetry" => vec![Op::DisableService { name: "NvTelemetryContainer" }],
         "nvidia_max_performance" => vec![Op::GpuVendorDwords {
@@ -581,6 +601,44 @@ mod tests {
         assert_eq!(m.get_dword(Hkcu, r"Software\Microsoft\Windows\CurrentVersion\Themes\Personalize", "AppsUseLightTheme"), None);
         // Every appearance tweak must be appliable (have real ops).
         for id in ["visual_fx_performance", "disable_transparency", "dark_mode", "hide_task_view", "taskbar_end_task", "disable_bing_search", "disable_consumer_features"] {
+            assert!(is_appliable(id), "{id} should be appliable");
+        }
+    }
+
+    #[test]
+    fn winutil_parity_batch_applies_reverts_and_detects() {
+        let m = MockMutator::new();
+        // A representative DWORD tweak from the new batch applies + reverts exactly.
+        let u = apply_all(&m, "disable_mpo");
+        assert_eq!(m.get_dword(Hklm, r"SOFTWARE\Microsoft\Windows\Dwm", "OverlayTestMode"), Some(5));
+        assert!(is_applied_with(&m, "disable_mpo")); // live-state detection sees it
+        undo_all(&m, &u);
+        assert_eq!(m.get_dword(Hklm, r"SOFTWARE\Microsoft\Windows\Dwm", "OverlayTestMode"), None);
+        assert!(!is_applied_with(&m, "disable_mpo"));
+
+        // Num Lock is an SZ tweak; prior value must be restored, not deleted.
+        let m2 = MockMutator::new();
+        m2.set_sz(Hkcu, r"Control Panel\Keyboard", "InitialKeyboardIndicators", "0").unwrap();
+        let u = apply_all(&m2, "num_lock_startup");
+        assert_eq!(m2.get_sz(Hkcu, r"Control Panel\Keyboard", "InitialKeyboardIndicators").as_deref(), Some("2"));
+        undo_all(&m2, &u);
+        assert_eq!(m2.get_sz(Hkcu, r"Control Panel\Keyboard", "InitialKeyboardIndicators").as_deref(), Some("0"));
+
+        // A DNS preset restores whatever NameServer was there before.
+        let base = r"SYSTEM\CurrentControlSet\Services\Tcpip\Parameters\Interfaces";
+        let m3 = MockMutator::new().with_dword(Hklm, &format!(r"{base}\IF-A"), "Seed", 1);
+        let u = apply_all(&m3, "dns_quad9");
+        assert_eq!(m3.get_sz(Hklm, &format!(r"{base}\IF-A"), "NameServer").as_deref(), Some("9.9.9.9,149.112.112.112"));
+        undo_all(&m3, &u);
+        assert_eq!(m3.get_sz(Hklm, &format!(r"{base}\IF-A"), "NameServer"), None);
+
+        // Every new id must actually be appliable (have real ops).
+        for id in [
+            "taskbar_align_left", "hide_start_recommendations", "scrollbars_always",
+            "num_lock_startup", "verbose_logon", "detailed_bsod", "utc_time",
+            "disable_mpo", "disable_wpbt",
+            "dns_google", "dns_quad9", "dns_opendns", "dns_adguard",
+        ] {
             assert!(is_appliable(id), "{id} should be appliable");
         }
     }
