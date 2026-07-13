@@ -6,8 +6,10 @@ import {
   FolderOpen,
   Gamepad2,
   Info,
+  KeyRound,
   RefreshCw,
   Rocket,
+  Search,
   Settings as SettingsIcon,
   ShieldCheck,
   Wifi,
@@ -18,6 +20,7 @@ import { useSystemStore } from "../store/systemStore";
 import { useSettingsStore } from "../store/settingsStore";
 import { useAiStore } from "../store/aiStore";
 import { getUpdateInfo, openLogsFolder } from "../lib/backend";
+import { tavilyKey, saveApiKey } from "../lib/aiConfig";
 import { toast } from "../store/toastStore";
 import Toggle from "../components/Toggle";
 import UpdateModal from "../components/UpdateModal";
@@ -81,6 +84,24 @@ export default function Settings() {
       setAutostartOn(!next); // revert on failure
       toast.error("Couldn't change startup setting", "Try running Mujify as administrator.");
     }
+  };
+
+  // Tavily key for the AI's optional live web search — the NVIDIA key is baked in
+  // (users never touch it), but web search is bring-your-own since it's optional.
+  const [tvKey, setTvKey] = useState("");
+  const [tvSet, setTvSet] = useState(false);
+  const [savingTv, setSavingTv] = useState(false);
+  useEffect(() => {
+    void tavilyKey().then((k) => setTvSet(!!k)).catch(() => {});
+  }, []);
+  const saveTavily = async (v: string) => {
+    setSavingTv(true);
+    await saveApiKey("tavily", v);
+    setTvSet(!!v);
+    setSavingTv(false);
+    setTvKey("");
+    toast.success(v ? "Web search key saved" : "Web search key cleared",
+      v ? "The AI can now search the live web." : "Web search is off.");
   };
 
   const checkUpdates = async () => {
@@ -196,6 +217,49 @@ export default function Settings() {
             </p>
           </div>
           <Toggle on={autostartOn} onClick={() => void toggleAutostart()} />
+        </div>
+      </Section>
+
+      {/* Web search (Tavily) — optional, bring-your-own; NVIDIA key is baked in */}
+      <Section icon={Search} title="AI Web Search (optional)">
+        <p className="mb-2 text-[12px] leading-relaxed text-txt2">
+          The AI Assistant works out of the box. To also let it search the live web (latest drivers, prices,
+          game updates), add a free <span className="font-semibold text-txt">Tavily</span> key from tavily.com —
+          stored only on this PC. Leave it empty and the AI simply answers without web search.
+        </p>
+        <div className="flex items-center justify-between border-t border-edge py-3">
+          <div className="flex items-center gap-2">
+            <KeyRound size={14} className="text-accent" />
+            <span className="text-[13px] font-medium text-txt">Tavily key</span>
+            <span className={`text-[11px] font-semibold ${tvSet ? "text-success" : "text-txt3"}`}>
+              {tvSet ? "● Set" : "○ Not set"}
+            </span>
+          </div>
+        </div>
+        <div className="flex items-center gap-2">
+          <input
+            type="password"
+            value={tvKey}
+            onChange={(e) => setTvKey(e.target.value)}
+            placeholder={tvSet ? "Enter a new key to replace it…" : "Paste your Tavily key (tvly-…)"}
+            className="flex-1 rounded-btn border border-edge bg-bg px-3 py-2 text-[12.5px] text-txt placeholder:text-txt3 focus:border-accent/40 focus:outline-none"
+          />
+          <button
+            onClick={() => void saveTavily(tvKey.trim())}
+            disabled={savingTv || !tvKey.trim()}
+            className="rounded-btn bg-accent px-4 py-2 text-[12px] font-semibold text-white hover:bg-accent-hi disabled:opacity-40"
+          >
+            {savingTv ? "Saving…" : "Save"}
+          </button>
+          {tvSet && (
+            <button
+              onClick={() => void saveTavily("")}
+              disabled={savingTv}
+              className="rounded-btn border border-edge bg-bg px-3 py-2 text-[12px] font-medium text-txt2 hover:text-txt disabled:opacity-40"
+            >
+              Clear
+            </button>
+          )}
         </div>
       </Section>
 
