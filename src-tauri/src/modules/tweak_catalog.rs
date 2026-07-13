@@ -109,20 +109,20 @@ const CATALOG: &[TweakDef] = &[
     TweakDef { id: "disable_widgets", title: "Disable Widgets / News & Interests", description: "Turns off the taskbar Widgets board and its background feed process.", category: System, risk: Safe, impact: 2 },
     TweakDef { id: "disable_background_apps", title: "Disable Background Apps", description: "Stops UWP/Store apps from running and updating in the background.", category: System, risk: Moderate, impact: 3 },
     TweakDef { id: "disable_storage_sense", title: "Disable Storage Sense", description: "Stops the automatic disk-cleanup task from running in the background.", category: System, risk: Safe, impact: 1 },
-    TweakDef { id: "clear_standby", title: "Clear Standby Memory", description: "Flushes the standby memory list back to the game when RAM runs low.", category: System, risk: Safe, impact: 3 },
+    TweakDef { id: "clear_standby", title: "Clear Standby Memory", description: "A one-shot action, not a toggle — run it from “Free up memory” in the Cleaner tab to flush the standby list back to the game.", category: System, risk: Safe, impact: 3 },
     TweakDef { id: "disable_memory_compression", title: "Disable Memory Compression", description: "Reduces CPU overhead from compressing RAM pages on high-memory systems.", category: System, risk: Moderate, impact: 3 },
     TweakDef { id: "disable_hvci", title: "Disable Memory Integrity (Core Isolation)", description: "Turns off HVCI/VBS Memory Integrity to reclaim its gaming performance cost. This LOWERS a security protection and needs a restart to take effect — a deliberate tradeoff, not a blanket recommendation.", category: System, risk: Advanced, impact: 3 },
     TweakDef { id: "max_refresh_rate", title: "Set Monitor to Max Refresh Rate", description: "Raises your display to its highest refresh rate at the current resolution — a 60Hz-stuck 144Hz panel is night-and-day. Instantly reversible.", category: Graphics, risk: Moderate, impact: 4 },
 
     // ---------- Performance ----------
     TweakDef { id: "disable_core_parking", title: "Disable CPU Core Parking", description: "Keeps all CPU cores active instead of parking idle ones — smoother frame pacing.", category: Performance, risk: Moderate, impact: 5 },
-    TweakDef { id: "timer_resolution", title: "Timer Resolution Optimization", description: "Locks the system timer to 1 ms for smoother frames and lower input latency.", category: Performance, risk: Moderate, impact: 5 },
+    TweakDef { id: "timer_resolution", title: "Timer Resolution Optimization", description: "Info only — modern Windows (2004+) gives each game the timer resolution it requests while focused, so a forced global 1 ms tweak no longer helps and can raise power draw. Shown for awareness.", category: Performance, risk: Safe, impact: 5 },
     TweakDef { id: "disable_dynamic_tick", title: "Disable Dynamic Tick", description: "Legacy timer tweak — modern Windows handles this well; often no gain and it can hurt. Experimental.", category: Performance, risk: Advanced, impact: 2 },
     TweakDef { id: "disable_hpet", title: "Disable HPET", description: "Legacy timer tweak — community consensus moved away years ago; can even hurt on modern CPUs. Experimental.", category: Performance, risk: Advanced, impact: 2 },
     TweakDef { id: "cpu_affinity_pcore", title: "Pin Games to Performance Cores", description: "Steers the game to P-cores on hybrid CPUs (auto-skips where it would hurt).", category: Performance, risk: Advanced, impact: 4 },
     TweakDef { id: "disable_power_throttling", title: "Disable Power Throttling", description: "Stops Windows from throttling foreground apps to save power.", category: Performance, risk: Moderate, impact: 4 },
     TweakDef { id: "win32_priority", title: "Optimize Win32 Priority Separation", description: "Sets Win32PrioritySeparation to 0x26 (38) — short, variable quantums that strongly favour the foreground game for the highest FPS. (For reference: 0x2A = max responsiveness/snappier Windows, 0x18 = favour background tasks.)", category: Performance, risk: Moderate, impact: 3 },
-    TweakDef { id: "game_priority", title: "Above-Normal Game Priority", description: "Raises the running game's process priority so it gets scheduler preference.", category: Performance, risk: Safe, impact: 3 },
+    TweakDef { id: "game_priority", title: "Above-Normal Game Priority", description: "Info only — process priority is set on the live game at runtime (during Auto-Optimize), not as a persistent Windows setting, so there's no global toggle here.", category: Performance, risk: Safe, impact: 3 },
     TweakDef { id: "mmcss_gaming", title: "MMCSS Gaming Profile", description: "Gives games a larger GPU/CPU scheduling share via the multimedia scheduler.", category: Performance, risk: Moderate, impact: 3 },
     TweakDef { id: "large_system_cache", title: "Optimize System Responsiveness", description: "Sets SystemResponsiveness to 10 so Windows reserves less CPU for background multimedia and gives more to your game (10 is the recommended gaming value; Windows default is 20).", category: Performance, risk: Moderate, impact: 3 },
 
@@ -138,7 +138,7 @@ const CATALOG: &[TweakDef] = &[
     TweakDef { id: "disable_delivery_optimization", title: "Disable Update P2P Sharing", description: "Stops Delivery Optimization uploading Windows updates to other PCs over your connection.", category: Network, risk: Safe, impact: 2 },
 
     // ---------- Graphics ----------
-    TweakDef { id: "gpu_low_latency", title: "GPU Low Latency Mode", description: "Enables the driver's low-latency render queue (NVIDIA Reflex / AMD Anti-Lag).", category: Graphics, risk: Safe, impact: 4 },
+    TweakDef { id: "gpu_low_latency", title: "GPU Low Latency Mode", description: "Info only — this lives in your GPU driver, not Windows. Turn on NVIDIA Reflex (or “Low Latency Mode: Ultra”) / AMD Anti-Lag in the game or your driver control panel.", category: Graphics, risk: Safe, impact: 4 },
     TweakDef { id: "disable_fso", title: "Disable Fullscreen Optimizations", description: "Forces true exclusive fullscreen for lower input lag and better compatibility.", category: Graphics, risk: Moderate, impact: 4 },
     TweakDef { id: "hags", title: "Hardware-Accelerated GPU Scheduling", description: "Lets the GPU manage its own memory scheduling on supported cards.", category: Graphics, risk: Moderate, impact: 3 },
     TweakDef { id: "disable_game_bar", title: "Disable Xbox Game Bar", description: "Removes the DVR/overlay capture hook overhead.", category: Graphics, risk: Safe, impact: 3 },
@@ -163,8 +163,8 @@ const CATALOG: &[TweakDef] = &[
 
     // ---------- Gaming ----------
     TweakDef { id: "mouse_accel_off", title: "Disable Mouse Acceleration", description: "Makes cursor and aim movement 1:1 for consistent aim.", category: Gaming, risk: Safe, impact: 4 },
-    TweakDef { id: "raw_input", title: "Raw Input Priority", description: "Prioritizes raw mouse/keyboard input for lower input latency.", category: Gaming, risk: Moderate, impact: 3 },
-    TweakDef { id: "fps_cap", title: "Smart FPS Cap", description: "Caps FPS just under your refresh to cut latency when sync is on.", category: Gaming, risk: Safe, impact: 3 },
+    TweakDef { id: "raw_input", title: "Raw Input Priority", description: "Info only — enable “Raw Input” in each game's mouse/controls settings; it bypasses Windows pointer processing per-game, so there's no global switch.", category: Gaming, risk: Safe, impact: 3 },
+    TweakDef { id: "fps_cap", title: "Smart FPS Cap", description: "Info only — set an FPS cap ~3 below your refresh rate in the game's settings or your GPU driver (NVIDIA/AMD) for the lowest latency with sync on.", category: Gaming, risk: Safe, impact: 3 },
     TweakDef { id: "keyboard_delay", title: "Minimize Keyboard Repeat Delay", description: "Sets the fastest keyboard repeat/response for input.", category: Gaming, risk: Safe, impact: 2 },
     TweakDef { id: "disable_sticky_keys", title: "Disable Sticky Keys", description: "Prevents the Sticky Keys prompt from interrupting games.", category: Gaming, risk: Safe, impact: 1 },
 

@@ -37,7 +37,7 @@ function hardwareGroups(gpuVendor: string | undefined): HwGroup[] {
       subtitle: "Keep every core awake and prioritise your game.",
       icon: Cpu,
       color: "#f97316",
-      ids: ["disable_core_parking", "disable_power_throttling", "win32_priority", "power_high_perf", "power_ultimate", "game_priority", "mmcss_gaming", "large_system_cache"],
+      ids: ["disable_core_parking", "disable_power_throttling", "win32_priority", "power_high_perf", "power_ultimate", "mmcss_gaming", "large_system_cache"],
     },
     {
       id: "gpu",
@@ -45,7 +45,7 @@ function hardwareGroups(gpuVendor: string | undefined): HwGroup[] {
       subtitle: "Low latency, no capture overhead, no down-clocking.",
       icon: Monitor,
       color: "#a855f7",
-      ids: ["hags", "gpu_low_latency", "disable_fso", "disable_game_bar", "disable_gamedvr", "gpu_priority", "shader_cache", ...vendorGpu],
+      ids: ["hags", "disable_fso", "disable_game_bar", "disable_gamedvr", "gpu_priority", ...vendorGpu],
     },
     {
       id: "ram",
@@ -53,7 +53,7 @@ function hardwareGroups(gpuVendor: string | undefined): HwGroup[] {
       subtitle: "Free memory back to the game, cut background caching.",
       icon: MemoryStick,
       color: "#6366f1",
-      ids: ["clear_standby", "disable_memory_compression", "disable_sysmain"],
+      ids: ["disable_memory_compression", "disable_sysmain"],
     },
     {
       id: "npu",
