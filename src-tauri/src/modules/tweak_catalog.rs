@@ -176,6 +176,12 @@ const CATALOG: &[TweakDef] = &[
     TweakDef { id: "taskbar_end_task", title: "Add “End Task” to Taskbar", description: "Enables right-click → End Task on taskbar apps, so you can kill a frozen game without opening Task Manager.", category: Appearance, risk: Safe, impact: 2 },
     TweakDef { id: "disable_bing_search", title: "Disable Bing in Start Search", description: "Stops Start-menu search from querying Bing/web — local results only, faster and more private.", category: Appearance, risk: Safe, impact: 2 },
     TweakDef { id: "disable_consumer_features", title: "Disable Auto-Installed Promo Apps", description: "Stops Windows from silently installing promoted/suggested apps (Candy Crush and friends) on your account.", category: Appearance, risk: Safe, impact: 2 },
+    TweakDef { id: "show_file_extensions", title: "Show File Extensions", description: "Reveals file extensions (.exe, .txt, .bat) in Explorer — safer and clearer than hiding them.", category: Appearance, risk: Safe, impact: 1 },
+    TweakDef { id: "show_hidden_files", title: "Show Hidden Files", description: "Shows hidden files and folders in File Explorer.", category: Appearance, risk: Safe, impact: 1 },
+    TweakDef { id: "hide_taskbar_search", title: "Hide Taskbar Search Box", description: "Removes the wide search box from the taskbar for a cleaner bar (search still works via Start).", category: Appearance, risk: Safe, impact: 1 },
+    TweakDef { id: "disable_lock_screen", title: "Disable Lock Screen", description: "Skips the lock-screen image and goes straight to the sign-in prompt.", category: Appearance, risk: Safe, impact: 1 },
+    TweakDef { id: "enable_long_paths", title: "Enable Long File Paths", description: "Lets Windows and apps use paths longer than 260 characters — avoids weird errors with deep game/mod folders.", category: System, risk: Safe, impact: 1 },
+    TweakDef { id: "disable_notification_center", title: "Disable Notification Center", description: "Turns off the Action/Notification Center flyout and its calendar popup — fewer background interruptions while gaming.", category: Privacy, risk: Safe, impact: 2 },
 ];
 
 /// Scan current state and report per-tweak applied/available + category rollups.

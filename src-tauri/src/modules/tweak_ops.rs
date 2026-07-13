@@ -310,6 +310,12 @@ pub fn ops_for(tweak_id: &str) -> Vec<Op> {
         "taskbar_end_task" => vec![dw(Hkcu, r"Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced\TaskbarDeveloperSettings", "TaskbarEndTask", 1)],
         "disable_bing_search" => vec![dw(Hkcu, r"Software\Microsoft\Windows\CurrentVersion\Search", "BingSearchEnabled", 0)],
         "disable_consumer_features" => vec![dw(Hklm, r"SOFTWARE\Policies\Microsoft\Windows\CloudContent", "DisableWindowsConsumerFeatures", 1)],
+        "show_file_extensions" => vec![dw(Hkcu, r"Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced", "HideFileExt", 0)],
+        "show_hidden_files" => vec![dw(Hkcu, r"Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced", "Hidden", 1)],
+        "hide_taskbar_search" => vec![dw(Hkcu, r"Software\Microsoft\Windows\CurrentVersion\Search", "SearchboxTaskbarMode", 0)],
+        "disable_lock_screen" => vec![dw(Hklm, r"SOFTWARE\Policies\Microsoft\Windows\Personalization", "NoLockScreen", 1)],
+        "enable_long_paths" => vec![dw(Hklm, r"SYSTEM\CurrentControlSet\Control\FileSystem", "LongPathsEnabled", 1)],
+        "disable_notification_center" => vec![dw(Hkcu, r"Software\Policies\Microsoft\Windows\Explorer", "DisableNotificationCenter", 1)],
         "mmcss_gaming" => vec![
             dw(Hklm, MMCSS_GAMES, "GPU Priority", 8),
             dw(Hklm, MMCSS_GAMES, "Priority", 6),
@@ -575,6 +581,20 @@ mod tests {
         assert_eq!(m.get_dword(Hkcu, r"Software\Microsoft\Windows\CurrentVersion\Themes\Personalize", "AppsUseLightTheme"), None);
         // Every appearance tweak must be appliable (have real ops).
         for id in ["visual_fx_performance", "disable_transparency", "dark_mode", "hide_task_view", "taskbar_end_task", "disable_bing_search", "disable_consumer_features"] {
+            assert!(is_appliable(id), "{id} should be appliable");
+        }
+    }
+
+    #[test]
+    fn winutil_batch_tweaks_apply_and_revert() {
+        let m = MockMutator::new();
+        // Show file extensions writes HideFileExt=0 and undoes to prior/absent.
+        let u = apply_all(&m, "show_file_extensions");
+        assert_eq!(m.get_dword(Hkcu, r"Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced", "HideFileExt"), Some(0));
+        undo_all(&m, &u);
+        assert_eq!(m.get_dword(Hkcu, r"Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced", "HideFileExt"), None);
+        // Every tweak in the batch must actually be appliable (have real ops).
+        for id in ["show_file_extensions", "show_hidden_files", "hide_taskbar_search", "disable_lock_screen", "enable_long_paths", "disable_notification_center"] {
             assert!(is_appliable(id), "{id} should be appliable");
         }
     }
