@@ -36,9 +36,9 @@ export default function Cleaner() {
     setOptimizing(false);
     if (res) {
       toast.success(
-        res.freedMb > 0 ? `Freed ${res.freedMb.toLocaleString()} MB of RAM` : "RAM already lean",
+        res.freedMb > 0 ? `Returned ${res.freedMb.toLocaleString()} MB to available` : "RAM already lean",
         res.freedMb > 0
-          ? `${res.afterAvailableMb.toLocaleString()} MB now available (trimmed ${res.processesTrimmed} processes).`
+          ? `Trimmed ${res.processesTrimmed} apps' working sets: ${res.beforeAvailableMb.toLocaleString()} → ${res.afterAvailableMb.toLocaleString()} MB available. Windows parks it as standby, so a game grabs it instantly — Task Manager may still show it as "cached", which is normal.`
           : "Nothing meaningful to reclaim right now — your memory is already tight-packed.",
       );
       void loadRam();
