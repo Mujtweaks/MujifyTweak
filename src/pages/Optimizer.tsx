@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Activity, ArrowLeft, BrainCircuit, Cpu, MemoryStick, Monitor, Shield, Trash2, Zap, type LucideIcon } from "lucide-react";
+import { Activity, ArrowLeft, Cpu, MemoryStick, Monitor, Shield, Trash2, Zap, type LucideIcon } from "lucide-react";
 import { scanTweaks } from "../lib/backend";
 import { useSystemStore } from "../store/systemStore";
 import { useTweakStore } from "../store/tweakStore";
@@ -54,14 +54,6 @@ function hardwareGroups(gpuVendor: string | undefined): HwGroup[] {
       icon: MemoryStick,
       color: "#6366f1",
       ids: ["disable_memory_compression", "disable_sysmain"],
-    },
-    {
-      id: "npu",
-      label: "NPU / Windows AI",
-      subtitle: "The NPU doesn't affect FPS — this just quiets background AI.",
-      icon: BrainCircuit,
-      color: "#14b8a6",
-      ids: ["disable_recall", "disable_copilot"],
     },
   ];
 }
@@ -230,7 +222,7 @@ export default function Optimizer({ onNavigate: _onNavigate }: { onNavigate: (pa
       {/* By hardware component */}
       <div>
         <h2 className="mb-3 text-[13px] font-bold uppercase tracking-wide text-txt2">By hardware</h2>
-        <div className="grid grid-cols-4 gap-4">
+        <div className="grid grid-cols-3 gap-4">
           {groups.map((g, i) => {
             const rows = groupRows(g);
             const applied = rows.filter((t) => t.applied).length;

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Info, Plus, Sparkles, TrendingUp } from "lucide-react";
+import { AlertTriangle, Info, Plus, Sparkles, TrendingUp } from "lucide-react";
 import { CATEGORY_META, impactTier } from "../lib/categories";
 import { ACTION_LABEL, TWEAK_DETAILS } from "../lib/tweakDetails";
 import { riskMeta } from "../lib/risk";
@@ -60,6 +60,11 @@ export default function TweakCard({ tweak, selected, onToggle, onInfo }: TweakCa
       {/* Middle */}
       <p className="mt-3 text-[15px] font-bold text-txt">{tweak.title}</p>
       <p className="mt-1 text-[12px] leading-relaxed text-txt2">{tweak.description}</p>
+      {tweak.warning && (
+        <p className="mt-2 flex items-start gap-1.5 rounded-chip border border-accent/30 bg-accent/10 px-2.5 py-1.5 text-[11px] font-medium leading-snug text-accent">
+          <AlertTriangle size={12} className="mt-0.5 shrink-0" /> {tweak.warning}
+        </p>
+      )}
 
       {/* Bottom row */}
       <div className="mt-4 flex items-center justify-between">
@@ -73,8 +78,8 @@ export default function TweakCard({ tweak, selected, onToggle, onInfo }: TweakCa
           </button>
           <button
             onClick={() => onInfo?.(tweak)}
-            title="Details"
-            className="grid h-7 w-7 place-items-center rounded-full border border-edge bg-bg text-txt2 transition-colors hover:text-txt"
+            title={tweak.warning ?? "Details"}
+            className={`grid h-7 w-7 place-items-center rounded-full border bg-bg transition-colors ${tweak.warning ? "border-accent/50 text-accent hover:text-accent-hi" : "border-edge text-txt2 hover:text-txt"}`}
           >
             <Info size={13} strokeWidth={2} />
           </button>

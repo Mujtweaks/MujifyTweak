@@ -1,5 +1,6 @@
 import { BrainCircuit, Cpu, HardDrive, Laptop, MemoryStick, Monitor, type LucideIcon } from "lucide-react";
 import BoosterCard from "../components/BoosterCard";
+import OverlayControl from "../components/OverlayControl";
 import ScoreGauge from "../components/ScoreGauge";
 import ActionCards from "../components/ActionCards";
 import StatGauges from "../components/StatGauges";
@@ -78,6 +79,7 @@ export default function Dashboard({ onNavigate }: { onNavigate: (page: PageId) =
         </section>
         <section className="flex min-h-0 flex-col gap-4">
           <PerformanceChart />
+          <OverlayControl />
           <RestorePointCard />
           <RecentActivity onNavigate={onNavigate} />
         </section>

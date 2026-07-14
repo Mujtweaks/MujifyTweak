@@ -210,6 +210,8 @@ export interface TweakInfo {
   available: boolean;
   /** Real, tested apply path exists — otherwise the UI shows it scan-only. */
   appliable: boolean;
+  /** A safety caution — when set, the info icon turns RED and shows this text. */
+  warning: string | null;
 }
 
 export interface ChangeLogEntry {

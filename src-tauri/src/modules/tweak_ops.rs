@@ -438,6 +438,27 @@ pub fn ops_for(tweak_id: &str) -> Vec<Op> {
         "disable_mpo" => vec![dw(Hklm, r"SOFTWARE\Microsoft\Windows\Dwm", "OverlayTestMode", 5)],
         // Security — block firmware-injected vendor software (WPBT)
         "disable_wpbt" => vec![dw(Hklm, r"SYSTEM\CurrentControlSet\Control\Session Manager", "DisableWpbtExecution", 1)],
+        // Prevent BitLocker auto device-encryption (reg policy — reversible).
+        "disable_bitlocker" => vec![dw(Hklm, r"SYSTEM\CurrentControlSet\Control\BitLocker", "PreventDeviceEncryption", 1)],
+        // "More pins" Start layout (fewer recommendations — closest clean Win11 setting).
+        "start_more_pins" => vec![dw(Hkcu, r"Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced", "Start_Layout", 1)],
+        // Set several non-essential services to Manual (each captures prior state → reversible).
+        "services_manual" => vec![
+            Op::SetService { name: "Fax", start_type: "demand", running: false },
+            Op::SetService { name: "MapsBroker", start_type: "demand", running: false },
+            Op::SetService { name: "RemoteRegistry", start_type: "demand", running: false },
+            Op::SetService { name: "RetailDemo", start_type: "demand", running: false },
+            Op::SetService { name: "WMPNetworkSvc", start_type: "demand", running: false },
+        ],
+        // Removals — one-way commands (reinstallable from Windows; not auto-reverted). Warned in the UI.
+        "remove_onedrive" => vec![Op::Command {
+            program: "powershell",
+            args: &["-NoProfile", "-Command", "taskkill /f /im OneDrive.exe 2>$null; if (Test-Path \"$env:SystemRoot\\System32\\OneDriveSetup.exe\") { & \"$env:SystemRoot\\System32\\OneDriveSetup.exe\" /uninstall }; if (Test-Path \"$env:SystemRoot\\SysWOW64\\OneDriveSetup.exe\") { & \"$env:SystemRoot\\SysWOW64\\OneDriveSetup.exe\" /uninstall }"],
+        }],
+        "remove_xbox" => vec![Op::Command {
+            program: "powershell",
+            args: &["-NoProfile", "-Command", "Get-AppxPackage Microsoft.XboxGamingOverlay,Microsoft.GamingApp,Microsoft.XboxGameOverlay,Microsoft.Xbox.TCUI,Microsoft.XboxIdentityProvider,Microsoft.XboxSpeechToTextOverlay | Remove-AppxPackage -ErrorAction SilentlyContinue"],
+        }],
         // Snappier UI + less background overhead (all reversible)
         "menu_show_delay" => vec![sz(Hkcu, r"Control Panel\Desktop", "MenuShowDelay", "0")],
         "svchost_split_threshold" => vec![dw(Hklm, r"SYSTEM\CurrentControlSet\Control", "SvcHostSplitThresholdInKB", 0x0400_0000)],

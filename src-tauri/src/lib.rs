@@ -150,6 +150,19 @@ fn set_autostart_enabled(app: tauri::AppHandle, enabled: bool) -> Result<(), Str
     if enabled { al.enable() } else { al.disable() }.map_err(|e| e.to_string())
 }
 
+/// Toggle Windows' own Game Mode (per-user, benign, instantly reversible). Wires
+/// the top-bar "Game Mode" switch to a real system setting instead of a dead UI
+/// flag — Windows then prioritises the foreground game and pauses some background
+/// work while you play.
+#[tauri::command]
+fn set_game_mode(enabled: bool) -> Result<(), String> {
+    use modules::system_mutator::{RealMutator, RegHive::Hkcu, SystemMutator};
+    let v = if enabled { 1 } else { 0 };
+    RealMutator.set_dword(Hkcu, r"Software\Microsoft\GameBar", "AutoGameModeEnabled", v)?;
+    RealMutator.set_dword(Hkcu, r"Software\Microsoft\GameBar", "AllowAutoGameMode", v)?;
+    Ok(())
+}
+
 /// Save a system report (HTML built by the frontend from real data) to the user's
 /// Documents folder and return the full path. Read-only w.r.t. the system — it
 /// only writes the one report file the user asked for.
@@ -355,6 +368,7 @@ pub fn run() {
             game_detector::resolve_steam_appid,
             game_icons::game_icon,
             overlay::set_overlay_enabled,
+            set_game_mode,
             game_profiles::get_recommended_tweaks,
             game_profiler::get_game_profile,
             game_settings::get_settings_advice,

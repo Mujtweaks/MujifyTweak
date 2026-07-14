@@ -2,7 +2,6 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Bot, ChevronsDown, ChevronsUp, Cpu, Globe, RotateCcw, Send, Sparkles, Square, Zap } from "lucide-react";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import { invoke } from "@tauri-apps/api/core";
-import { nvidiaKey } from "../lib/aiConfig";
 import { getChangeLog, scanDeviceHealth } from "../lib/backend";
 import { useAiStore } from "../store/aiStore";
 import { toast } from "../store/toastStore";
@@ -186,10 +185,12 @@ export default function AIAssistant({ onNavigate }: { onNavigate: (page: PageId)
   const scrollToTop = () => topRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
   const scrollToBottom = () => endRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
 
-  // Restore the saved conversation and check the API key on mount.
+  // Restore the saved conversation on mount. The assistant is ALWAYS available:
+  // a local key means it talks to NVIDIA directly, and with no key it goes
+  // through Mujify's free proxy — so we never gate the user behind "add a key".
   useEffect(() => {
     void loadPersistedSession();
-    void nvidiaKey().then((k) => setKeyReady(!!k));
+    setKeyReady(true);
   }, [loadPersistedSession]);
 
   // Register the streaming listeners once (not per-send, which would leak them).

@@ -178,6 +178,7 @@ fn start_capture(app: AppHandle, exe: String) {
         }
     };
     *CURRENT_CHILD.lock().unwrap_or_else(|e| e.into_inner()) = Some(child);
+    super::logger::info(format!("sidecar: PresentMon started, targeting '{exe}'"));
 
     tauri::async_runtime::spawn(async move {
         let mut col: Option<usize> = None;
@@ -188,6 +189,17 @@ fn start_capture(app: AppHandle, exe: String) {
         let mut last_emit = Instant::now();
 
         while let Some(event) = rx.recv().await {
+            // PresentMon errors (no ETW session / access / no matching process)
+            // go to stderr — log them so a stuck "FPS: —" is diagnosable instead
+            // of a silent black box.
+            if let CommandEvent::Stderr(bytes) = &event {
+                let e = String::from_utf8_lossy(bytes);
+                let e = e.trim();
+                if !e.is_empty() {
+                    super::logger::warn(format!("sidecar PresentMon stderr: {e}"));
+                }
+                continue;
+            }
             let CommandEvent::Stdout(bytes) = event else {
                 continue;
             };
@@ -202,6 +214,9 @@ fn start_capture(app: AppHandle, exe: String) {
                 header_seen = true;
                 col = frame_time_column(line);
                 gpu_col = gpu_busy_column(line);
+                super::logger::info(format!(
+                    "sidecar: PresentMon header seen — frametime col {col:?}. Live FPS is now capturing."
+                ));
                 continue;
             }
             let Some(fcol) = col else { continue };

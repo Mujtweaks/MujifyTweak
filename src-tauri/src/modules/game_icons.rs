@@ -42,9 +42,10 @@ fn resolve_game_exe(p: &Path) -> Option<PathBuf> {
         "vcredist", "dxsetup", "helper", "launcher_installer", "update", "notification",
     ];
     let mut best: Option<(u64, PathBuf)> = None;
-    // Search up to 2 directory levels deep (Roblox keeps the player under
-    // Versions\<hash>\, Epic games under a nested folder, etc.).
-    for entry in walkdir::WalkDir::new(p).max_depth(2).into_iter().flatten() {
+    // Search several levels deep — many games bury the real exe (Fortnite lives at
+    // Fortnite\FortniteGame\Binaries\Win64\…, Roblox under Versions\<hash>\, etc.).
+    // Capped at depth 5 so we find them without walking an entire drive.
+    for entry in walkdir::WalkDir::new(p).max_depth(5).into_iter().flatten() {
         let path = entry.path();
         if !path.extension().map(|e| e.eq_ignore_ascii_case("exe")).unwrap_or(false) {
             continue;

@@ -41,6 +41,34 @@ pub struct TweakInfo {
     pub applied: bool,
     pub available: bool,
     pub appliable: bool,
+    /// A safety caution shown in RED on the info icon when present (e.g. "don't
+    /// apply on a laptop"). None = the ordinary white info icon.
+    pub warning: Option<String>,
+}
+
+/// Safety warnings for the tweaks that genuinely need one. Everything else
+/// returns None (plain white info icon). Kept as one table so the UI and the
+/// apply-confirm dialog surface the exact same caution.
+pub fn warning_for(id: &str) -> Option<&'static str> {
+    match id {
+        "power_ultimate" | "power_high_perf" =>
+            Some("On a laptop this runs the CPU/GPU hot and drains the battery — only use it plugged in, and watch your temperatures."),
+        "disable_bitlocker" =>
+            Some("Only disable BitLocker if you understand the security tradeoff — your drive will no longer be encrypted."),
+        "remove_onedrive" =>
+            Some("Do NOT apply if you use OneDrive — this removes it and unsyncs your OneDrive folder. Your local files stay, but cloud sync stops."),
+        "remove_xbox" =>
+            Some("Removes the Xbox app and its components — skip this if you use Xbox Game Pass, Xbox achievements, or play Xbox-app games."),
+        "services_manual" =>
+            Some("Sets several non-essential services to Manual start. Safe for most people, but if you rely on printing, Bluetooth or fax, re-enable those after."),
+        "disable_hvci" =>
+            Some("This LOWERS a Windows security protection (Memory Integrity) for a gaming gain. Deliberate tradeoff — needs a restart."),
+        "disable_core_parking" | "disable_power_throttling" =>
+            Some("Great on a desktop; on a laptop it raises heat and battery drain because cores never idle down."),
+        "browser_debloat" =>
+            Some("Turns off built-in browser upsells/telemetry (Edge/Brave). Reversible, but it changes some browser policies."),
+        _ => None,
+    }
 }
 
 #[derive(Serialize, Clone)]
@@ -142,13 +170,8 @@ const CATALOG: &[TweakDef] = &[
     TweakDef { id: "tcp_optimize", title: "TCP Auto-Tuning", description: "Tunes TCP window auto-tuning and scaling for gaming traffic.", category: Network, risk: Moderate, impact: 3 },
     TweakDef { id: "tcp_ack_frequency", title: "TCP ACK Frequency", description: "Acknowledges packets immediately rather than delaying — pairs with Nagle off.", category: Network, risk: Moderate, impact: 3 },
     TweakDef { id: "flush_dns", title: "Flush DNS Cache", description: "Clears stale DNS entries before an online session.", category: Network, risk: Safe, impact: 2 },
-    TweakDef { id: "dns_cloudflare", title: "Fast DNS — Cloudflare (1.1.1.1)", description: "Points DNS at Cloudflare for faster, private name resolution.", category: Network, risk: Safe, impact: 2 },
-    TweakDef { id: "dns_google", title: "Fast DNS — Google (8.8.8.8)", description: "Points DNS at Google Public DNS — fast and globally reachable.", category: Network, risk: Safe, impact: 2 },
-    TweakDef { id: "dns_quad9", title: "Secure DNS — Quad9 (9.9.9.9)", description: "Quad9 blocks known malicious domains at the DNS layer — safer name resolution.", category: Network, risk: Safe, impact: 2 },
-    TweakDef { id: "dns_opendns", title: "DNS — OpenDNS", description: "Cisco OpenDNS resolvers with optional filtering and good uptime.", category: Network, risk: Safe, impact: 2 },
-    TweakDef { id: "dns_adguard", title: "Ad-Blocking DNS — AdGuard", description: "AdGuard DNS filters ads and trackers network-wide before they load. Great for cleaner browsing.", category: Network, risk: Safe, impact: 2 },
     TweakDef { id: "disable_teredo", title: "Disable Teredo / ISATAP", description: "Removes legacy IPv6 tunneling that can add latency and instability.", category: Network, risk: Safe, impact: 2 },
-    TweakDef { id: "disable_delivery_optimization", title: "Disable Update P2P Sharing", description: "Stops Delivery Optimization uploading Windows updates to other PCs over your connection.", category: Network, risk: Safe, impact: 2 },
+    TweakDef { id: "disable_delivery_optimization", title: "Disable Delivery Optimization", description: "Stops Windows Delivery Optimization from uploading your downloaded updates to other PCs over your connection — saves upload bandwidth.", category: Network, risk: Safe, impact: 2 },
 
     // ---------- Graphics ----------
     TweakDef { id: "gpu_low_latency", title: "GPU Low Latency Mode", description: "Info only — this lives in your GPU driver, not Windows. Turn on NVIDIA Reflex (or “Low Latency Mode: Ultra”) / AMD Anti-Lag in the game or your driver control panel.", category: Graphics, risk: Safe, impact: 4 },
@@ -175,6 +198,9 @@ const CATALOG: &[TweakDef] = &[
     TweakDef { id: "disable_location", title: "Disable Location Tracking", description: "Turns off the system location service and its background polling.", category: Privacy, risk: Safe, impact: 2 },
     TweakDef { id: "disable_feedback", title: "Disable Feedback Requests", description: "Stops Windows from periodically asking for feedback.", category: Privacy, risk: Safe, impact: 1 },
     TweakDef { id: "disable_wpbt", title: "Block Firmware App Injection (WPBT)", description: "Stops the motherboard firmware from silently installing vendor software into Windows on every boot (the WPBT mechanism). A real security & bloat win. Reversible.", category: Privacy, risk: Moderate, impact: 2 },
+    TweakDef { id: "disable_bitlocker", title: "Disable BitLocker Auto-Encryption", description: "Stops Windows automatically encrypting your drive with BitLocker. Reversible policy change — does not decrypt an already-encrypted drive.", category: Privacy, risk: Advanced, impact: 1 },
+    TweakDef { id: "services_manual", title: "Set Unneeded Services to Manual", description: "Stops non-essential background services (Fax, Downloaded Maps, Remote Registry, Retail Demo, WMP Network Sharing) from starting on boot — they'll still start on demand if something needs them. Frees RAM and boot time.", category: System, risk: Moderate, impact: 3 },
+    TweakDef { id: "remove_onedrive", title: "Remove Microsoft OneDrive", description: "Uninstalls OneDrive and stops it launching at startup. Your local files stay put; only cloud sync stops.", category: System, risk: Advanced, impact: 2 },
 
     // ---------- Gaming ----------
     TweakDef { id: "mouse_accel_off", title: "Disable Mouse Acceleration", description: "Makes cursor and aim movement 1:1 for consistent aim.", category: Gaming, risk: Safe, impact: 4 },
@@ -182,13 +208,14 @@ const CATALOG: &[TweakDef] = &[
     TweakDef { id: "fps_cap", title: "Smart FPS Cap", description: "Info only — set an FPS cap ~3 below your refresh rate in the game's settings or your GPU driver (NVIDIA/AMD) for the lowest latency with sync on.", category: Gaming, risk: Safe, impact: 3 },
     TweakDef { id: "keyboard_delay", title: "Minimize Keyboard Repeat Delay", description: "Sets the fastest keyboard repeat/response for input.", category: Gaming, risk: Safe, impact: 2 },
     TweakDef { id: "disable_sticky_keys", title: "Disable Sticky Keys", description: "Prevents the Sticky Keys prompt from interrupting games.", category: Gaming, risk: Safe, impact: 1 },
+    TweakDef { id: "remove_xbox", title: "Remove Xbox App & Components", description: "Uninstalls the Xbox app, Game Bar overlay and related components. Skip if you use Game Pass or Xbox achievements.", category: Gaming, risk: Advanced, impact: 2 },
 
     // ---------- Appearance (make Windows lean & snappy) ----------
     TweakDef { id: "visual_fx_performance", title: "Best-Performance Visual Effects", description: "Switches Windows visual effects to “Adjust for best performance” — drops animations and shadows so the desktop feels instant. Fully reversible.", category: Appearance, risk: Safe, impact: 3 },
     TweakDef { id: "disable_transparency", title: "Disable Transparency Effects", description: "Turns off the translucent taskbar/menus (Acrylic/Mica) — a small GPU/compositor saving and a cleaner look.", category: Appearance, risk: Safe, impact: 2 },
     TweakDef { id: "dark_mode", title: "Enable Dark Mode", description: "Switches apps and the system UI to the dark theme.", category: Appearance, risk: Safe, impact: 1 },
     TweakDef { id: "hide_task_view", title: "Hide Task View Button", description: "Removes the Task View (virtual-desktops) button from the taskbar for a cleaner bar.", category: Appearance, risk: Safe, impact: 1 },
-    TweakDef { id: "taskbar_end_task", title: "Add “End Task” to Taskbar", description: "Enables right-click → End Task on taskbar apps, so you can kill a frozen game without opening Task Manager.", category: Appearance, risk: Safe, impact: 2 },
+    TweakDef { id: "taskbar_end_task", title: "Enable End Task on Right-Click", description: "Adds “End Task” to the right-click menu of taskbar apps, so you can kill a frozen game instantly without opening Task Manager.", category: Appearance, risk: Safe, impact: 2 },
     TweakDef { id: "disable_bing_search", title: "Disable Bing in Start Search", description: "Stops Start-menu search from querying Bing/web — local results only, faster and more private.", category: Appearance, risk: Safe, impact: 2 },
     TweakDef { id: "disable_consumer_features", title: "Disable Auto-Installed Promo Apps", description: "Stops Windows from silently installing promoted/suggested apps (Candy Crush and friends) on your account.", category: Appearance, risk: Safe, impact: 2 },
     TweakDef { id: "show_file_extensions", title: "Show File Extensions", description: "Reveals file extensions (.exe, .txt, .bat) in Explorer — safer and clearer than hiding them.", category: Appearance, risk: Safe, impact: 1 },
@@ -200,6 +227,7 @@ const CATALOG: &[TweakDef] = &[
     TweakDef { id: "taskbar_align_left", title: "Move Taskbar Icons Left", description: "Aligns taskbar icons to the left (classic Windows 10 style) instead of centered.", category: Appearance, risk: Safe, impact: 1 },
     TweakDef { id: "hide_start_recommendations", title: "Hide Start “Recommended”", description: "Removes the Recommended (recent files/apps) section from the Start menu for a cleaner, more private Start.", category: Appearance, risk: Safe, impact: 1 },
     TweakDef { id: "scrollbars_always", title: "Always Show Scrollbars", description: "Keeps scrollbars visible instead of auto-hiding them — easier to grab, no layout shift.", category: Appearance, risk: Safe, impact: 1 },
+    TweakDef { id: "start_more_pins", title: "Start Menu: More Pins Layout", description: "Switches the Start menu to the “More pins” layout — bigger pinned area, smaller Recommended strip. The cleaner, more classic feel.", category: Appearance, risk: Safe, impact: 1 },
 ];
 
 /// Scan current state and report per-tweak applied/available + category rollups.
@@ -224,6 +252,7 @@ pub fn scan_tweaks(is_laptop: Option<bool>) -> ScanResult {
                 applied,
                 available,
                 appliable: super::tweak_ops::is_appliable(d.id),
+                warning: warning_for(d.id).map(String::from),
             }
         })
         .collect();
