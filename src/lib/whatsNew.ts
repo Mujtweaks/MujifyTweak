@@ -5,7 +5,7 @@
 // Update the version + notes on each release.
 
 export const WHATS_NEW = {
-  version: "0.9.0-beta.10",
+  version: "0.9.0-beta.1",
   headline: "Your stats, on screen.",
   notes: [
     "🎯 In-game overlay — a small, always-on-top, click-through panel showing live FPS, CPU, GPU and temperatures while you play, MSI-Afterburner style. Turn it on in Settings → In-Game Overlay and tick exactly which stats you want. Every number is measured, never faked. (Works over borderless & windowed games; Windows can’t overlay true exclusive-fullscreen without hooking, which we never do.)",
