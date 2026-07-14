@@ -2,10 +2,13 @@ import { useEffect, useMemo, useState } from "react";
 import { CheckCircle2, ChevronLeft, Signal, Trophy, X, Zap } from "lucide-react";
 import GameArt from "./GameArt";
 import ApplyConfirmModal from "./ApplyConfirmModal";
-import { getGameCatalog, pingGameServers, scanTweaks } from "../lib/backend";
+import { fetchInstalledGames, getGameCatalog, pingGameServers, scanTweaks } from "../lib/backend";
 import { useSystemStore } from "../store/systemStore";
 import { useTweakStore } from "../store/tweakStore";
-import type { GameCatalogEntry, GameServersResult, TweakInfo } from "../lib/types";
+import { useGameStore } from "../store/gameStore";
+import type { GameCatalogEntry, GameInfo, GameServersResult, TweakInfo } from "../lib/types";
+
+const normName = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, "");
 
 // green <60ms, yellow 60-120ms, red >120ms, grey = no reply.
 function pingTone(ms: number | null): string {
@@ -33,17 +36,33 @@ export default function PingOptimizer({ onClose }: { onClose: () => void }) {
   const hardware = useSystemStore((s) => s.hardware);
 
   const [catalog, setCatalog] = useState<GameCatalogEntry[]>([]);
+  const storeGames = useGameStore((s) => s.installedGames);
+  const [installed, setInstalled] = useState<GameInfo[]>(storeGames);
   const [selected, setSelected] = useState<GameCatalogEntry | null>(null);
   const [result, setResult] = useState<GameServersResult | null>(null);
   const [loading, setLoading] = useState(false);
   const [confirm, setConfirm] = useState<TweakInfo[] | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+  const [showAll, setShowAll] = useState(false);
 
   useEffect(() => {
     void getGameCatalog().then(setCatalog);
+    // Always work from the real installed library so we only offer games the
+    // user actually has (not a generic list of popular titles).
+    if (storeGames.length > 0) setInstalled(storeGames);
+    else void fetchInstalledGames().then(setInstalled);
     if (!scanResult) void scanTweaks(hardware?.isLaptop ?? null).then((r) => r && setScan(r));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Only games the user actually has AND that we know server regions for. If the
+  // intersection is empty (or they opt to see everything), fall back to the full
+  // supported list so the tool is still usable.
+  const ownedCatalog = useMemo(() => {
+    const owned = new Set(installed.map((g) => normName(g.name)));
+    return catalog.filter((g) => owned.has(normName(g.name)));
+  }, [catalog, installed]);
+  const visibleCatalog = showAll || ownedCatalog.length === 0 ? catalog : ownedCatalog;
 
   const pickGame = async (g: GameCatalogEntry) => {
     setSelected(g);
@@ -105,20 +124,36 @@ export default function PingOptimizer({ onClose }: { onClose: () => void }) {
         {/* Body */}
         <div className="min-h-0 flex-1 overflow-y-auto p-5">
           {!selected ? (
-            <div className="grid grid-cols-3 gap-4 sm:grid-cols-4">
-              {catalog.map((g) => (
-                <button key={g.id} onClick={() => void pickGame(g)} className="group flex flex-col items-center gap-2">
-                  <div className="aspect-[3/4] w-full overflow-hidden rounded-xl border border-edge transition-colors group-hover:border-accent/50">
-                    <GameArt name={g.name} appId={g.appId} className="h-full w-full" rounded="rounded-xl" />
-                  </div>
-                  <span className="w-full truncate text-center text-[11.5px] text-txt2 transition-colors group-hover:text-txt">
-                    {g.name}
-                  </span>
-                </button>
-              ))}
-              {catalog.length === 0 && (
-                <p className="col-span-full py-8 text-center text-[12px] text-txt3">Loading games…</p>
-              )}
+            <div>
+              <div className="mb-3 flex items-center justify-between">
+                <p className="text-[11px] text-txt3">
+                  {ownedCatalog.length === 0
+                    ? "None of your installed games have known servers — showing all supported games."
+                    : showAll
+                      ? "Showing all supported games."
+                      : `${ownedCatalog.length} of your installed game${ownedCatalog.length === 1 ? "" : "s"} supported.`}
+                </p>
+                {ownedCatalog.length > 0 && (
+                  <button onClick={() => setShowAll((v) => !v)} className="text-[11px] font-medium text-txt2 hover:text-accent">
+                    {showAll ? "Show only mine" : "Show all"}
+                  </button>
+                )}
+              </div>
+              <div className="grid grid-cols-3 gap-4 sm:grid-cols-4">
+                {visibleCatalog.map((g) => (
+                  <button key={g.id} onClick={() => void pickGame(g)} className="group flex flex-col items-center gap-2">
+                    <div className="aspect-[3/4] w-full overflow-hidden rounded-xl border border-edge transition-colors group-hover:border-accent/50">
+                      <GameArt name={g.name} appId={g.appId} className="h-full w-full" rounded="rounded-xl" />
+                    </div>
+                    <span className="w-full truncate text-center text-[11.5px] text-txt2 transition-colors group-hover:text-txt">
+                      {g.name}
+                    </span>
+                  </button>
+                ))}
+                {catalog.length === 0 && (
+                  <p className="col-span-full py-8 text-center text-[12px] text-txt3">Loading games…</p>
+                )}
+              </div>
             </div>
           ) : loading ? (
             <p className="py-10 text-center text-[12.5px] text-txt3">Pinging {selected.name} servers…</p>

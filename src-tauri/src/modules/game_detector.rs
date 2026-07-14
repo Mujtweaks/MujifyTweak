@@ -565,6 +565,10 @@ fn scan_uninstall_registry(games: &mut Vec<GameInfo>) {
 /// (display name, env var, subpath that proves it's installed). Read-only.
 const STANDALONE_GAMES: &[(&str, &str, &str)] = &[
     ("Roblox", "LOCALAPPDATA", r"Roblox\Versions"),
+    // Launcher folder FIRST so its exe (real icon) wins the name de-dupe over the
+    // data-only .minecraft folder, which has no executable to pull a logo from.
+    ("Minecraft", "ProgramFiles(x86)", r"Minecraft Launcher"),
+    ("Minecraft", "ProgramFiles", r"Minecraft Launcher"),
     ("Minecraft", "APPDATA", r".minecraft"),
     ("Minecraft", "LOCALAPPDATA", r"Packages\Microsoft.MinecraftUWP_8wekyb3d8bbwe"),
     ("Minecraft Legends", "LOCALAPPDATA", r"Packages\Microsoft.MinecraftEducationEdition_8wekyb3d8bbwe"),

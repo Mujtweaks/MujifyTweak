@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { ArrowLeft, BrainCircuit, Cpu, MemoryStick, Monitor, Zap, type LucideIcon } from "lucide-react";
+import { Activity, ArrowLeft, BrainCircuit, Cpu, MemoryStick, Monitor, Shield, Trash2, Zap, type LucideIcon } from "lucide-react";
 import { scanTweaks } from "../lib/backend";
 import { useSystemStore } from "../store/systemStore";
 import { useTweakStore } from "../store/tweakStore";
@@ -105,11 +105,35 @@ export default function Optimizer({ onNavigate: _onNavigate }: { onNavigate: (pa
 
   // One-click "Optimize {component}" — selects the safe, appliable, not-applied
   // members and opens the confirm modal. Never applies directly.
-  const optimizeGroup = (g: HwGroup) => {
+  const optimizeGroup = (g: HwGroup) => optimizeIds(groupRows(g).map((t) => t.id));
+  const optimizeIds = (ids: string[]) => {
     const allowed = PRESET_RISK["balanced"];
-    const picks = groupRows(g).filter((t) => t.appliable && t.available && !t.applied && allowed.includes(t.risk));
+    const picks = ids
+      .map((id) => byId.get(id))
+      .filter((t): t is TweakInfo => !!t)
+      .filter((t) => t.appliable && t.available && !t.applied && allowed.includes(t.risk));
     if (picks.length) setConfirm(picks);
   };
+
+  // Live counts across the whole catalog (real, from the scan).
+  const appliedCount = tweaks.filter((t) => t.applied).length;
+  const availableCount = tweaks.filter((t) => t.appliable && t.available && !t.applied).length;
+  const categoryCount = scanResult?.categories.length ?? 0;
+
+  // One-click goal presets — each a curated set of real, reversible tweak ids.
+  // "howMany" counts how many are still actionable so the card can show progress.
+  const GOALS: { id: string; label: string; desc: string; icon: LucideIcon; color: string; ids: string[] }[] = [
+    { id: "fps", label: "Competitive FPS", desc: "Max frames & steady pacing for shooters.", icon: Zap, color: "#e3000e",
+      ids: ["disable_fso", "disable_gamedvr", "disable_game_bar", "hags", "gpu_priority", "mmcss_gaming", "win32_priority", "disable_core_parking", "disable_power_throttling", "power_high_perf", "network_throttling_index", "disable_nagle"] },
+    { id: "latency", label: "Lowest Latency", desc: "Cut input lag & network delay.", icon: Activity, color: "#f59e0b",
+      ids: ["disable_nagle", "tcp_ack_frequency", "network_qos", "tcp_optimize", "disable_mpo", "mouse_accel_off", "usb_selective_suspend_off"] },
+    { id: "privacy", label: "Privacy Lockdown", desc: "Kill telemetry, ads & tracking.", icon: Shield, color: "#22c55e",
+      ids: ["disable_telemetry", "disable_ad_id", "disable_activity_history", "disable_location", "disable_feedback", "disable_wer", "disable_recall", "disable_wpbt"] },
+    { id: "debloat", label: "Debloat & Clean", desc: "Remove suggested apps & background bloat.", icon: Trash2, color: "#6366f1",
+      ids: ["disable_consumer_features", "disable_content_delivery", "disable_background_apps", "disable_widgets", "disable_storage_sense", "disable_tips", "disable_bing_search"] },
+  ];
+  const goalActionable = (ids: string[]) =>
+    ids.map((id) => byId.get(id)).filter((t): t is TweakInfo => !!t).filter((t) => t.appliable && t.available && !t.applied).length;
 
   // ---- Sub-page: a hardware group's tweaks ----
   if (openGroup) {
@@ -159,6 +183,48 @@ export default function Optimizer({ onNavigate: _onNavigate }: { onNavigate: (pa
       <div>
         <h1 className="text-[42px] font-black uppercase leading-none tracking-tight text-txt">Optimizer</h1>
         <p className="mt-1.5 text-[14px] text-txt2">Tune each part of your PC — every tweak free, confirmed, and reversible.</p>
+      </div>
+
+      {/* Live optimization summary (real counts from the scan) */}
+      <div className="grid grid-cols-3 gap-4">
+        <div className="rounded-2xl border border-edge bg-card p-5">
+          <p className="text-[11px] font-bold uppercase tracking-wide text-txt3">Optimizations active</p>
+          <p className="mt-2 text-[30px] font-black leading-none text-success">{appliedCount}</p>
+        </div>
+        <div className="rounded-2xl border border-edge bg-card p-5">
+          <p className="text-[11px] font-bold uppercase tracking-wide text-txt3">Ready to apply</p>
+          <p className="mt-2 text-[30px] font-black leading-none text-accent">{availableCount}</p>
+        </div>
+        <div className="rounded-2xl border border-edge bg-card p-5">
+          <p className="text-[11px] font-bold uppercase tracking-wide text-txt3">Categories</p>
+          <p className="mt-2 text-[30px] font-black leading-none text-txt">{categoryCount}</p>
+        </div>
+      </div>
+
+      {/* One-click goals */}
+      <div>
+        <h2 className="mb-3 text-[13px] font-bold uppercase tracking-wide text-txt2">By goal — one click</h2>
+        <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+          {GOALS.map((g) => {
+            const todo = goalActionable(g.ids);
+            return (
+              <div key={g.id} className="flex flex-col rounded-2xl border border-edge bg-card p-5">
+                <span className="grid h-12 w-12 place-items-center rounded-2xl" style={{ backgroundColor: `${g.color}20` }}>
+                  <g.icon size={22} style={{ color: g.color }} />
+                </span>
+                <p className="mt-3 text-[15px] font-bold text-txt">{g.label}</p>
+                <p className="mt-0.5 flex-1 text-[11.5px] leading-snug text-txt2">{g.desc}</p>
+                <button
+                  onClick={() => optimizeIds(g.ids)}
+                  disabled={todo === 0}
+                  className="glint mt-3 flex items-center justify-center gap-1.5 rounded-btn bg-accent px-3 py-2 text-[12px] font-bold text-white hover:bg-accent-hi disabled:opacity-50"
+                >
+                  <Zap size={13} strokeWidth={2.5} fill="currentColor" /> {todo === 0 ? "All applied" : `Apply (${todo})`}
+                </button>
+              </div>
+            );
+          })}
+        </div>
       </div>
 
       {/* By hardware component */}

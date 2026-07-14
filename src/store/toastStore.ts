@@ -24,10 +24,23 @@ export interface Toast {
   leaving?: boolean;
 }
 
+/** A persisted notification (survives the 3s toast) shown in the bell panel. */
+export interface NotificationItem {
+  id: number;
+  type: ToastType;
+  title: string;
+  description?: string;
+  time: number;
+}
+
 interface ToastState {
   toasts: Toast[];
+  history: NotificationItem[];
+  unread: number;
   push: (t: { type: ToastType; title: string; description?: string; action?: ToastAction }) => void;
   dismiss: (id: number) => void;
+  markAllRead: () => void;
+  clearHistory: () => void;
 }
 
 const VISIBLE_MS = 3000; // time on screen before auto-dismiss
@@ -37,12 +50,23 @@ let nextId = 1;
 
 export const useToastStore = create<ToastState>((set, get) => ({
   toasts: [],
+  history: [],
+  unread: 0,
 
   push: ({ type, title, description, action }) => {
     const id = nextId++;
-    set((s) => ({ toasts: [...s.toasts, { id, type, title, description, action }] }));
+    set((s) => ({
+      toasts: [...s.toasts, { id, type, title, description, action }],
+      // Keep a reviewable log (newest first, capped) + bump the unread badge, so
+      // a notification the user missed isn't gone forever.
+      history: [{ id, type, title, description, time: Date.now() }, ...s.history].slice(0, 50),
+      unread: s.unread + 1,
+    }));
     setTimeout(() => get().dismiss(id), VISIBLE_MS);
   },
+
+  markAllRead: () => set({ unread: 0 }),
+  clearHistory: () => set({ history: [], unread: 0 }),
 
   dismiss: (id) => {
     // Flag as leaving (exit animation), then actually remove after it plays.

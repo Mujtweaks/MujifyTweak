@@ -1,5 +1,6 @@
-import { useEffect, useState } from "react";
-import { Bell, ChevronDown, Copy, Gamepad2, Minus, Settings, Square, X } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { Bell, Check, CheckCheck, ChevronDown, Copy, Gamepad2, Minus, Settings, Square, Trash2, X } from "lucide-react";
+import { useToastStore } from "../store/toastStore";
 import {
   closeWindow,
   isWindowMaximized,
@@ -28,6 +29,39 @@ interface TopBarProps {
 export default function TopBar({ page, onNavigate }: TopBarProps) {
   const activeGame = useGameStore((s) => s.activeGame);
   const userName = useSettingsStore((s) => s.userName);
+  const history = useToastStore((s) => s.history);
+  const unread = useToastStore((s) => s.unread);
+  const markAllRead = useToastStore((s) => s.markAllRead);
+  const clearHistory = useToastStore((s) => s.clearHistory);
+  const [notifOpen, setNotifOpen] = useState(false);
+  const notifRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!notifOpen) return;
+    const onDoc = (e: MouseEvent) => {
+      if (notifRef.current && !notifRef.current.contains(e.target as Node)) setNotifOpen(false);
+    };
+    document.addEventListener("mousedown", onDoc);
+    return () => document.removeEventListener("mousedown", onDoc);
+  }, [notifOpen]);
+  const toggleNotif = () => {
+    setNotifOpen((v) => {
+      if (!v) markAllRead();
+      return !v;
+    });
+  };
+  const relTime = (t: number) => {
+    const s = Math.floor((Date.now() - t) / 1000);
+    if (s < 60) return "just now";
+    if (s < 3600) return `${Math.floor(s / 60)}m ago`;
+    if (s < 86400) return `${Math.floor(s / 3600)}h ago`;
+    return `${Math.floor(s / 86400)}d ago`;
+  };
+  const notifTone: Record<string, string> = {
+    success: "text-success",
+    warning: "text-warning",
+    error: "text-accent",
+    info: "text-txt2",
+  };
   const gameModeEnabled = useGameStore((s) => s.gameModeEnabled);
   const toggleGameMode = useGameStore((s) => s.toggleGameMode);
   const [maximized, setMaximized] = useState(false);
@@ -77,9 +111,53 @@ export default function TopBar({ page, onNavigate }: TopBarProps) {
         >
           <DiscordIcon className="h-4 w-4 [&_path]:fill-current" /> Join
         </button>
-        <button onClick={() => onNavigate("changelog")} title="Recent changes" className="grid h-9 w-9 place-items-center rounded-btn text-txt3 transition-colors hover:bg-white/5 hover:text-txt">
-          <Bell size={16} strokeWidth={1.75} />
-        </button>
+        <div ref={notifRef} className="relative">
+          <button onClick={toggleNotif} title="Notifications" className="relative grid h-9 w-9 place-items-center rounded-btn text-txt3 transition-colors hover:bg-white/5 hover:text-txt">
+            <Bell size={16} strokeWidth={1.75} />
+            {unread > 0 && (
+              <span className="absolute -right-0.5 -top-0.5 grid h-4 min-w-4 place-items-center rounded-full bg-accent px-1 text-[9px] font-bold text-white">
+                {unread > 9 ? "9+" : unread}
+              </span>
+            )}
+          </button>
+          {notifOpen && (
+            <div className="absolute right-0 top-11 z-50 w-[340px] overflow-hidden rounded-2xl border border-edge bg-panel shadow-2xl">
+              <div className="flex items-center justify-between border-b border-edge px-4 py-3">
+                <span className="text-[13px] font-bold text-txt">Notifications</span>
+                {history.length > 0 && (
+                  <button onClick={clearHistory} className="flex items-center gap-1 text-[11px] text-txt3 hover:text-accent">
+                    <Trash2 size={12} /> Clear
+                  </button>
+                )}
+              </div>
+              <div className="max-h-[360px] overflow-y-auto">
+                {history.length === 0 ? (
+                  <div className="grid place-items-center gap-2 px-4 py-10 text-center">
+                    <CheckCheck size={22} className="text-txt3" />
+                    <p className="text-[12px] text-txt3">You're all caught up.</p>
+                  </div>
+                ) : (
+                  history.map((n) => (
+                    <div key={n.id} className="flex items-start gap-3 border-b border-edge/60 px-4 py-3 last:border-0">
+                      <Check size={14} className={`mt-0.5 shrink-0 ${notifTone[n.type] ?? "text-txt2"}`} />
+                      <div className="min-w-0 flex-1">
+                        <p className="text-[12.5px] font-semibold text-txt">{n.title}</p>
+                        {n.description && <p className="mt-0.5 text-[11.5px] leading-snug text-txt2">{n.description}</p>}
+                        <p className="mt-1 text-[10px] text-txt3">{relTime(n.time)}</p>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+              <button
+                onClick={() => { setNotifOpen(false); onNavigate("changelog"); }}
+                className="w-full border-t border-edge px-4 py-2.5 text-[11.5px] font-medium text-txt2 transition-colors hover:bg-white/5 hover:text-txt"
+              >
+                View change log
+              </button>
+            </div>
+          )}
+        </div>
         <button onClick={() => onNavigate("settings")} title="Settings" className="grid h-9 w-9 place-items-center rounded-btn text-txt3 transition-colors hover:bg-white/5 hover:text-txt">
           <Settings size={16} strokeWidth={1.75} />
         </button>
