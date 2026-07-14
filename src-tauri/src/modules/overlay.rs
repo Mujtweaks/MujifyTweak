@@ -40,9 +40,16 @@ pub fn set_overlay_enabled(app: AppHandle, enabled: bool) -> Result<(), String> 
         .shadow(false)
         .resizable(false)
         .focused(false)
+        .visible(true)
         .build()
-        .map_err(|e| e.to_string())?;
+        .map_err(|e| {
+            super::logger::warn(format!("overlay: window build failed: {e}"));
+            e.to_string()
+        })?;
     // Click-through so it never steals input from the game.
     let _ = win.set_ignore_cursor_events(true);
+    let _ = win.show();
+    let _ = win.set_always_on_top(true);
+    super::logger::info("overlay: window created and shown".to_string());
     Ok(())
 }

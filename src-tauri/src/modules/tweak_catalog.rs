@@ -232,8 +232,17 @@ const CATALOG: &[TweakDef] = &[
 
 /// Scan current state and report per-tweak applied/available + category rollups.
 /// Reads only — nothing is changed on the system.
+/// Off the UI thread — reading live registry state for all ~90 tweaks can take a
+/// moment, and running it on the main thread froze the Optimizer/Tweaks tabs at
+/// "loading…". `spawn_blocking` keeps the window responsive while it scans.
 #[tauri::command]
-pub fn scan_tweaks(is_laptop: Option<bool>) -> ScanResult {
+pub async fn scan_tweaks(is_laptop: Option<bool>) -> ScanResult {
+    tokio::task::spawn_blocking(move || scan_tweaks_impl(is_laptop))
+        .await
+        .unwrap_or_else(|_| ScanResult { tweaks: Vec::new(), categories: Vec::new(), total: 0, applied: 0 })
+}
+
+fn scan_tweaks_impl(is_laptop: Option<bool>) -> ScanResult {
     let tweaks: Vec<TweakInfo> = CATALOG
         .iter()
         .map(|d| {

@@ -44,8 +44,15 @@ fn resolve_game_exe(p: &Path) -> Option<PathBuf> {
     let mut best: Option<(u64, PathBuf)> = None;
     // Search several levels deep — many games bury the real exe (Fortnite lives at
     // Fortnite\FortniteGame\Binaries\Win64\…, Roblox under Versions\<hash>\, etc.).
-    // Capped at depth 5 so we find them without walking an entire drive.
+    // HARD CAP the number of entries walked: a 50GB game folder can hold hundreds
+    // of thousands of files, and walking all of them made the icon never return
+    // (the logo stayed a letter). 20k entries is plenty to reach any real game exe.
+    let mut scanned = 0usize;
     for entry in walkdir::WalkDir::new(p).max_depth(5).into_iter().flatten() {
+        scanned += 1;
+        if scanned > 20_000 {
+            break;
+        }
         let path = entry.path();
         if !path.extension().map(|e| e.eq_ignore_ascii_case("exe")).unwrap_or(false) {
             continue;

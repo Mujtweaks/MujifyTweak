@@ -52,7 +52,7 @@ export default function OverlayControl({ compact = false }: { compact?: boolean 
           <div className="pr-2">
             <p className="text-[14px] font-bold text-txt">In-game FPS / temp overlay</p>
             <p className="mt-0.5 text-[11.5px] leading-snug text-txt2">
-              Live stats on top of your game, MSI-Afterburner style. Shows over borderless &amp; windowed games.
+              A live performance overlay on top of your game — FPS, temps and load at a glance. Shows over borderless &amp; windowed games.
             </p>
           </div>
         </div>
