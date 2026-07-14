@@ -137,6 +137,35 @@ const NOT_GAME_EXES: &[&str] = &[
     "launcher", "vconsole2", "easyanticheat", "battleye", "vgtray",
 ];
 
+/// Launcher-less games whose running process lives OUTSIDE any library folder
+/// (Roblox in %LOCALAPPDATA%, Minecraft under a Java runtime, …), so the
+/// path-based `game_from_running` never catches them. Matched by exe stem, which
+/// is why they were showing "no game active" even mid-game.
+const STANDALONE_RUNNING: &[(&str, &str)] = &[
+    ("robloxplayerbeta", "Roblox"),
+    ("robloxplayer", "Roblox"),
+    ("minecraft.windows", "Minecraft"),
+    ("minecraftwindows", "Minecraft"),
+    ("fortniteclient-win64-shipping", "Fortnite"),
+    ("valorant-win64-shipping", "VALORANT"),
+    ("league of legends", "League of Legends"),
+    ("leagueoflegends", "League of Legends"),
+    ("genshinimpact", "Genshin Impact"),
+    ("yuanshen", "Genshin Impact"),
+];
+
+/// Detect a launcher-less game from its process. `cmd` is the lowercased, joined
+/// command line — used to identify Minecraft Java, which runs as `javaw.exe`.
+fn standalone_running_game(stem: &str, cmd: &str) -> Option<&'static str> {
+    if let Some((_, name)) = STANDALONE_RUNNING.iter().find(|(s, _)| stem == *s) {
+        return Some(name);
+    }
+    if (stem == "javaw" || stem == "java") && (cmd.contains("minecraft") || cmd.contains("net.minecraft")) {
+        return Some("Minecraft");
+    }
+    None
+}
+
 /// Turn a folder or exe name into a readable title ("watch_dogs2" → "Watch Dogs2").
 fn titleize(raw: &str) -> String {
     let cleaned = raw.replace(['_', '-'], " ");
@@ -235,6 +264,29 @@ pub fn start(app: AppHandle) {
                         app_id: None,
                     });
                     break;
+                }
+            }
+            // Launcher-less games (Roblox, Minecraft Java, …) matched by exe /
+            // command line, no library-folder requirement.
+            if active.is_none() {
+                for process in sys.processes().values() {
+                    let stem = stem_of(&process.name().to_string_lossy());
+                    let cmd = process
+                        .cmd()
+                        .iter()
+                        .map(|s| s.to_string_lossy().to_lowercase())
+                        .collect::<Vec<_>>()
+                        .join(" ");
+                    if let Some(name) = standalone_running_game(&stem, &cmd) {
+                        active = Some(GameInfo {
+                            name: name.to_string(),
+                            exe: process.name().to_string_lossy().to_string(),
+                            launcher: None,
+                            install_path: process.exe().and_then(|p| p.parent()).map(|p| p.to_string_lossy().to_string()),
+                            app_id: None,
+                        });
+                        break;
+                    }
                 }
             }
             if active.is_none() {
@@ -682,6 +734,21 @@ mod tests {
         // Their publishers are recognised too (for the uninstall-registry path).
         assert!(is_probable_game("Roblox", "Roblox Corporation", ""));
         assert!(is_probable_game("Minecraft Launcher", "Mojang", ""));
+    }
+
+    #[test]
+    fn launcher_less_running_games_are_detected() {
+        // Roblox runs from %LOCALAPPDATA% (no library folder) — must still match.
+        assert_eq!(standalone_running_game("robloxplayerbeta", ""), Some("Roblox"));
+        // Minecraft Java is a javaw process — identified by its command line.
+        assert_eq!(
+            standalone_running_game("javaw", "-cp c:\\users\\me\\appdata\\roaming\\.minecraft\\libraries net.minecraft.client.main.main"),
+            Some("Minecraft")
+        );
+        // A plain javaw (e.g. an IDE) is NOT a game.
+        assert_eq!(standalone_running_game("javaw", "-jar build/tool.jar"), None);
+        // Something random isn't a game.
+        assert_eq!(standalone_running_game("notepad", ""), None);
     }
 
     #[test]

@@ -97,6 +97,48 @@ fn category_specs() -> Vec<(&'static str, &'static str, &'static str, bool, Vec<
         }
     }
 
+    // Windows Update leftovers — already-installed update downloads.
+    let mut wu_roots = Vec::new();
+    if let Some(p) = exists(PathBuf::from(&windir).join(r"SoftwareDistribution\Download")) {
+        wu_roots.push(p);
+    }
+    // Delivery Optimization cache — peer-update chunks kept around after install.
+    let mut do_roots = Vec::new();
+    if let Some(p) = exists(PathBuf::from(&windir).join(r"SoftwareDistribution\DeliveryOptimization")) {
+        do_roots.push(p);
+    }
+    // Thumbnail / icon cache — Explorer rebuilds these on demand.
+    let mut thumb_roots = Vec::new();
+    if let Some(l) = &local {
+        if let Some(p) = exists(l.join(r"Microsoft\Windows\Explorer")) {
+            thumb_roots.push(p);
+        }
+    }
+    // System & web cache (INetCache) — regenerable.
+    let mut inet_roots = Vec::new();
+    if let Some(l) = &local {
+        if let Some(p) = exists(l.join(r"Microsoft\Windows\INetCache")) {
+            inet_roots.push(p);
+        }
+    }
+    // Windows Error Reporting queued reports (user + machine).
+    let mut wer_roots = Vec::new();
+    if let Some(l) = &local {
+        if let Some(p) = exists(l.join(r"Microsoft\Windows\WER")) {
+            wer_roots.push(p);
+        }
+    }
+    if let Ok(pd) = std::env::var("PROGRAMDATA") {
+        if let Some(p) = exists(PathBuf::from(pd).join(r"Microsoft\Windows\WER")) {
+            wer_roots.push(p);
+        }
+    }
+    // Prefetch — Windows rebuilds it; a small initial-launch cost, then back to normal.
+    let mut prefetch_roots = Vec::new();
+    if let Some(p) = exists(PathBuf::from(&windir).join("Prefetch")) {
+        prefetch_roots.push(p);
+    }
+
     vec![
         (
             "temp",
@@ -118,6 +160,48 @@ fn category_specs() -> Vec<(&'static str, &'static str, &'static str, bool, Vec<
             "Leftover application crash-dump files. Only needed for debugging a specific crash.",
             true,
             dump_roots,
+        ),
+        (
+            "winupdate",
+            "Windows Update cache",
+            "Update installers Windows already applied. Safe to remove — Windows re-downloads anything it still needs.",
+            true,
+            wu_roots,
+        ),
+        (
+            "deliveryopt",
+            "Delivery Optimization files",
+            "Peer-to-peer update chunks kept after installing. Fully regenerable.",
+            true,
+            do_roots,
+        ),
+        (
+            "thumbnails",
+            "Thumbnail & icon cache",
+            "Explorer's picture/icon thumbnail cache. Rebuilds automatically as you browse.",
+            true,
+            thumb_roots,
+        ),
+        (
+            "inetcache",
+            "System web cache",
+            "Cached web content from Windows components (INetCache). Regenerated on demand.",
+            true,
+            inet_roots,
+        ),
+        (
+            "werreports",
+            "Error report queue",
+            "Queued Windows Error Reporting data. Only used to send crash telemetry — safe to clear.",
+            true,
+            wer_roots,
+        ),
+        (
+            "prefetch",
+            "Prefetch data",
+            "Windows launch-prediction files. Rebuilds itself — expect a slightly slower first launch of each app after clearing.",
+            true,
+            prefetch_roots,
         ),
     ]
 }

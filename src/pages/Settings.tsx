@@ -10,6 +10,7 @@ import {
   Rocket,
   Settings as SettingsIcon,
   ShieldCheck,
+  Sparkles,
   Wifi,
   Zap,
 } from "lucide-react";
@@ -21,6 +22,8 @@ import { getUpdateInfo, openLogsFolder } from "../lib/backend";
 import { toast } from "../store/toastStore";
 import Toggle from "../components/Toggle";
 import UpdateModal from "../components/UpdateModal";
+import WhatsNewModal from "../components/WhatsNewModal";
+import { WHATS_NEW } from "../lib/whatsNew";
 import type { UpdateInfo } from "../lib/types";
 
 function Section({ icon: Icon, title, children }: { icon: typeof Info; title: string; children: React.ReactNode }) {
@@ -64,6 +67,7 @@ export default function Settings() {
   const [checking, setChecking] = useState(false);
   const [updateInfo, setUpdateInfo] = useState<UpdateInfo | null>(null);
   const [showUpdate, setShowUpdate] = useState(false);
+  const [showWhatsNew, setShowWhatsNew] = useState(false);
 
   // Start-on-startup — backed by the OS autostart entry (defaults ON at first run).
   const [autostartOn, setAutostartOn] = useState(true);
@@ -144,6 +148,24 @@ export default function Settings() {
 
       {showUpdate && updateInfo && (
         <UpdateModal version={updateInfo.version} onClose={() => setShowUpdate(false)} />
+      )}
+
+      {/* What's New */}
+      <Section icon={Sparkles} title="What's New">
+        <p className="text-[12.5px] leading-relaxed text-txt2">
+          <span className="font-semibold text-txt">v{WHATS_NEW.version} — {WHATS_NEW.headline}</span> See everything that
+          changed in this build. You can reopen this any time.
+        </p>
+        <button
+          onClick={() => setShowWhatsNew(true)}
+          className="mt-3 flex items-center gap-2 rounded-btn border border-edge bg-bg px-4 py-2 text-[12.5px] font-medium text-txt hover:border-edge2"
+        >
+          <Sparkles size={14} className="text-accent" /> See what's new
+        </button>
+      </Section>
+
+      {showWhatsNew && (
+        <WhatsNewModal version={WHATS_NEW.version} notes={WHATS_NEW.notes.join("\n")} onClose={() => setShowWhatsNew(false)} />
       )}
 
       {/* Advanced */}
