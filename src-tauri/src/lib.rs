@@ -26,7 +26,7 @@ use tauri::{
 use modules::{
     ai_backend, auto_apply, benchmark, change_journal, change_log, cleaner, config, debloat,
     driver_doctor, fix_catalog,
-    game_detector, game_profiler, game_profiles, game_settings, hardware_profiler, hardware_tier,
+    game_detector, game_icons, game_profiler, game_profiles, game_settings, hardware_profiler, hardware_tier,
     health_scan, logger, network_monitor, profile_store, ram_optimizer, ready_check, restore_points,
     rollback_engine, server_ping, sessions, speed_test, support, system_monitor, tweak_catalog,
     tweaks_engine,
@@ -353,6 +353,7 @@ pub fn run() {
             hardware_tier::get_hardware_tier,
             game_detector::get_installed_games,
             game_detector::resolve_steam_appid,
+            game_icons::game_icon,
             game_profiles::get_recommended_tweaks,
             game_profiler::get_game_profile,
             game_settings::get_settings_advice,

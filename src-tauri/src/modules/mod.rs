@@ -19,6 +19,7 @@ pub mod driver_doctor;
 pub mod fix_catalog;
 pub mod frame_time_monitor;
 pub mod game_detector;
+pub mod game_icons;
 pub mod game_profiler;
 pub mod game_profiles;
 pub mod game_settings;

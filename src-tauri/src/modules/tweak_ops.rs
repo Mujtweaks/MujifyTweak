@@ -438,6 +438,18 @@ pub fn ops_for(tweak_id: &str) -> Vec<Op> {
         "disable_mpo" => vec![dw(Hklm, r"SOFTWARE\Microsoft\Windows\Dwm", "OverlayTestMode", 5)],
         // Security — block firmware-injected vendor software (WPBT)
         "disable_wpbt" => vec![dw(Hklm, r"SYSTEM\CurrentControlSet\Control\Session Manager", "DisableWpbtExecution", 1)],
+        // Snappier UI + less background overhead (all reversible)
+        "menu_show_delay" => vec![sz(Hkcu, r"Control Panel\Desktop", "MenuShowDelay", "0")],
+        "svchost_split_threshold" => vec![dw(Hklm, r"SYSTEM\CurrentControlSet\Control", "SvcHostSplitThresholdInKB", 0x0400_0000)],
+        "disable_wer" => vec![dw(Hklm, r"SOFTWARE\Microsoft\Windows\Windows Error Reporting", "Disabled", 1)],
+        "disable_autoplay" => vec![dw(Hkcu, r"SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\AutoplayHandlers", "DisableAutoplay", 1)],
+        "disable_content_delivery" => vec![
+            dw(Hkcu, r"Software\Microsoft\Windows\CurrentVersion\ContentDeliveryManager", "SilentInstalledAppsEnabled", 0),
+            dw(Hkcu, r"Software\Microsoft\Windows\CurrentVersion\ContentDeliveryManager", "PreInstalledAppsEnabled", 0),
+            dw(Hkcu, r"Software\Microsoft\Windows\CurrentVersion\ContentDeliveryManager", "OemPreInstalledAppsEnabled", 0),
+            dw(Hkcu, r"Software\Microsoft\Windows\CurrentVersion\ContentDeliveryManager", "ContentDeliveryAllowed", 0),
+        ],
+
         // Network — DNS provider presets (mutually-exclusive; each captures prior NameServer)
         "dns_google" => vec![Op::SzAllInterfaces { name: "NameServer", value: "8.8.8.8,8.8.4.4" }],
         "dns_quad9" => vec![Op::SzAllInterfaces { name: "NameServer", value: "9.9.9.9,149.112.112.112" }],

@@ -642,11 +642,14 @@ pub async fn resolve_steam_appid(name: String) -> Option<String> {
     // Only accept a confident match: the top result's name should look like the
     // query (case-insensitive contains either way) so we don't slap the wrong
     // cover on a game. Otherwise keep the placeholder.
+    // Require an EXACT title match (ignoring case, spaces and punctuation) so we
+    // never slap the wrong cover on a game — e.g. "Minecraft" must not match
+    // "Minecraft Dungeons". Non-matches fall through to the game's own exe icon.
+    let norm = |s: &str| s.chars().filter(|c| c.is_alphanumeric()).flat_map(|c| c.to_lowercase()).collect::<String>();
+    let want = norm(q);
     let first = items.first()?;
-    let hit_name = first.get("name")?.as_str()?.to_lowercase();
-    let ql = q.to_lowercase();
-    let close = hit_name.contains(&ql) || ql.contains(&hit_name);
-    if !close {
+    let hit_name = first.get("name")?.as_str()?;
+    if norm(hit_name) != want {
         return None;
     }
     first.get("id")?.as_u64().map(|id| id.to_string())

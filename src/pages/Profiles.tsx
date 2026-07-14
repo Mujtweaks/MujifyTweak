@@ -125,7 +125,7 @@ export default function Profiles({ onNavigate }: { onNavigate: (page: PageId) =>
                 className="stagger-item group relative"
               >
                 <div className={`relative aspect-[3/4] overflow-hidden rounded-xl border ${isActive ? "border-success/50" : "border-edge"}`}>
-                  <GameArt name={g.name} appId={g.appId} className="h-full w-full" rounded="rounded-xl" />
+                  <GameArt name={g.name} appId={g.appId} path={g.installPath ?? g.exe} className="h-full w-full" rounded="rounded-xl" />
                   <div className="absolute inset-0 grid place-items-center bg-black/60 opacity-0 transition-opacity duration-100 group-hover:opacity-100">
                     <span className="flex items-center gap-1.5 rounded-btn bg-accent px-3 py-1.5 text-[11px] font-semibold text-white"><Zap size={12} fill="currentColor" /> {isProfiled ? "Optimized" : "Optimize"}</span>
                   </div>
