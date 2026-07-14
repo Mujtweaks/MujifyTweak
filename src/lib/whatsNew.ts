@@ -5,14 +5,13 @@
 // Update the version + notes on each release.
 
 export const WHATS_NEW = {
-  version: "0.9.0-beta.9",
-  headline: "Your games, seen live.",
+  version: "0.9.0-beta.10",
+  headline: "Your stats, on screen.",
   notes: [
-    "🎮 Live game detection, fixed — Roblox, Minecraft (Java & Bedrock) and other launcher-less games are now recognised the moment you launch them, so the top bar shows the real active game instead of “None”.",
-    "📊 Real FPS & frame-time — with the active game finally detected, the live FPS and frame-pacing capture attaches automatically while you play. Every number is measured on your machine, never invented.",
-    "🖥️ GPU dashboard, levelled up — a cleaner layout with a live Ready Score, a real settings checklist, an optimization radar built from your actual config, and one-click Smart Recommendations. Sensors your hardware doesn’t expose read “Not detected”, never a fake value.",
-    "🧹 Cleaner, deeper — more one-click categories (Windows Update leftovers, crash dumps, thumbnail cache, delivery-optimization files and more), each with an exact, honest size before you remove anything.",
-    "🔔 Notifications that stay — the bell keeps a full history with an unread badge, so a toast you missed is still there to read.",
-    "✨ What’s New, on demand — this very panel now lives in Settings, so you can reopen it any time and catch up on every change.",
+    "🎯 In-game overlay — a small, always-on-top, click-through panel showing live FPS, CPU, GPU and temperatures while you play, MSI-Afterburner style. Turn it on in Settings → In-Game Overlay and tick exactly which stats you want. Every number is measured, never faked. (Works over borderless & windowed games; Windows can’t overlay true exclusive-fullscreen without hooking, which we never do.)",
+    "🛑 Fixed “Claude detected as a game” — and Spotify, Discord and other apps too. They were being mistaken for games because they live in the Windows Apps folder; that folder is no longer treated as a game library.",
+    "🎮 Live game detection — Roblox and Minecraft (and other launcher-less games) are recognised the moment you launch them, so the top bar shows the real active game and FPS capture attaches automatically.",
+    "🧹 Cleaner, deeper — Windows Update cache, Delivery Optimization, thumbnails, web cache, error reports and Prefetch, each with an exact, honest size.",
+    "🔔 Notification history in the bell, and ✨ this What’s New panel now lives in Settings so you can reopen it any time.",
   ],
 } as const;

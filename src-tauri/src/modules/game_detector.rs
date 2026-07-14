@@ -69,6 +69,10 @@ const NON_GAME_NAMES: &[&str] = &[
     // "roblox studio" catches the Start-menu shortcut "Roblox Studio for <user>".
     "roblox studio", "unreal engine", "unity hub", "godot", "rpg maker",
     "visual studio", "vscode", "vs code", " sdk", "development kit",
+    // Common desktop/UWP apps that were slipping through as "games".
+    "claude", "spotify", "discord", "whatsapp", "telegram", "slack",
+    "obsidian", "notion", "zoom", "microsoft teams", "vlc media",
+    "onedrive", "dropbox", "adobe", "chatgpt", "copilot",
 ];
 
 /// True if a title is a known non-game desktop app (Wallpaper Engine, docks, …).
@@ -122,7 +126,9 @@ const LIB_MARKERS: &[&str] = &[
     "ubisoft game launcher\\games",
     "ubisoft\\ubisoft game launcher",
     "\\xboxgames\\",
-    "\\windowsapps\\",
+    // NOTE: "\\windowsapps\\" was removed — it matched EVERY UWP/MSIX app
+    // (Claude, Spotify, Discord…), so those were wrongly flagged as "games".
+    // Real UWP games are caught by name (STANDALONE_RUNNING) or \xboxgames\.
 ];
 
 /// Launcher / helper / crash-handler exes that live in game folders but are NOT
@@ -764,6 +770,12 @@ mod tests {
         assert!(is_non_game_name("Roblox Studio for syeda"));
         assert!(is_non_game_name("Unreal Engine 5.4"));
         assert!(!is_non_game_name("Roblox"));
+        // UWP/desktop apps that were being flagged as games are now filtered.
+        assert!(is_non_game_name("Claude 1.20186.1.0 X64 Pzs8sxrjxfjjc"));
+        assert!(is_non_game_name("Spotify"));
+        assert!(is_non_game_name("Discord"));
+        // The \windowsapps\ marker is gone, so a UWP app path is NOT a "game".
+        assert!(game_from_running(r"C:\Program Files\WindowsApps\Claude_1.0\claude.exe", "claude").is_none());
     }
 
     #[test]

@@ -69,6 +69,36 @@ export default function Settings() {
   const [showUpdate, setShowUpdate] = useState(false);
   const [showWhatsNew, setShowWhatsNew] = useState(false);
 
+  // In-game overlay (MSI-Afterburner-style live FPS/temp panel).
+  const OVERLAY_METRICS: { id: string; label: string }[] = [
+    { id: "fps", label: "FPS" },
+    { id: "cpu", label: "CPU %" },
+    { id: "gpu", label: "GPU %" },
+    { id: "cputemp", label: "CPU temp" },
+    { id: "gputemp", label: "GPU temp" },
+    { id: "ram", label: "RAM %" },
+  ];
+  const [overlayOn, setOverlayOn] = useState(() => {
+    try { return localStorage.getItem("mujify.overlay.enabled") === "1"; } catch { return false; }
+  });
+  const [overlayMetrics, setOverlayMetrics] = useState<string[]>(() => {
+    try {
+      const raw = localStorage.getItem("mujify.overlay.metrics");
+      return raw ? (JSON.parse(raw) as string[]) : ["fps", "cpu", "gpu", "cputemp", "gputemp"];
+    } catch { return ["fps", "cpu", "gpu", "cputemp", "gputemp"]; }
+  });
+  const persistMetrics = (m: string[]) => {
+    setOverlayMetrics(m);
+    try { localStorage.setItem("mujify.overlay.metrics", JSON.stringify(m)); } catch { /* ignore */ }
+  };
+  const toggleOverlay = async (next: boolean) => {
+    setOverlayOn(next);
+    try { localStorage.setItem("mujify.overlay.enabled", next ? "1" : "0"); } catch { /* ignore */ }
+    try { await invoke("set_overlay_enabled", { enabled: next }); } catch (e) { toast.error("Overlay", String(e)); }
+  };
+  const toggleMetric = (id: string) =>
+    persistMetrics(overlayMetrics.includes(id) ? overlayMetrics.filter((x) => x !== id) : [...overlayMetrics, id]);
+
   // Start-on-startup — backed by the OS autostart entry (defaults ON at first run).
   const [autostartOn, setAutostartOn] = useState(true);
   useEffect(() => {
@@ -167,6 +197,36 @@ export default function Settings() {
       {showWhatsNew && (
         <WhatsNewModal version={WHATS_NEW.version} notes={WHATS_NEW.notes.join("\n")} onClose={() => setShowWhatsNew(false)} />
       )}
+
+      {/* In-Game Overlay */}
+      <Section icon={Gamepad2} title="In-Game Overlay">
+        <div className="flex items-center justify-between py-1">
+          <div className="pr-4">
+            <p className="text-[13px] text-txt">Live FPS / temp overlay</p>
+            <p className="mt-0.5 text-[11px] text-txt3">
+              A small always-on-top panel with real live stats, like MSI Afterburner. Shows over borderless &amp; windowed
+              games (Windows can't overlay true exclusive-fullscreen without hooking, which we never do).
+            </p>
+          </div>
+          <Toggle on={overlayOn} onClick={() => void toggleOverlay(!overlayOn)} />
+        </div>
+        {overlayOn && (
+          <div className="mt-3 flex flex-wrap gap-2">
+            {OVERLAY_METRICS.map((m) => {
+              const on = overlayMetrics.includes(m.id);
+              return (
+                <button
+                  key={m.id}
+                  onClick={() => toggleMetric(m.id)}
+                  className={`rounded-full border px-3 py-1 text-[11.5px] font-semibold transition-colors ${on ? "border-accent bg-accent/15 text-accent" : "border-edge bg-bg text-txt3 hover:text-txt2"}`}
+                >
+                  {m.label}
+                </button>
+              );
+            })}
+          </div>
+        )}
+      </Section>
 
       {/* Advanced */}
       <Section icon={Cpu} title="Advanced">
