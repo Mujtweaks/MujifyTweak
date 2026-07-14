@@ -73,6 +73,14 @@ const NON_GAME_NAMES: &[&str] = &[
     "claude", "spotify", "discord", "whatsapp", "telegram", "slack",
     "obsidian", "notion", "zoom", "microsoft teams", "vlc media",
     "onedrive", "dropbox", "adobe", "chatgpt", "copilot",
+    // Launchers, background services, runtimes & anti-cheat — NOT games, even
+    // though they install/run inside game folders.
+    "epic online services", "epiconlineservices", "epic games launcher",
+    "riot client", "riot vanguard", "riotclient", "vgc",
+    "easyanticheat", "easy anti-cheat", "battleye", "battle.net",
+    "ea app", "ea desktop", "origin", "ubisoft connect", "uplay",
+    "gog galaxy", "steam client", "steamworks", "redistributable",
+    "directx", "visual c++", "dotnet", ".net runtime", "vcredist",
 ];
 
 /// True if a title is a known non-game desktop app (Wallpaper Engine, docks, …).
@@ -91,15 +99,44 @@ fn norm_name(name: &str) -> String {
         .join(" ")
 }
 
+/// Collapse variant / per-user / launcher-suffixed titles to one canonical name
+/// so the SAME game found by different scanners shows exactly once — e.g.
+/// "Roblox", "Roblox Player" and "Roblox Player for <user>" are all just Roblox.
+fn canonical_name(name: &str) -> String {
+    let n = name.to_lowercase();
+    if n.contains("roblox") {
+        return "Roblox".to_string();
+    }
+    if n.contains("counter-strike") || n.contains("counter strike") || n == "cs2" {
+        return "Counter-Strike 2".to_string();
+    }
+    if n.contains("minecraft") && !n.contains("dungeon") && !n.contains("legend") && !n.contains("launcher") {
+        return "Minecraft".to_string();
+    }
+    name.to_string()
+}
+
 /// Add a game to the library unless it's a non-game app or a duplicate of one
-/// already found (by normalized name). The single choke-point every scanner
-/// pushes through, so filtering + de-dup can't drift between them.
-fn push_unique(games: &mut Vec<GameInfo>, g: GameInfo) {
+/// already found (by canonical normalized name). The single choke-point every
+/// scanner pushes through, so filtering + de-dup can't drift between them. When a
+/// duplicate carries richer data (an install path or Steam appid for cover art),
+/// it back-fills the entry we already have rather than being dropped outright.
+fn push_unique(games: &mut Vec<GameInfo>, mut g: GameInfo) {
     if g.name.trim().is_empty() || is_non_game_name(&g.name) {
         return;
     }
+    g.name = canonical_name(&g.name);
     let key = norm_name(&g.name);
-    if games.iter().any(|x| norm_name(&x.name) == key) {
+    if let Some(existing) = games.iter_mut().find(|x| norm_name(&x.name) == key) {
+        if existing.install_path.is_none() && g.install_path.is_some() {
+            existing.install_path = g.install_path;
+        }
+        if existing.app_id.is_none() && g.app_id.is_some() {
+            existing.app_id = g.app_id;
+        }
+        if existing.exe.is_empty() && !g.exe.is_empty() {
+            existing.exe = g.exe;
+        }
         return;
     }
     games.push(g);
@@ -137,10 +174,13 @@ const NOT_GAME_EXES: &[&str] = &[
     "steam", "steamwebhelper", "steamservice", "gameoverlayui", "cef",
     "epicgameslauncher", "epicwebhelper", "unrealcefsubprocess", "eoshelper",
     "galaxyclient", "galaxycommunication", "battle.net", "agent",
-    "riotclientservices", "riotclientux", "riotclientcrashhandler",
+    "riotclientservices", "riotclientux", "riotclientcrashhandler", "riotclient",
     "eadesktop", "eabackgroundservice", "origin", "ubisoftconnect", "upc",
     "crashhandler", "crashreportclient", "unitycrashhandler64", "unitycrashhandler32",
-    "launcher", "vconsole2", "easyanticheat", "battleye", "vgtray",
+    "launcher", "vconsole2", "easyanticheat", "battleye", "vgtray", "vgc",
+    // Epic Online Services (the SDK/overlay that runs alongside games — not a game).
+    "epiconlineservices", "epiconlineservicesuserhelper", "eosoverlayrenderprocess",
+    "epicgameslauncher", "epicwebhelper",
 ];
 
 /// Launcher-less games whose running process lives OUTSIDE any library folder
@@ -776,6 +816,30 @@ mod tests {
         assert!(is_non_game_name("Discord"));
         // The \windowsapps\ marker is gone, so a UWP app path is NOT a "game".
         assert!(game_from_running(r"C:\Program Files\WindowsApps\Claude_1.0\claude.exe", "claude").is_none());
+    }
+
+    #[test]
+    fn services_launchers_anticheat_are_not_games_and_roblox_dedupes() {
+        // Launchers / services / anti-cheat must never appear as games.
+        assert!(is_non_game_name("Epic Online Services"));
+        assert!(is_non_game_name("Riot Client"));
+        assert!(is_non_game_name("Riot Vanguard"));
+        // Roblox found three ways collapses to a single "Roblox".
+        assert_eq!(canonical_name("Roblox Player"), "Roblox");
+        assert_eq!(canonical_name("Roblox Player for Urban9"), "Roblox");
+        let mut games = Vec::new();
+        let mk = |n: &str, path: Option<&str>| GameInfo {
+            name: n.to_string(), exe: String::new(), launcher: None,
+            install_path: path.map(String::from), app_id: None,
+        };
+        push_unique(&mut games, mk("Roblox Player", None));
+        push_unique(&mut games, mk("Roblox Player for Urban9", None));
+        push_unique(&mut games, mk("Roblox", Some(r"C:\Users\x\AppData\Local\Roblox\Versions")));
+        push_unique(&mut games, mk("Epic Online Services", None)); // filtered
+        assert_eq!(games.len(), 1, "all Roblox variants collapse; EOS is filtered");
+        assert_eq!(games[0].name, "Roblox");
+        // The richer install path back-filled from a later duplicate (for its icon).
+        assert!(games[0].install_path.is_some());
     }
 
     #[test]
