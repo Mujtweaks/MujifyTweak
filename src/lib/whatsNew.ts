@@ -5,7 +5,7 @@
 // Update the version + notes on each release.
 
 export const WHATS_NEW = {
-  version: "0.9.0-beta.2",
+  version: "0.9.0-beta.11",
   headline: "Safer, clearer, more of it.",
   notes: [
     "⚠️ Real warnings — tweaks that need caution now show a RED info icon and a plain-English warning right on the card (e.g. power plans warn against laptop overheating; OneDrive/Xbox removal and BitLocker warn before you touch them).",
