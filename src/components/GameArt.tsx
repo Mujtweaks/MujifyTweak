@@ -18,19 +18,68 @@ const artCache = new Map<string, string>();
 // path -> extracted-icon data URI cache (""=tried, none). Extract each exe once.
 const iconCache = new Map<string, string>();
 
-// Real Steam art, tried in order: portrait library card (matches the 3:4 tile),
-// then the landscape header, then the header on Akamai as a last resort. All on
-// *.steamstatic.com — the canonical static CDN (steampowered.com does NOT serve
-// this art, which is why the old URL fell through to the letter tile).
-const steamUrls = (appId: string): string[] => [
-  `https://cdn.cloudflare.steamstatic.com/steam/apps/${appId}/library_600x900.jpg`,
-  `https://cdn.cloudflare.steamstatic.com/steam/apps/${appId}/header.jpg`,
-  `https://cdn.akamai.steamstatic.com/steam/apps/${appId}/header.jpg`,
+/** How a source image is shaped, which decides how it's framed in a 3:4 tile. */
+type ArtKind = "portrait" | "landscape" | "icon";
+
+// Real Steam art, tried in order. The portrait library card matches the 3:4 tile
+// natively; the landscape header is the fallback for the many titles that have
+// no portrait art. All on *.steamstatic.com — the canonical static CDN
+// (steampowered.com does NOT serve this art, which is why the old URL fell
+// through to the letter tile).
+const steamSources = (appId: string): { url: string; kind: ArtKind }[] => [
+  { url: `https://cdn.cloudflare.steamstatic.com/steam/apps/${appId}/library_600x900_2x.jpg`, kind: "portrait" },
+  { url: `https://cdn.cloudflare.steamstatic.com/steam/apps/${appId}/library_600x900.jpg`, kind: "portrait" },
+  { url: `https://cdn.cloudflare.steamstatic.com/steam/apps/${appId}/header.jpg`, kind: "landscape" },
+  { url: `https://cdn.akamai.steamstatic.com/steam/apps/${appId}/header.jpg`, kind: "landscape" },
 ];
 
 /**
- * Real Steam art by appid, with a deterministic letter tile fallback (never a
- * fake/placeholder box for a non-Steam game or when offline).
+ * Frame art that isn't already 3:4 (a landscape header, or a square exe icon)
+ * against a blurred, scaled-up copy of itself.
+ *
+ * Cropping a 460x215 header into a 3:4 tile cut the title off, and letterboxing
+ * a 256px icon left dead bars — both were why the logos looked wrong even when
+ * they loaded. Containing the real image over its own blurred backdrop keeps the
+ * whole logo readable and fills the tile. Nothing is invented: the backdrop is
+ * the same pixels as the artwork.
+ */
+function FramedArt({
+  src,
+  alt,
+  kind,
+  className,
+  rounded,
+  onError,
+}: {
+  src: string;
+  alt: string;
+  kind: ArtKind;
+  className: string;
+  rounded: string;
+  onError?: () => void;
+}) {
+  return (
+    <span className={`${className} ${rounded} relative block shrink-0 overflow-hidden bg-black/40`}>
+      <span
+        aria-hidden
+        className="absolute inset-0 scale-150 bg-cover bg-center blur-lg saturate-150"
+        style={{ backgroundImage: `url("${src}")`, opacity: 0.5 }}
+      />
+      <img
+        src={src}
+        alt={alt}
+        onError={onError}
+        draggable={false}
+        className={`relative h-full w-full object-contain ${kind === "icon" ? "p-[16%]" : ""}`}
+      />
+    </span>
+  );
+}
+
+/**
+ * Real Steam art by appid, then the game's own exe icon, with a deterministic
+ * letter tile as the last resort (never a fake/placeholder cover for a game we
+ * couldn't identify, and never another game's cover).
  */
 export default function GameArt({
   name,
@@ -72,10 +121,17 @@ export default function GameArt({
     };
   }, [name, appId]);
 
-  // For non-Steam games, pull the REAL icon out of the game's exe (data URI,
-  // CSP-allowed) so it shows a logo instead of a letter. Cached per path.
+  const effectiveId = appId ?? resolved;
+  // Steam art is the better source when it exists, so only dig the icon out of
+  // the exe when we actually need it: no appid, or the CDN had no art for this
+  // title. (Extraction walks the game's folder — not worth doing for a game
+  // whose cover already loaded.) Cached per path.
+  const needsIcon = !effectiveId || failed;
+
+  // Pull the REAL icon out of the game's exe (data URI, CSP-allowed) so it shows
+  // a logo instead of a letter.
   useEffect(() => {
-    if (appId || !path || !isTauri) return;
+    if (!path || !isTauri || !needsIcon) return;
     const cached = iconCache.get(path);
     if (cached !== undefined) {
       setIconUri(cached || null);
@@ -91,31 +147,47 @@ export default function GameArt({
     return () => {
       alive = false;
     };
-  }, [path, appId]);
+  }, [path, needsIcon]);
 
   const hues = [0, 210, 140, 275, 32, 190];
   const hue = hues[(name.charCodeAt(0) || 0) % hues.length];
-  const effectiveId = appId ?? resolved;
 
   if (effectiveId && !failed) {
-    const urls = steamUrls(effectiveId);
-    return (
-      <img
-        src={urls[urlIndex] ?? ""}
-        alt={name}
-        onError={() => {
-          if (urlIndex < urls.length - 1) setUrlIndex((i) => i + 1);
-          else setFailed(true);
-        }}
-        draggable={false}
-        className={`${className} ${rounded} object-cover`}
-      />
-    );
+    const sources = steamSources(effectiveId);
+    const source = sources[urlIndex];
+    if (source) {
+      const next = () => {
+        if (urlIndex < sources.length - 1) setUrlIndex((i) => i + 1);
+        else setFailed(true);
+      };
+      // Portrait art already matches the tile — show it edge to edge.
+      if (source.kind === "portrait") {
+        return (
+          <img
+            src={source.url}
+            alt={name}
+            onError={next}
+            draggable={false}
+            className={`${className} ${rounded} shrink-0 object-cover`}
+          />
+        );
+      }
+      return (
+        <FramedArt
+          src={source.url}
+          alt={name}
+          kind={source.kind}
+          className={className}
+          rounded={rounded}
+          onError={next}
+        />
+      );
+    }
   }
 
-  // No Steam cover → the game's own exe icon (real logo for Roblox/Minecraft/…).
+  // No Steam cover → the game's own exe icon (real logo for Roblox/Fortnite/…).
   if (iconUri) {
-    return <img src={iconUri} alt={name} draggable={false} className={`${className} ${rounded} object-contain`} />;
+    return <FramedArt src={iconUri} alt={name} kind="icon" className={className} rounded={rounded} />;
   }
 
   return (

@@ -293,6 +293,12 @@ fn resolve_gpu_adapter_path(m: &dyn SystemMutator, vendors: &[&str]) -> Option<S
 /// The concrete op list for a tweak id. Unknown ids return empty (nothing runs).
 /// Every op here is fully reversible via its captured UndoOp.
 pub fn ops_for(tweak_id: &str) -> Vec<Op> {
+    // Services Manager rows travel as `service:<Name>`. The name is resolved
+    // against the curated catalog — an unknown one yields no ops, so the apply is
+    // refused rather than passed through to `sc`.
+    if let Some(name) = super::services_manager::service_name_from_tweak_id(tweak_id) {
+        return vec![Op::SetService { name, start_type: "disabled", running: false }];
+    }
     match tweak_id {
         // ---- System / performance (registry) ----
         "power_high_perf" => vec![Op::PowerPlan { guid: HIGH_PERF_GUID }],

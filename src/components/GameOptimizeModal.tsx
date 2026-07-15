@@ -41,6 +41,11 @@ export default function GameOptimizeModal({ game, onClose }: { game: GameInfo; o
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [game.name]);
 
+  // The recommendations are ids; they only become real tweaks once the catalog
+  // scan lands. Until then the list is legitimately empty — say so, instead of
+  // rendering an empty list next to a mysteriously dead Apply button.
+  const catalogReady = !!scanResult;
+
   const byId = useMemo(
     () => new Map((scanResult?.tweaks ?? []).map((t) => [t.id, t])),
     [scanResult],
@@ -127,6 +132,11 @@ export default function GameOptimizeModal({ game, onClose }: { game: GameInfo; o
               <p className="mb-2 flex items-center gap-2 text-[11px] font-semibold uppercase tracking-widest text-txt3">
                 Recommended for {game.name}
               </p>
+              {!catalogReady && (
+                <p className="rounded-chip border border-edge bg-card px-3 py-4 text-center text-[11.5px] text-txt3">
+                  Reading your current Windows settings…
+                </p>
+              )}
               <ul className="flex flex-col gap-1.5">
                 {recommended.map(({ why, tweak }) => {
                   const scanOnly = !tweak.appliable || !tweak.available;
@@ -220,10 +230,22 @@ export default function GameOptimizeModal({ game, onClose }: { game: GameInfo; o
             <button
               onClick={() => setConfirm(recommended.map((x) => x.tweak))}
               disabled={applyCount === 0}
+              // A dead button with no explanation is what made this feel broken.
+              title={
+                !catalogReady
+                  ? "Still reading your current Windows settings…"
+                  : applyCount === 0
+                    ? "Every recommended tweak is already active on this PC."
+                    : `Review and apply ${applyCount} change${applyCount === 1 ? "" : "s"}`
+              }
               className="flex items-center gap-2 rounded-btn bg-accent px-4 py-2 text-[12.5px] font-semibold text-white shadow-[0_4px_20px_rgba(227,0,14,0.3)] hover:bg-accent-hi disabled:opacity-60"
             >
               <Zap size={14} strokeWidth={2.25} fill="currentColor" />
-              Apply Recommended{applyCount > 0 ? ` (${applyCount})` : ""}
+              {!catalogReady
+                ? "Loading…"
+                : applyCount === 0
+                  ? "All applied"
+                  : `Apply Recommended (${applyCount})`}
             </button>
           )}
           </div>

@@ -165,8 +165,32 @@ export interface GameInfo {
   appId: string | null;
 }
 
+/** One curated Windows service joined with this machine's REAL current state. */
+export interface ServiceStatus {
+  /** The tweak id it applies under (`service:<Name>`) — same pipeline as any
+   *  other change, so it's logged and undoable. */
+  id: string;
+  name: string;
+  title: string;
+  description: string;
+  /** The real cost of turning it off. null when there genuinely isn't one. */
+  warning: string | null;
+  risk: "safe" | "moderate" | "advanced";
+  recommended: boolean;
+  /** "boot" | "system" | "auto" | "demand" | "disabled" | "absent". */
+  startType: string;
+  running: boolean;
+  /** False when the service isn't installed on this PC. */
+  present: boolean;
+}
+
 export interface AntiCheatStatus {
+  /** The gate is engaged: an anti-cheat is loaded AND a game is actually live,
+   *  so anything above Safe is held until the game exits. */
   active: boolean;
+  /** An anti-cheat is merely installed/idle (Vanguard runs from boot forever).
+   *  Informational only — it restricts nothing. */
+  present: boolean;
   detected: string[];
 }
 

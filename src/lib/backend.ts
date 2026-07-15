@@ -28,6 +28,7 @@ import type {
   PingResponse,
   Profile,
   ScanResult,
+  ServiceStatus,
   SettingsAdvice,
   GameSession,
   DetectiveReport,
@@ -464,6 +465,18 @@ export async function applyFix(id: string): Promise<boolean> {
     console.error("apply_fix failed:", err);
     toast.errorHelp("Fix failed", String(err));
     return false;
+  }
+}
+
+/** Services Manager — read-only. Reports each curated service's REAL start type
+ *  and running state. Changing one goes through applyTweaks like anything else. */
+export async function fetchServices(): Promise<ServiceStatus[]> {
+  if (!isTauri) return [];
+  try {
+    return await invoke<ServiceStatus[]>("list_services");
+  } catch (err) {
+    console.error("list_services failed:", err);
+    return [];
   }
 }
 

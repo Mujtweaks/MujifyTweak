@@ -37,6 +37,7 @@ pub mod ready_check;
 pub mod restore_points;
 pub mod rollback_engine;
 pub mod server_ping;
+pub mod services_manager;
 pub mod sessions;
 pub mod speed_test;
 pub mod support;

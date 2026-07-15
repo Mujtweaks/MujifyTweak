@@ -83,10 +83,38 @@ const NON_GAME_NAMES: &[&str] = &[
     "directx", "visual c++", "dotnet", ".net runtime", "vcredist",
 ];
 
-/// True if a title is a known non-game desktop app (Wallpaper Engine, docks, …).
+/// Non-game apps whose names are too SHORT or too common to match as a bare
+/// substring — these are matched on whole-word boundaries instead. "hone" (the
+/// rival optimizer, which was showing up as a game tile) can't be a substring
+/// rule or it would also eat a game called "Phone Simulator".
+///
+/// Mostly PC-tuning/utility software: it lives next to games and gets picked up
+/// by the install-path heuristic, but it is never something you play.
+const NON_GAME_WORDS: &[&str] = &[
+    "hone", "wemod", "cheat engine", "razer cortex", "game booster",
+    "smart game booster", "advanced systemcare", "ccleaner", "iobit",
+    "driver booster", "wise care", "throttlestop", "process lasso",
+    "o&o shutup", "rip tweaks", "riptweaks", "jv16", "tweaking",
+    // Our own app must never list itself as one of the user's games.
+    "mujify", "mujify tweaks",
+];
+
+/// True if a title is a known non-game desktop app (Wallpaper Engine, docks,
+/// rival optimizers, …).
+///
+/// Two matching modes on purpose: distinctive multi-word names are safe as
+/// substrings, while short/common ones must match whole words only.
 fn is_non_game_name(name: &str) -> bool {
     let n = name.to_lowercase();
-    NON_GAME_NAMES.iter().any(|x| n.contains(x))
+    if NON_GAME_NAMES.iter().any(|x| n.contains(x)) {
+        return true;
+    }
+    // Whole-word/phrase match: pad both sides so "hone" hits "Hone 1.2" but not
+    // "Phone Simulator".
+    let padded = format!(" {} ", norm_name(name));
+    NON_GAME_WORDS
+        .iter()
+        .any(|w| padded.contains(&format!(" {w} ")))
 }
 
 /// Normalized de-dup key: lowercase, separators→space, whitespace collapsed —
@@ -274,6 +302,64 @@ fn game_from_running(exe_path: &str, stem: &str) -> Option<GameInfo> {
     })
 }
 
+/// The single source of truth for "is a game running right now, and which one".
+///
+/// Shared by the poller below and by `anti_cheat_guard::detect_active`, so the
+/// UI's indicator and the backend's apply gate can never disagree about whether
+/// a game is live. Read-only: it only inspects an existing process snapshot.
+pub fn detect_active_game(sys: &System) -> Option<GameInfo> {
+    // First a curated match (nice display names)…
+    for process in sys.processes().values() {
+        let raw = process.name().to_string_lossy().to_string();
+        let stem = stem_of(&raw);
+        if let Some(name) = games_db::lookup(&stem) {
+            return Some(GameInfo {
+                name: name.to_string(),
+                exe: raw,
+                launcher: None,
+                install_path: process
+                    .exe()
+                    .and_then(|p| p.parent())
+                    .map(|p| p.to_string_lossy().to_string()),
+                app_id: None,
+            });
+        }
+    }
+    // …then launcher-less games (Roblox, Minecraft Java, …) matched by exe /
+    // command line, with no library-folder requirement…
+    for process in sys.processes().values() {
+        let stem = stem_of(&process.name().to_string_lossy());
+        let cmd = process
+            .cmd()
+            .iter()
+            .map(|s| s.to_string_lossy().to_lowercase())
+            .collect::<Vec<_>>()
+            .join(" ");
+        if let Some(name) = standalone_running_game(&stem, &cmd) {
+            return Some(GameInfo {
+                name: name.to_string(),
+                exe: process.name().to_string_lossy().to_string(),
+                launcher: None,
+                install_path: process
+                    .exe()
+                    .and_then(|p| p.parent())
+                    .map(|p| p.to_string_lossy().to_string()),
+                app_id: None,
+            });
+        }
+    }
+    // …then a GENERIC pass so games not in the table are still detected.
+    for process in sys.processes().values() {
+        let stem = stem_of(&process.name().to_string_lossy());
+        if let Some(path) = process.exe() {
+            if let Some(g) = game_from_running(&path.to_string_lossy(), &stem) {
+                return Some(g);
+            }
+        }
+    }
+    None
+}
+
 pub fn start(app: AppHandle) {
     if RUNNING.swap(true, Ordering::SeqCst) {
         return;
@@ -292,60 +378,7 @@ pub fn start(app: AppHandle) {
                 .map(|p| stem_of(&p.name().to_string_lossy()))
                 .collect();
 
-            // Active game — first a curated match (nice display names), then a
-            // GENERIC pass so games not in the table are still detected.
-            let mut active: Option<GameInfo> = None;
-            for process in sys.processes().values() {
-                let raw = process.name().to_string_lossy().to_string();
-                let stem = stem_of(&raw);
-                if let Some(name) = games_db::lookup(&stem) {
-                    active = Some(GameInfo {
-                        name: name.to_string(),
-                        exe: raw,
-                        launcher: None,
-                        install_path: process
-                            .exe()
-                            .and_then(|p| p.parent())
-                            .map(|p| p.to_string_lossy().to_string()),
-                        app_id: None,
-                    });
-                    break;
-                }
-            }
-            // Launcher-less games (Roblox, Minecraft Java, …) matched by exe /
-            // command line, no library-folder requirement.
-            if active.is_none() {
-                for process in sys.processes().values() {
-                    let stem = stem_of(&process.name().to_string_lossy());
-                    let cmd = process
-                        .cmd()
-                        .iter()
-                        .map(|s| s.to_string_lossy().to_lowercase())
-                        .collect::<Vec<_>>()
-                        .join(" ");
-                    if let Some(name) = standalone_running_game(&stem, &cmd) {
-                        active = Some(GameInfo {
-                            name: name.to_string(),
-                            exe: process.name().to_string_lossy().to_string(),
-                            launcher: None,
-                            install_path: process.exe().and_then(|p| p.parent()).map(|p| p.to_string_lossy().to_string()),
-                            app_id: None,
-                        });
-                        break;
-                    }
-                }
-            }
-            if active.is_none() {
-                for process in sys.processes().values() {
-                    let stem = stem_of(&process.name().to_string_lossy());
-                    if let Some(path) = process.exe() {
-                        if let Some(g) = game_from_running(&path.to_string_lossy(), &stem) {
-                            active = Some(g);
-                            break;
-                        }
-                    }
-                }
-            }
+            let active: Option<GameInfo> = detect_active_game(&sys);
 
             if active != last_active {
                 let _ = app.emit("game_changed", &active);
@@ -354,7 +387,9 @@ pub fn start(app: AppHandle) {
                 last_active = active;
             }
 
-            let ac = anti_cheat_guard::evaluate(&stems);
+            // The gate only engages while a game is genuinely live — an idle
+            // anti-cheat service (Vanguard runs from boot forever) must not.
+            let ac = anti_cheat_guard::evaluate(&stems, last_active.is_some());
             let _ = app.emit("anti_cheat_status", &ac);
 
             // FPS Drop Detective: accumulate this game's live session; on exit it
@@ -675,6 +710,86 @@ const STANDALONE_GAMES: &[(&str, &str, &str)] = &[
     ("League of Legends", "PROGRAMFILES", r"Riot Games\League of Legends"),
 ];
 
+/// Riot's install metadata folder names → the real display name. Riot titles
+/// have no Steam/Epic manifest and no uninstall entry per game, so without this
+/// they only ever appeared once already running.
+fn riot_product_display_name(dir_name: &str) -> Option<&'static str> {
+    // Folders are "<product>.<patchline>", e.g. "valorant.live".
+    let product = dir_name.split('.').next()?.to_lowercase();
+    Some(match product.as_str() {
+        "valorant" => "VALORANT",
+        "league_of_legends" => "League of Legends",
+        "legends_of_runeterra" | "bacon" => "Legends of Runeterra",
+        "wildrift" => "Wild Rift",
+        _ => return None,
+    })
+}
+
+/// Installed Riot games, from %ProgramData%\Riot Games\Metadata\<product>.<line>.
+/// Read-only: it only lists directory names.
+fn scan_riot(games: &mut Vec<GameInfo>) {
+    let Ok(programdata) = std::env::var("ProgramData") else {
+        return;
+    };
+    let metadata = PathBuf::from(programdata).join("Riot Games").join("Metadata");
+    let Ok(entries) = std::fs::read_dir(&metadata) else {
+        return;
+    };
+    for entry in entries.flatten() {
+        if !entry.path().is_dir() {
+            continue;
+        }
+        let dir = entry.file_name().to_string_lossy().to_string();
+        let Some(name) = riot_product_display_name(&dir) else {
+            continue;
+        };
+        // The default install root; used for the icon + engine scan when present.
+        let install = ["PROGRAMFILES", "ProgramFiles(x86)", "SystemDrive"]
+            .iter()
+            .filter_map(|v| std::env::var(v).ok())
+            .map(|base| PathBuf::from(base).join("Riot Games").join(name))
+            .find(|p| p.exists())
+            .map(|p| p.to_string_lossy().to_string());
+        push_unique(games, GameInfo {
+            name: name.to_string(),
+            exe: String::new(),
+            launcher: Some("Riot".into()),
+            install_path: install,
+            app_id: None,
+        });
+    }
+}
+
+/// Installed Xbox / Game Pass (PC) titles. They install to `<drive>:\XboxGames\
+/// <Game Name>\Content\…`, which is readable — unlike their UWP manifests, which
+/// is why these games previously only showed up once they were already running.
+fn scan_xbox(games: &mut Vec<GameInfo>) {
+    for letter in 'A'..='Z' {
+        let root = PathBuf::from(format!("{letter}:\\XboxGames"));
+        let Ok(entries) = std::fs::read_dir(&root) else {
+            continue; // drive doesn't exist, or has no Xbox library
+        };
+        for entry in entries.flatten() {
+            if !entry.path().is_dir() {
+                continue;
+            }
+            let name = entry.file_name().to_string_lossy().to_string();
+            // Every real title has a Content\ folder; skip launcher scaffolding.
+            let content = entry.path().join("Content");
+            if !content.exists() {
+                continue;
+            }
+            push_unique(games, GameInfo {
+                name,
+                exe: String::new(),
+                launcher: Some("Xbox".into()),
+                install_path: Some(content.to_string_lossy().to_string()),
+                app_id: None,
+            });
+        }
+    }
+}
+
 fn scan_standalone(games: &mut Vec<GameInfo>) {
     for (name, var, sub) in STANDALONE_GAMES {
         let Ok(base) = std::env::var(var) else { continue };
@@ -692,13 +807,14 @@ fn scan_standalone(games: &mut Vec<GameInfo>) {
 }
 
 /// Read-only scan across installed libraries. No launches, no modifications.
+///
 /// Steam + Epic + GOG + Ubisoft are read directly for precise metadata (install
-/// path, Steam appid for header art); the Uninstall-registry catch-all then adds
-/// anything else — Battle.net, EA/Origin, Rockstar, Riot, Amazon Games, and any
-/// other installed title recognized by publisher or install path. Xbox/Game Pass
-/// (UWP) titles don't expose a reliably-readable pre-install manifest either;
-/// those are still picked up live the moment they're launched (see
-/// `game_from_running`'s `\xboxgames\` / `\windowsapps\` library markers).
+/// path, Steam appid for cover art). Riot and Xbox/Game Pass get dedicated
+/// scanners because they publish no manifest any of the above can read — before
+/// those existed, those titles only appeared once you were already playing them.
+/// The Uninstall-registry catch-all then adds anything else — Battle.net,
+/// EA/Origin, Rockstar, Amazon Games, and any other installed title recognized
+/// by publisher or install path.
 #[tauri::command]
 pub fn get_installed_games() -> Vec<GameInfo> {
     let mut games = Vec::new();
@@ -706,6 +822,8 @@ pub fn get_installed_games() -> Vec<GameInfo> {
     scan_epic(&mut games);
     scan_gog(&mut games);
     scan_ubisoft(&mut games);
+    scan_riot(&mut games);
+    scan_xbox(&mut games);
     scan_uninstall_registry(&mut games);
     scan_standalone(&mut games);
     games.sort_by_key(|g| g.name.to_lowercase());
@@ -741,20 +859,63 @@ pub async fn resolve_steam_appid(name: String) -> Option<String> {
     }
     let v: serde_json::Value = resp.json().await.ok()?;
     let items = v.get("items")?.as_array()?;
-    // Only accept a confident match: the top result's name should look like the
-    // query (case-insensitive contains either way) so we don't slap the wrong
-    // cover on a game. Otherwise keep the placeholder.
-    // Require an EXACT title match (ignoring case, spaces and punctuation) so we
-    // never slap the wrong cover on a game — e.g. "Minecraft" must not match
-    // "Minecraft Dungeons". Non-matches fall through to the game's own exe icon.
-    let norm = |s: &str| s.chars().filter(|c| c.is_alphanumeric()).flat_map(|c| c.to_lowercase()).collect::<String>();
-    let want = norm(q);
-    let first = items.first()?;
-    let hit_name = first.get("name")?.as_str()?;
-    if norm(hit_name) != want {
+    let candidates: Vec<(String, String)> = items
+        .iter()
+        .take(5)
+        .filter_map(|it| {
+            let name = it.get("name")?.as_str()?.to_string();
+            let id = it.get("id")?.as_u64()?.to_string();
+            Some((name, id))
+        })
+        .collect();
+    best_steam_match(q, &candidates)
+}
+
+/// Normalize a title for comparison: letters and digits only, lowercased.
+fn norm_title(s: &str) -> String {
+    s.chars()
+        .filter(|c| c.is_alphanumeric())
+        .flat_map(|c| c.to_lowercase())
+        .collect()
+}
+
+/// The part of a Steam title before its subtitle — "Warface: Clutch" → "Warface".
+/// Only punctuation that genuinely introduces a subtitle counts; a plain space
+/// does NOT, which is what keeps "Minecraft" from matching "Minecraft Dungeons".
+fn title_without_subtitle(s: &str) -> &str {
+    match s.find([':', '–', '—', '(', '|']) {
+        Some(i) => s[..i].trim_end(),
+        None => s,
+    }
+}
+
+/// Pick the best CONFIDENT Steam match for a title, or None (the UI then falls
+/// back to the game's own exe icon — never a wrong cover).
+///
+/// Exact-match-only was too strict: real titles carry subtitles Steam spells out
+/// in full ("Warface" is listed as "Warface: Clutch"), so those games silently
+/// got a letter tile. Accepting the subtitle form is safe because the part before
+/// the colon still has to match exactly.
+fn best_steam_match(query: &str, candidates: &[(String, String)]) -> Option<String> {
+    let want = norm_title(query);
+    if want.is_empty() {
         return None;
     }
-    first.get("id")?.as_u64().map(|id| id.to_string())
+    let score = |name: &str| -> u8 {
+        if norm_title(name) == want {
+            2 // exact title
+        } else if norm_title(title_without_subtitle(name)) == want {
+            1 // same game, Steam just spells the subtitle out
+        } else {
+            0 // not confident — no cover is better than the wrong cover
+        }
+    };
+    candidates
+        .iter()
+        .map(|(name, id)| (score(name), id))
+        .filter(|(s, _)| *s > 0)
+        .max_by_key(|(s, _)| *s)
+        .map(|(_, id)| id.clone())
 }
 
 #[cfg(test)]
@@ -880,6 +1041,78 @@ mod tests {
     #[test]
     fn titleize_cleans_folder_names() {
         assert_eq!(titleize("watch_dogs-2"), "Watch Dogs 2");
+    }
+
+    #[test]
+    fn rival_optimizers_are_not_games_but_similar_titles_survive() {
+        // "Hone" is a rival PC optimizer that was showing up as a game tile.
+        assert!(is_non_game_name("Hone"));
+        assert!(is_non_game_name("Hone 1.2"));
+        assert!(is_non_game_name("WeMod"));
+        assert!(is_non_game_name("Razer Cortex"));
+        // The app must never list itself.
+        assert!(is_non_game_name("Mujify Tweaks"));
+        // Whole-word matching: a real game that merely CONTAINS those letters is
+        // not swept in. This is why "hone" can't be a substring rule.
+        assert!(!is_non_game_name("Phone Simulator"));
+        assert!(!is_non_game_name("Telephone Booth"));
+        assert!(!is_non_game_name("Hollow Knight"));
+    }
+
+    #[test]
+    fn riot_metadata_folders_map_to_real_titles() {
+        assert_eq!(riot_product_display_name("valorant.live"), Some("VALORANT"));
+        assert_eq!(
+            riot_product_display_name("league_of_legends.live"),
+            Some("League of Legends")
+        );
+        // Non-game Riot components (the client itself, patchline scaffolding).
+        assert_eq!(riot_product_display_name("riot_client.live"), None);
+        assert_eq!(riot_product_display_name(""), None);
+    }
+
+    #[test]
+    fn steam_match_accepts_exact_and_subtitled_titles() {
+        let c = |v: &[(&str, &str)]| -> Vec<(String, String)> {
+            v.iter().map(|(n, i)| (n.to_string(), i.to_string())).collect()
+        };
+        // Exact title.
+        assert_eq!(
+            best_steam_match("Counter-Strike 2", &c(&[("Counter-Strike 2", "730")])),
+            Some("730".into())
+        );
+        // Steam spells the subtitle out — same game, so the cover is right.
+        // This is exactly the case that used to fall through to a letter tile.
+        assert_eq!(
+            best_steam_match("Warface", &c(&[("Warface: Clutch", "291480")])),
+            Some("291480".into())
+        );
+        // Separators and case in our own title don't matter.
+        assert_eq!(
+            best_steam_match("Watch_Dogs", &c(&[("Watch_Dogs", "243470")])),
+            Some("243470".into())
+        );
+    }
+
+    #[test]
+    fn steam_match_never_returns_a_wrong_cover() {
+        let c = |v: &[(&str, &str)]| -> Vec<(String, String)> {
+            v.iter().map(|(n, i)| (n.to_string(), i.to_string())).collect()
+        };
+        // A different game that merely starts with the same word must NOT match —
+        // a plain space is not a subtitle separator.
+        assert_eq!(best_steam_match("Minecraft", &c(&[("Minecraft Dungeons", "1672970")])), None);
+        // Nor a sequel.
+        assert_eq!(best_steam_match("Portal", &c(&[("Portal 2", "620")])), None);
+        // Unrelated results are rejected outright.
+        assert_eq!(best_steam_match("Fortnite", &c(&[("Rocket League", "252950")])), None);
+        // No results at all.
+        assert_eq!(best_steam_match("Fortnite", &[]), None);
+        // An exact hit further down the list still wins over a near-miss on top.
+        assert_eq!(
+            best_steam_match("Fall Guys", &c(&[("Fall Guys Costume", "1"), ("Fall Guys", "1097150")])),
+            Some("1097150".into())
+        );
     }
 
     #[test]

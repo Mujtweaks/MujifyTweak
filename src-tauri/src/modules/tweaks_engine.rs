@@ -24,18 +24,33 @@ fn now_ms() -> i64 {
     chrono::Utc::now().timestamp_millis()
 }
 
+fn risk_str(risk: tweak_catalog::Risk) -> &'static str {
+    match risk {
+        tweak_catalog::Risk::Safe => "safe",
+        tweak_catalog::Risk::Moderate => "moderate",
+        tweak_catalog::Risk::Advanced => "advanced",
+    }
+}
+
 fn meta_for(tweak_id: &str) -> (String, String, bool) {
+    // Services Manager rows aren't in the tweak catalog — resolve their real
+    // title/risk from the services catalog so the ChangeLog reads "Print Spooler"
+    // rather than the raw id, and the anti-cheat gate sees the true risk level.
+    if let Some(name) = super::services_manager::service_name_from_tweak_id(tweak_id) {
+        if let Some(def) = super::services_manager::def_for(name) {
+            return (
+                format!("Disable service: {}", def.title),
+                risk_str(def.risk).to_string(),
+                true, // Op::SetService captures the exact prior state
+            );
+        }
+    }
     // (description, risk, reversible) pulled from the catalog where possible.
     let info = tweak_catalog::info_for(tweak_id);
     match info {
         Some(i) => (
             i.title,
-            match i.risk {
-                tweak_catalog::Risk::Safe => "safe",
-                tweak_catalog::Risk::Moderate => "moderate",
-                tweak_catalog::Risk::Advanced => "advanced",
-            }
-            .to_string(),
+            risk_str(i.risk).to_string(),
             tweak_id != "flush_dns", // flush is one-shot, not state-reversible
         ),
         None => (tweak_id.to_string(), "safe".to_string(), true),
@@ -212,6 +227,40 @@ mod tests {
         let res = apply_one(&m, "mouse_accel_off", true);
         assert!(res.is_ok());
         assert_eq!(m.get_sz(RegHive::Hkcu, r"Control Panel\Mouse", "MouseSpeed").unwrap(), "0");
+    }
+
+    #[test]
+    fn disabling_a_service_is_logged_with_real_copy_and_exact_undo() {
+        let m = MockMutator::new().with_service("Spooler", "auto", true);
+        let entry = apply_one(&m, "service:Spooler", false).unwrap();
+        // The ChangeLog must read like English, not like an id.
+        assert_eq!(entry.description, "Disable service: Print Spooler");
+        assert_eq!(entry.risk_level, "safe");
+        assert!(entry.reversible);
+        // The service really was disabled…
+        let now = m.get_service("Spooler").unwrap();
+        assert_eq!(now.start_type, "disabled");
+        assert!(!now.running);
+        // …and the EXACT prior state was captured, so undo restores auto+running
+        // rather than guessing at a default.
+        match &entry.undo_ops[0] {
+            crate::modules::tweak_ops::UndoOp::Service { name, prev } => {
+                assert_eq!(name, "Spooler");
+                let prev = prev.as_ref().expect("prior state must be captured");
+                assert_eq!(prev.start_type, "auto");
+                assert!(prev.running);
+            }
+            _ => panic!("expected a Service undo op"),
+        }
+    }
+
+    #[test]
+    fn a_service_outside_the_curated_catalog_is_refused() {
+        let m = MockMutator::new().with_service("Audiosrv", "auto", true);
+        // Not in the catalog → no ops → refused, and nothing was written.
+        assert!(apply_one(&m, "service:Audiosrv", false).is_err());
+        assert!(m.calls.borrow().is_empty());
+        assert_eq!(m.get_service("Audiosrv").unwrap().start_type, "auto");
     }
 
     #[test]

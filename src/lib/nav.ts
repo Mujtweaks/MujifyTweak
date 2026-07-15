@@ -5,6 +5,7 @@ import {
   Globe,
   LayoutDashboard,
   Rocket,
+  Server,
   Settings,
   SlidersHorizontal,
   Trash2,
@@ -22,6 +23,7 @@ export type PageId =
   | "gpu"
   | "network"
   | "tweaks"
+  | "services"
   | "fixes"
   | "cleaner"
   | "tools"
@@ -51,6 +53,7 @@ export const PAGE_TITLES: Record<PageId, string> = {
   gpu: "GPU",
   network: "Network",
   tweaks: "Tweaks",
+  services: "Services",
   fixes: "Fixes",
   cleaner: "Cleaner",
   tools: "Tools",
@@ -72,6 +75,7 @@ export const NAV_ITEMS: NavItem[] = [
   { id: "diagnostics", label: "Diagnostics", icon: Activity },
   { id: "network", label: "Network", icon: Globe },
   { id: "tweaks", label: "Tweaks", icon: SlidersHorizontal },
+  { id: "services", label: "Services", icon: Server },
   { id: "fixes", label: "Fixes", icon: Wrench },
   { id: "cleaner", label: "Cleaner", icon: Trash2 },
   { id: "ai", label: "AI Assistant", icon: Bot },

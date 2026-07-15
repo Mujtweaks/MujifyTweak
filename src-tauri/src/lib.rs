@@ -28,8 +28,8 @@ use modules::{
     driver_doctor, fix_catalog,
     game_detector, game_icons, overlay, game_profiler, game_profiles, game_settings, hardware_profiler, hardware_tier,
     health_scan, logger, network_monitor, profile_store, ram_optimizer, ready_check, restore_points,
-    rollback_engine, server_ping, sessions, speed_test, support, system_monitor, tweak_catalog,
-    tweaks_engine,
+    rollback_engine, server_ping, services_manager, sessions, speed_test, support, system_monitor,
+    tweak_catalog, tweaks_engine,
 };
 
 fn show_main(app: &tauri::AppHandle) {
@@ -385,6 +385,7 @@ pub fn run() {
             health_scan::scan_system_health,
             debloat::scan_bloatware,
             debloat::remove_bloatware,
+            services_manager::list_services,
             cleaner::scan_junk,
             cleaner::scan_large_files,
             cleaner::scan_duplicate_files,

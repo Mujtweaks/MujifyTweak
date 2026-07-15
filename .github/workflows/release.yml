@@ -77,6 +77,23 @@ jobs:
           if [ "$missing" = "1" ]; then exit 1; fi
           echo "Signing secrets are present (values not printed)."
 
+      # The in-app "What's New" modal reads the GitHub release BODY for the
+      # current version tag, so the body has to hold the real changelog — a
+      # generic "see the assets below" left that popup with nothing to say.
+      - name: Read release notes
+        id: notes
+        shell: bash
+        run: |
+          if [ ! -s RELEASE_NOTES.md ]; then
+            echo "::error::RELEASE_NOTES.md is missing or empty. It becomes the release body AND the in-app What's New popup — write it before tagging."
+            exit 1
+          fi
+          {
+            echo 'body<<RELEASE_NOTES_EOF'
+            cat RELEASE_NOTES.md
+            echo 'RELEASE_NOTES_EOF'
+          } >> "$GITHUB_OUTPUT"
+
       - name: Build + sign + publish
         uses: tauri-apps/tauri-action@v0
         env:
@@ -86,7 +103,7 @@ jobs:
         with:
           tagName: ${{ github.ref_name }}
           releaseName: "Mujify Tweaks ${{ github.ref_name }}"
-          releaseBody: "See the assets below to download and install."
+          releaseBody: ${{ steps.notes.outputs.body }}
           releaseDraft: false
           # MUST stay false for auto-update to work: the updater endpoint is
           # `releases/latest/download/latest.json`, and GitHub's /releases/latest

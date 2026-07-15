@@ -49,10 +49,16 @@ console.log(`  release: ${cur} -> ${next}`);
 // JSON re-serialisation) so formatting/comments are preserved.
 function bump(rel, patternFor) {
   const path = p(rel);
-  const text = readFileSync(path, "utf8");
+  const raw = readFileSync(path, "utf8");
   const { find, replace } = patternFor(cur, next);
+  // Compare on LF-normalised text, then restore the file's original line
+  // endings. Cargo.lock is CRLF on Windows, so a multi-line marker written with
+  // "\n" never matched it and every release aborted here before tagging.
+  const crlf = raw.includes("\r\n");
+  const text = raw.replace(/\r\n/g, "\n");
   if (!text.includes(find)) die(`could not find version marker in ${rel} (looked for: ${find})`);
-  writeFileSync(path, text.replace(find, replace));
+  const out = text.replace(find, replace);
+  writeFileSync(path, crlf ? out.replace(/\n/g, "\r\n") : out);
   console.log(`    updated ${rel}`);
 }
 

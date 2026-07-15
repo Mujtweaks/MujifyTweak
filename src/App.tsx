@@ -11,6 +11,7 @@ import Overview from "./pages/Overview";
 import Gpu from "./pages/Gpu";
 import Network from "./pages/Network";
 import Tweaks from "./pages/Tweaks";
+import Services from "./pages/Services";
 import Fixes from "./pages/Fixes";
 import Cleaner from "./pages/Cleaner";
 import Tools from "./pages/Tools";
@@ -169,6 +170,8 @@ export default function App() {
         return <Network />;
       case "tweaks":
         return <Tweaks />;
+      case "services":
+        return <Services />;
       case "fixes":
         return <Fixes />;
       case "cleaner":
