@@ -96,7 +96,7 @@ export default function GameOptimizeModal({ game, onClose }: { game: GameInfo; o
       <div className="flex max-h-[85vh] w-full max-w-xl flex-col rounded-card border border-edge bg-panel shadow-2xl">
         {/* Header */}
         <div className="flex items-center gap-3 border-b border-edge px-5 py-4">
-          <GameArt name={game.name} appId={game.appId} path={game.installPath ?? game.exe} className="h-11 w-11" rounded="rounded-lg" />
+          <GameArt name={game.name} appId={game.appId} path={game.iconPath ?? game.installPath ?? game.exe} className="h-11 w-11" rounded="rounded-lg" />
           <div className="min-w-0 flex-1">
             <h2 className="truncate text-[16px] font-bold text-txt">{game.name}</h2>
             <p className="text-[11.5px] text-txt2">

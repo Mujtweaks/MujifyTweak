@@ -135,6 +135,20 @@ async fn check_for_updates(app: tauri::AppHandle) -> Result<String, String> {
     }
 }
 
+/// Where we record that the user made a DELIBERATE start-on-boot choice.
+/// Absent = they never touched it, so the ON-by-default is (re)asserted at launch.
+fn autostart_choice_marker() -> Option<std::path::PathBuf> {
+    Some(
+        std::path::PathBuf::from(std::env::var("APPDATA").ok()?)
+            .join("MujifyTweaks")
+            .join("autostart_user_choice"),
+    )
+}
+
+fn autostart_user_choice_recorded() -> bool {
+    autostart_choice_marker().map(|p| p.exists()).unwrap_or(false)
+}
+
 /// Is "start Mujify on Windows startup" currently enabled?
 #[tauri::command]
 fn get_autostart_enabled(app: tauri::AppHandle) -> bool {
@@ -143,11 +157,25 @@ fn get_autostart_enabled(app: tauri::AppHandle) -> bool {
 }
 
 /// Turn "start on startup" on or off (Settings toggle).
+///
+/// Records that the user has made a deliberate choice, so the ON-by-default at
+/// launch stops asserting itself and their "off" actually sticks.
 #[tauri::command]
 fn set_autostart_enabled(app: tauri::AppHandle, enabled: bool) -> Result<(), String> {
     use tauri_plugin_autostart::ManagerExt;
     let al = app.autolaunch();
-    if enabled { al.enable() } else { al.disable() }.map_err(|e| e.to_string())
+    if enabled { al.enable() } else { al.disable() }.map_err(|e| e.to_string())?;
+    // Only after the change actually succeeded — otherwise a failed toggle would
+    // still silence the default and leave autostart off with nothing re-asserting it.
+    if let Some(marker) = autostart_choice_marker() {
+        if let Some(dir) = marker.parent() {
+            let _ = std::fs::create_dir_all(dir);
+        }
+        if let Err(e) = std::fs::write(&marker, if enabled { "on" } else { "off" }) {
+            logger::warn(format!("couldn't record start-on-boot choice: {e}"));
+        }
+    }
+    Ok(())
 }
 
 /// Toggle Windows' own Game Mode (per-user, benign, instantly reversible). Wires
@@ -310,21 +338,23 @@ pub fn run() {
         ))
         .setup(|app| {
             let handle = app.handle().clone();
-            // Start-on-startup defaults ON: enable it once on first launch, then
-            // respect the user's choice forever (a marker file records that we've
-            // done the one-time default so a later "off" in Settings sticks).
+            // Start-on-startup defaults ON, and SELF-HEALS.
+            //
+            // The old marker recorded "we ran the default once" and lived in
+            // %APPDATA%, which survives uninstall — while the uninstaller removes
+            // the Run entry. So after any reinstall the marker said "already
+            // done", the Run entry was gone, and autostart was silently off
+            // forever with the Settings toggle none the wiser.
+            //
+            // The marker now records only that the USER made a deliberate choice
+            // (written by set_autostart_enabled). With no such choice we simply
+            // assert the default every launch — idempotent, and it repairs itself
+            // after a reinstall. If the user turned it off, that's respected.
             {
                 use tauri_plugin_autostart::ManagerExt;
-                if let Ok(appdata) = std::env::var("APPDATA") {
-                    let marker = std::path::PathBuf::from(appdata)
-                        .join("MujifyTweaks")
-                        .join("autostart_initialized");
-                    // Only record the one-time default once enabling actually
-                    // succeeds — otherwise a transient failure would permanently
-                    // skip the default. Retries on the next launch until it sticks.
-                    if !marker.exists() && handle.autolaunch().enable().is_ok() {
-                        let _ = std::fs::create_dir_all(marker.parent().unwrap());
-                        let _ = std::fs::write(&marker, "1");
+                if !autostart_user_choice_recorded() && !handle.autolaunch().is_enabled().unwrap_or(false) {
+                    if let Err(e) = handle.autolaunch().enable() {
+                        logger::warn(format!("couldn't enable start-on-boot by default: {e}"));
                     }
                 }
             }

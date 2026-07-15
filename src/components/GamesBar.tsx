@@ -31,7 +31,7 @@ export default function GamesBar({ onNavigate }: { onNavigate: (page: PageId) =>
                 onClick={() => onNavigate("profiles")}
                 className="flex shrink-0 items-center gap-2 rounded-pill border border-edge bg-card px-3 py-1.5 text-[13px] text-txt2 transition-colors hover:text-txt"
               >
-                <GameArt name={g.name} appId={g.appId} path={g.installPath ?? g.exe} className="h-4 w-4" rounded="rounded" />
+                <GameArt name={g.name} appId={g.appId} path={g.iconPath ?? g.installPath ?? g.exe} className="h-4 w-4" rounded="rounded" />
                 {g.name}
               </button>
             ))

@@ -21,14 +21,18 @@ const iconCache = new Map<string, string>();
 /** How a source image is shaped, which decides how it's framed in a 3:4 tile. */
 type ArtKind = "portrait" | "landscape" | "icon";
 
-// Real Steam art, tried in order. The portrait library card matches the 3:4 tile
-// natively; the landscape header is the fallback for the many titles that have
-// no portrait art. All on *.steamstatic.com — the canonical static CDN
-// (steampowered.com does NOT serve this art, which is why the old URL fell
-// through to the letter tile).
+// Real Steam art, tried best-fit first. All on *.steamstatic.com — the canonical
+// static CDN (steampowered.com does NOT serve this art, which is why the old URL
+// fell through to the letter tile).
+//
+// `hero_capsule` (374x448) matters: plenty of older games have NO portrait art
+// at all — Watch_Dogs 404s on both library_600x900 sizes — and without this they
+// dropped straight to the 460x215 landscape banner, which looks wrong in a tall
+// tile no matter how it's framed. hero_capsule is nearly 3:4, so it just fits.
 const steamSources = (appId: string): { url: string; kind: ArtKind }[] => [
   { url: `https://cdn.cloudflare.steamstatic.com/steam/apps/${appId}/library_600x900_2x.jpg`, kind: "portrait" },
   { url: `https://cdn.cloudflare.steamstatic.com/steam/apps/${appId}/library_600x900.jpg`, kind: "portrait" },
+  { url: `https://cdn.cloudflare.steamstatic.com/steam/apps/${appId}/hero_capsule.jpg`, kind: "portrait" },
   { url: `https://cdn.cloudflare.steamstatic.com/steam/apps/${appId}/header.jpg`, kind: "landscape" },
   { url: `https://cdn.akamai.steamstatic.com/steam/apps/${appId}/header.jpg`, kind: "landscape" },
 ];

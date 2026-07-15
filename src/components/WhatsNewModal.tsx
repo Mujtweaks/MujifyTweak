@@ -1,4 +1,5 @@
 import { Sparkles, X } from "lucide-react";
+import Markdown from "./Markdown";
 import { DISCORD_INVITE, openExternal } from "../lib/links";
 
 /**
@@ -7,7 +8,6 @@ import { DISCORD_INVITE, openExternal } from "../lib/links";
  * (the caller skips it), so it's a graceful no-op while no releases exist.
  */
 export default function WhatsNewModal({ version, notes, onClose }: { version: string; notes: string; onClose: () => void }) {
-  const lines = notes.split("\n").map((l) => l.trim()).filter(Boolean);
   return (
     <div className="fixed inset-0 z-[65] grid place-items-center bg-black/75 p-6 backdrop-blur-sm">
       <div className="w-full max-w-md rounded-card border border-edge bg-panel shadow-2xl">
@@ -20,11 +20,9 @@ export default function WhatsNewModal({ version, notes, onClose }: { version: st
           </button>
         </div>
         <div className="max-h-[50vh] overflow-y-auto px-5 py-4">
-          <ul className="flex flex-col gap-1.5 text-[12.5px] leading-relaxed text-txt2">
-            {lines.map((l, i) => (
-              <li key={i}>{l.replace(/^[-*]\s*/, "• ")}</li>
-            ))}
-          </ul>
+          {/* The notes are the GitHub release body, which is Markdown — rendering
+              it as plain text showed readers literal "##" and "**". */}
+          <Markdown text={notes} />
         </div>
         <div className="border-t border-edge px-5 py-3.5 text-center">
           <button

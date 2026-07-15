@@ -163,6 +163,10 @@ export interface GameInfo {
   installPath: string | null;
   /** Steam appid when known — used to load real header art. */
   appId: string | null;
+  /** The exact file to pull this game's icon from, when Windows already told us
+   *  (a registered DisplayIcon, or a resolved launcher exe). Far more reliable
+   *  than guessing by walking the install folder. */
+  iconPath: string | null;
 }
 
 /** A background app, grouped across all its processes, with REAL measured RAM. */

@@ -31,6 +31,14 @@ pub struct GameInfo {
     pub install_path: Option<String>,
     /// Steam appid when known — the frontend uses it to show the real header art.
     pub app_id: Option<String>,
+    /// The exact file to pull the game's icon from, when we already know it —
+    /// Windows' own registered `DisplayIcon`, or a resolved launcher exe.
+    ///
+    /// Without this the icon extractor has to GUESS by walking the install
+    /// folder, which fails exactly where it matters: a data-only folder like
+    /// `%APPDATA%\.minecraft` has no exe at all, and a huge folder can burn the
+    /// walk's file cap before reaching the real game. Both produced letter tiles.
+    pub icon_path: Option<String>,
 }
 
 static RUNNING: AtomicBool = AtomicBool::new(false);
@@ -138,7 +146,13 @@ fn canonical_name(name: &str) -> String {
     if n.contains("counter-strike") || n.contains("counter strike") || n == "cs2" {
         return "Counter-Strike 2".to_string();
     }
-    if n.contains("minecraft") && !n.contains("dungeon") && !n.contains("legend") && !n.contains("launcher") {
+    // "Minecraft Launcher" IS Minecraft — it's how you launch and play it, and
+    // it's what Xbox/Game Pass installs the game as. Excluding "launcher" here
+    // meant a user with Game Pass Minecraft got TWO tiles: a "Minecraft" one
+    // from the data folder (no exe, so a letter tile) and a "Minecraft Launcher"
+    // one next to it. They collapse into a single Minecraft, and push_unique
+    // back-fills whichever entry actually knows where the exe is.
+    if n.contains("minecraft") && !n.contains("dungeon") && !n.contains("legend") && !n.contains("education") {
         return "Minecraft".to_string();
     }
     name.to_string()
@@ -164,6 +178,11 @@ fn push_unique(games: &mut Vec<GameInfo>, mut g: GameInfo) {
         }
         if existing.exe.is_empty() && !g.exe.is_empty() {
             existing.exe = g.exe;
+        }
+        // A duplicate that knows the real icon file wins — that's the whole
+        // point of collapsing "Minecraft Launcher" into "Minecraft".
+        if existing.icon_path.is_none() && g.icon_path.is_some() {
+            existing.icon_path = g.icon_path;
         }
         return;
     }
@@ -299,6 +318,7 @@ fn game_from_running(exe_path: &str, stem: &str) -> Option<GameInfo> {
             .parent()
             .map(|p| p.to_string_lossy().to_string()),
         app_id: None,
+        icon_path: None,
     })
 }
 
@@ -322,6 +342,7 @@ pub fn detect_active_game(sys: &System) -> Option<GameInfo> {
                     .and_then(|p| p.parent())
                     .map(|p| p.to_string_lossy().to_string()),
                 app_id: None,
+                icon_path: None,
             });
         }
     }
@@ -345,6 +366,7 @@ pub fn detect_active_game(sys: &System) -> Option<GameInfo> {
                     .and_then(|p| p.parent())
                     .map(|p| p.to_string_lossy().to_string()),
                 app_id: None,
+                icon_path: None,
             });
         }
     }
@@ -486,6 +508,7 @@ fn scan_steam(games: &mut Vec<GameInfo>) {
                         launcher: Some("Steam".into()),
                         install_path: Some(install_path.to_string_lossy().into()),
                         app_id: if app_id.is_empty() { None } else { Some(app_id) },
+                        icon_path: None,
                     });
                 }
             }
@@ -524,6 +547,7 @@ fn scan_epic(games: &mut Vec<GameInfo>) {
                                 .and_then(|v| v.as_str())
                                 .map(|s| s.to_string()),
                             app_id: None,
+                            icon_path: None,
                         });
                     }
                 }
@@ -551,6 +575,7 @@ fn scan_gog(games: &mut Vec<GameInfo>) {
                 launcher: Some("GOG".into()),
                 install_path: path,
                 app_id: None,
+                icon_path: None,
             });
         }
     }
@@ -581,6 +606,7 @@ fn scan_ubisoft(games: &mut Vec<GameInfo>) {
                 launcher: Some("Ubisoft".into()),
                 install_path: Some(dir),
                 app_id: None,
+                icon_path: None,
             });
         }
     }
@@ -672,6 +698,11 @@ fn scan_uninstall_registry(games: &mut Vec<GameInfo>) {
             if !is_probable_game(&name, &publisher, &install_location) {
                 continue;
             }
+            // Windows already registered this program's icon — by far the most
+            // reliable logo source, and it needs no folder walking or guessing.
+            let display_icon: String = entry.get_value("DisplayIcon").unwrap_or_default();
+            let icon_path = icon_path_from_display_icon(&display_icon)
+                .filter(|p| std::path::Path::new(p).is_file());
             // push_unique handles both "already found by a more precise scanner"
             // (normalized-name de-dup) and non-game filtering.
             push_unique(games, GameInfo {
@@ -680,6 +711,7 @@ fn scan_uninstall_registry(games: &mut Vec<GameInfo>) {
                 launcher: Some(if publisher.trim().is_empty() { "Installed".into() } else { publisher }),
                 install_path: if install_location.trim().is_empty() { None } else { Some(install_location) },
                 app_id: None,
+                icon_path,
             });
         }
     };
@@ -691,15 +723,144 @@ fn scan_uninstall_registry(games: &mut Vec<GameInfo>) {
     scan_one(&hkcu, r"SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall", games);
 }
 
+/// Clean an uninstall entry's `DisplayIcon` into a plain file path.
+///
+/// Windows already knows the icon for every installed program, so this is by far
+/// the most reliable logo source — no folder walking, no guessing. The value is
+/// usually `C:\path\game.exe,0` (an icon index) and is sometimes quoted.
+fn icon_path_from_display_icon(raw: &str) -> Option<String> {
+    let s = raw.trim().trim_matches('"');
+    if s.is_empty() {
+        return None;
+    }
+    // Strip a trailing icon index (",0" / ",-1") without breaking "C:\..." paths.
+    let path = match s.rfind(',') {
+        Some(i) if s[i + 1..].trim().parse::<i32>().is_ok() => &s[..i],
+        _ => s,
+    };
+    let path = path.trim().trim_matches('"');
+    if path.is_empty() {
+        return None;
+    }
+    Some(path.to_string())
+}
+
+/// The Roblox PLAYER exe, if the player is actually installed.
+///
+/// Roblox versions live in `%LOCALAPPDATA%\Roblox\Versions\<hash>\`, and the
+/// same folder also holds Roblox STUDIO. Testing for the Versions folder alone
+/// therefore claimed "Roblox is installed" for someone who only has Studio — and
+/// pointed the icon extractor at a folder so large it hit its file cap before
+/// finding anything, leaving a letter tile. Requiring the player's exe fixes the
+/// false positive and hands the icon extractor the exact file in one step.
+/// The CLASSIC Roblox player, at %LOCALAPPDATA%\Roblox\Versions\<hash>\.
+///
+/// Only the classic install is looked for here. The Microsoft Store build lives
+/// in `Program Files\WindowsApps`, which a normal (non-elevated) process cannot
+/// list or read at all — so probing it would be dead code. That build is instead
+/// found by `scan_xbox` via `C:\XboxGames\Roblox\Content`, which IS readable and
+/// holds the same RobloxPlayerBeta.exe.
+fn roblox_player_exe() -> Option<PathBuf> {
+    let versions = PathBuf::from(std::env::var("LOCALAPPDATA").ok()?)
+        .join("Roblox")
+        .join("Versions");
+    for entry in std::fs::read_dir(&versions).ok()?.flatten() {
+        let exe = entry.path().join("RobloxPlayerBeta.exe");
+        if exe.is_file() {
+            return Some(exe);
+        }
+    }
+    None
+}
+
+/// Exe names inside an Xbox game's `Content\` that are never the game itself.
+const XBOX_HELPER_EXES: &[&str] = &["gamelaunchhelper", "crashhandler", "crashpad", "unins"];
+
+/// Score an Xbox logo asset. Higher is better; `None` means "not a logo".
+///
+/// Game Pass titles ship their branding as PNGs (an MSIX app's icon lives in the
+/// package manifest, NOT inside the exe), in a spray of variants:
+/// `SmallLogo.altform-unplated_targetsize-256.png`, `.contrast-black_…`, and so
+/// on. We want the biggest normal-contrast one; the high-contrast/black/white
+/// accessibility variants are wrong outside those themes, and SplashScreen is a
+/// wide banner rather than a logo.
+fn xbox_logo_score(file_name: &str) -> Option<i32> {
+    let n = file_name.to_lowercase();
+    if !n.ends_with(".png") {
+        return None;
+    }
+    if n.contains("splashscreen") || n.contains("widelogo") || n.contains("badge") {
+        return None; // banners, not logos
+    }
+    if n.contains("contrast-black") || n.contains("contrast-white") || n.contains("contrast-high") {
+        return None; // accessibility variants
+    }
+    let mut score = 0;
+    if n.contains("largelogo") { score += 40 }
+    if n.contains("square150x150") || n.contains("square310x310") { score += 35 }
+    if n.contains("graphicslogo") { score += 25 }
+    if n.contains("storelogo") { score += 20 }
+    if n.contains("smalllogo") { score += 15 }
+    if n.contains("targetsize-256") { score += 30 }
+    if n.contains("scale-400") { score += 12 }
+    if n.contains("scale-200") { score += 8 }
+    if n.contains("unplated") { score += 6 } // transparent, no coloured plate
+    if score == 0 && !n.contains("logo") {
+        return None;
+    }
+    Some(score)
+}
+
+/// The best icon source inside an Xbox title's `Content\` folder.
+///
+/// A logo PNG is STRONGLY preferred over the exe: Game Pass exes routinely can't
+/// be opened at all (the folder denies direct reads), and even when they can they
+/// often carry no embedded icon, which is exactly why these tiles were showing a
+/// bare letter. Falls back to the real game exe — skipping `gamelaunchhelper.exe`,
+/// which every Game Pass title ships and which would otherwise give every Xbox
+/// game the same generic icon.
+fn xbox_icon_source(content: &std::path::Path) -> Option<PathBuf> {
+    let mut best_logo: Option<(i32, u64, PathBuf)> = None;
+    let mut best_exe: Option<(u64, PathBuf)> = None;
+
+    for entry in std::fs::read_dir(content).ok()?.flatten() {
+        let path = entry.path();
+        let Some(name) = path.file_name().and_then(|s| s.to_str()) else { continue };
+        let size = entry.metadata().map(|m| m.len()).unwrap_or(0);
+
+        if let Some(score) = xbox_logo_score(name) {
+            if best_logo
+                .as_ref()
+                .map(|(s, sz, _)| (score, size) > (*s, *sz))
+                .unwrap_or(true)
+            {
+                best_logo = Some((score, size, path));
+            }
+            continue;
+        }
+        if path.extension().map(|e| e.eq_ignore_ascii_case("exe")).unwrap_or(false) {
+            let stem = path.file_stem().and_then(|s| s.to_str()).unwrap_or("").to_lowercase();
+            if XBOX_HELPER_EXES.iter().any(|h| stem.contains(h)) {
+                continue;
+            }
+            if best_exe.as_ref().map(|(s, _)| size > *s).unwrap_or(true) {
+                best_exe = Some((size, path));
+            }
+        }
+    }
+    best_logo
+        .map(|(_, _, p)| p)
+        .or_else(|| best_exe.map(|(_, p)| p))
+}
+
 /// Popular games installed OUTSIDE the standard launchers — Roblox, Minecraft
 /// (Java + Bedrock/UWP), etc. — detected by their well-known install folder
 /// existing. They don't appear in Steam/Epic/GOG manifests or the uninstall
 /// registry with a recognisable publisher, so they'd be missed otherwise.
 /// (display name, env var, subpath that proves it's installed). Read-only.
 const STANDALONE_GAMES: &[(&str, &str, &str)] = &[
-    ("Roblox", "LOCALAPPDATA", r"Roblox\Versions"),
-    // Launcher folder FIRST so its exe (real icon) wins the name de-dupe over the
-    // data-only .minecraft folder, which has no executable to pull a logo from.
+    // Roblox is NOT here: presence of its Versions folder does not mean the
+    // player is installed (Roblox Studio shares it). See roblox_player_exe().
     ("Minecraft", "ProgramFiles(x86)", r"Minecraft Launcher"),
     ("Minecraft", "ProgramFiles", r"Minecraft Launcher"),
     ("Minecraft", "APPDATA", r".minecraft"),
@@ -756,6 +917,7 @@ fn scan_riot(games: &mut Vec<GameInfo>) {
             launcher: Some("Riot".into()),
             install_path: install,
             app_id: None,
+            icon_path: None,
         });
     }
 }
@@ -779,18 +941,34 @@ fn scan_xbox(games: &mut Vec<GameInfo>) {
             if !content.exists() {
                 continue;
             }
+            // Resolve the real exe now: it's the icon source, and it saves the
+            // extractor from walking a multi-GB game folder to guess at one.
+            let icon_path = xbox_icon_source(&content).map(|p| p.to_string_lossy().to_string());
             push_unique(games, GameInfo {
                 name,
                 exe: String::new(),
                 launcher: Some("Xbox".into()),
                 install_path: Some(content.to_string_lossy().to_string()),
                 app_id: None,
+                icon_path,
             });
         }
     }
 }
 
 fn scan_standalone(games: &mut Vec<GameInfo>) {
+    // Roblox first, and only when the PLAYER's exe genuinely exists. The exe
+    // path doubles as the icon source, so this can never fall to a letter tile.
+    if let Some(exe) = roblox_player_exe() {
+        push_unique(games, GameInfo {
+            name: "Roblox".into(),
+            exe: "RobloxPlayerBeta.exe".into(),
+            launcher: Some("Installed".into()),
+            install_path: exe.parent().map(|p| p.to_string_lossy().to_string()),
+            app_id: None,
+            icon_path: Some(exe.to_string_lossy().to_string()),
+        });
+    }
     for (name, var, sub) in STANDALONE_GAMES {
         let Ok(base) = std::env::var(var) else { continue };
         let path = PathBuf::from(base).join(sub);
@@ -801,6 +979,7 @@ fn scan_standalone(games: &mut Vec<GameInfo>) {
                 launcher: Some("Installed".into()),
                 install_path: Some(path.to_string_lossy().into()),
                 app_id: None,
+                icon_path: None,
             });
         }
     }
@@ -936,8 +1115,12 @@ mod tests {
     fn standalone_and_publisher_coverage_includes_common_games() {
         // The launcher-less games users kept saying were missing must be covered.
         let names: Vec<&str> = STANDALONE_GAMES.iter().map(|(n, _, _)| *n).collect();
-        assert!(names.contains(&"Roblox"));
         assert!(names.contains(&"Minecraft"));
+        // Roblox is deliberately NOT a folder-existence check: its Versions
+        // folder also exists for someone who only has Roblox STUDIO, which
+        // wrongly claimed the game was installed and gave a letter tile. It's
+        // detected by the player's real exe instead — see roblox_player_exe().
+        assert!(!names.contains(&"Roblox"));
         // Their publishers are recognised too (for the uninstall-registry path).
         assert!(is_probable_game("Roblox", "Roblox Corporation", ""));
         assert!(is_probable_game("Minecraft Launcher", "Mojang", ""));
@@ -991,7 +1174,7 @@ mod tests {
         let mut games = Vec::new();
         let mk = |n: &str, path: Option<&str>| GameInfo {
             name: n.to_string(), exe: String::new(), launcher: None,
-            install_path: path.map(String::from), app_id: None,
+            install_path: path.map(String::from), app_id: None, icon_path: None,
         };
         push_unique(&mut games, mk("Roblox Player", None));
         push_unique(&mut games, mk("Roblox Player for Urban9", None));
@@ -1008,7 +1191,7 @@ mod tests {
         let mut games = Vec::new();
         let mk = |n: &str| GameInfo {
             name: n.to_string(), exe: String::new(), launcher: None,
-            install_path: None, app_id: None,
+            install_path: None, app_id: None, icon_path: None,
         };
         push_unique(&mut games, mk("Watch Dogs"));
         push_unique(&mut games, mk("Watch_Dogs")); // same title, different separator
@@ -1044,6 +1227,77 @@ mod tests {
     }
 
     #[test]
+    fn display_icon_registry_values_are_cleaned_into_real_paths() {
+        // The common form: a path plus an icon index.
+        assert_eq!(
+            icon_path_from_display_icon(r"C:\Games\Cool\game.exe,0").as_deref(),
+            Some(r"C:\Games\Cool\game.exe")
+        );
+        // Quoted, negative index.
+        assert_eq!(
+            icon_path_from_display_icon(r#""C:\Program Files\A Game\g.exe",-1"#).as_deref(),
+            Some(r"C:\Program Files\A Game\g.exe")
+        );
+        // No index at all.
+        assert_eq!(
+            icon_path_from_display_icon(r"C:\Games\x\y.ico").as_deref(),
+            Some(r"C:\Games\x\y.ico")
+        );
+        // A drive-letter colon must NOT be mistaken for an index separator.
+        assert_eq!(
+            icon_path_from_display_icon(r"C:\a,b\game.exe").as_deref(),
+            Some(r"C:\a,b\game.exe"),
+            "a comma that isn't followed by a number is part of the path"
+        );
+        assert_eq!(icon_path_from_display_icon(""), None);
+        assert_eq!(icon_path_from_display_icon("   "), None);
+    }
+
+    #[test]
+    fn minecraft_launcher_collapses_into_minecraft_and_keeps_the_real_icon() {
+        // The Game Pass install is literally called "Minecraft Launcher", which
+        // used to produce a SECOND tile next to a letter-tile "Minecraft" from
+        // the data folder. They must be one game, keeping the launcher's exe.
+        assert_eq!(canonical_name("Minecraft Launcher"), "Minecraft");
+        assert_eq!(canonical_name("Minecraft"), "Minecraft");
+        // …but genuinely different games keep their own identity.
+        assert_eq!(canonical_name("Minecraft Dungeons"), "Minecraft Dungeons");
+        assert_eq!(canonical_name("Minecraft Legends"), "Minecraft Legends");
+
+        let mut games = Vec::new();
+        // Xbox scanner finds the launcher (knows the exe) …
+        push_unique(&mut games, GameInfo {
+            name: "Minecraft Launcher".into(), exe: String::new(), launcher: Some("Xbox".into()),
+            install_path: Some(r"C:\XboxGames\Minecraft Launcher\Content".into()),
+            app_id: None, icon_path: Some(r"C:\XboxGames\Minecraft Launcher\Content\game.exe".into()),
+        });
+        // … and the standalone scanner finds the data folder (no exe).
+        push_unique(&mut games, GameInfo {
+            name: "Minecraft".into(), exe: String::new(), launcher: Some("Installed".into()),
+            install_path: Some(r"C:\Users\me\AppData\Roaming\.minecraft".into()),
+            app_id: None, icon_path: None,
+        });
+        assert_eq!(games.len(), 1, "one Minecraft, not two");
+        assert_eq!(games[0].name, "Minecraft");
+        assert!(games[0].icon_path.is_some(), "the real icon survives the collapse");
+    }
+
+    #[test]
+    fn a_richer_duplicate_backfills_the_icon_path() {
+        let mut games = Vec::new();
+        push_unique(&mut games, GameInfo {
+            name: "Some Game".into(), exe: String::new(), launcher: None,
+            install_path: None, app_id: None, icon_path: None,
+        });
+        push_unique(&mut games, GameInfo {
+            name: "Some Game".into(), exe: String::new(), launcher: None,
+            install_path: None, app_id: None, icon_path: Some(r"C:\g\game.exe".into()),
+        });
+        assert_eq!(games.len(), 1);
+        assert_eq!(games[0].icon_path.as_deref(), Some(r"C:\g\game.exe"));
+    }
+
+    #[test]
     fn rival_optimizers_are_not_games_but_similar_titles_survive() {
         // "Hone" is a rival PC optimizer that was showing up as a game tile.
         assert!(is_non_game_name("Hone"));
@@ -1057,6 +1311,28 @@ mod tests {
         assert!(!is_non_game_name("Phone Simulator"));
         assert!(!is_non_game_name("Telephone Booth"));
         assert!(!is_non_game_name("Hollow Knight"));
+    }
+
+    #[test]
+    fn xbox_logo_assets_are_picked_over_accessibility_and_banner_variants() {
+        // Game Pass ships a spray of logo variants; picking the wrong one gives a
+        // black-on-black icon or a stretched banner.
+        let s = |n: &str| xbox_logo_score(n);
+        // Never: high-contrast/accessibility variants, or wide banners.
+        assert_eq!(s("SmallLogo.contrast-black_altform-unplated_targetsize-256.png"), None);
+        assert_eq!(s("SmallLogo.contrast-white_altform-unplated_targetsize-256.png"), None);
+        assert_eq!(s("SmallLogo.contrast-high_altform-unplated_targetsize-256.png"), None);
+        assert_eq!(s("SplashScreen.png"), None);
+        assert_eq!(s("WideLogo.scale-200.png"), None);
+        // Not an image at all.
+        assert_eq!(s("Minecraft.exe"), None);
+        // The big 256px unplated logo must beat the small scaled one — this is
+        // the exact pair present in a real Game Pass Minecraft install.
+        let big = s("SmallLogo.altform-unplated_targetsize-256.png").unwrap();
+        let small = s("SmallLogo.scale-200.png").unwrap();
+        assert!(big > small, "the 256px asset must win ({big} vs {small})");
+        // And a proper LargeLogo outranks a StoreLogo.
+        assert!(s("LargeLogo.scale-400.png").unwrap() > s("StoreLogo.png").unwrap());
     }
 
     #[test]

@@ -199,44 +199,65 @@ export default function AIAssistant({ onNavigate }: { onNavigate: (page: PageId)
     let unlistenChunk: UnlistenFn | undefined;
     let unlistenDone: UnlistenFn | undefined;
     let active = true;
-    // Smooth "typewriter" reveal (ChatGPT-style): the network delivers tokens in
-    // uneven bursts, so instead of painting each burst we keep the full received
-    // text as `target` and let `shown` catch up to it a few characters per frame.
-    // The display advances at a steady, smooth pace regardless of burst timing.
+    // Wait for the WHOLE reply, then reveal it smoothly.
+    //
+    // Painting tokens as they land can't be smooth: the network delivers them in
+    // uneven bursts, and every burst re-renders the Markdown, so the text jerks
+    // and reflows as lists and code blocks complete themselves mid-thought. The
+    // old "catch up by remaining/8 per frame" reveal made that worse — it sped up
+    // and slowed down with the bursts.
+    //
+    // So nothing is shown while the model is talking (the thinking indicator is
+    // up), and once the reply is complete it animates in at a steady, purely
+    // time-based rate. The pace no longer depends on the network at all.
     const buf = streamBuf.current;
     let rafId: number | null = null;
+    let revealStart = 0;
+    let revealMs = 0;
+
+    // Ease-out: quick to get going, gently settling — reads as deliberate rather
+    // than mechanical, and never crawls on a long answer.
+    const easeOut = (t: number) => 1 - Math.pow(1 - t, 3);
+
     const tick = () => {
       rafId = null;
-      if (buf.shown < buf.target.length) {
-        // reveal faster when far behind so we never lag the model, but always
-        // a smooth minimum drip so short replies still animate.
-        const remaining = buf.target.length - buf.shown;
-        buf.shown += Math.max(3, Math.ceil(remaining / 8));
-        if (buf.shown > buf.target.length) buf.shown = buf.target.length;
-        useAiStore.getState().setStreamingContent(() => buf.target.slice(0, buf.shown));
-      }
-      if (buf.shown < buf.target.length) {
+      const len = buf.target.length;
+      if (len === 0) return;
+      const elapsed = performance.now() - revealStart;
+      const t = revealMs === 0 ? 1 : Math.min(1, elapsed / revealMs);
+      buf.shown = Math.max(buf.shown, Math.floor(len * easeOut(t)));
+      useAiStore.getState().setStreamingContent(() => buf.target.slice(0, buf.shown));
+      if (t < 1) {
         rafId = requestAnimationFrame(tick);
-      } else if (buf.done) {
-        useAiStore.getState().finalizeStreaming();
-        // Hard-reset the buffer so the NEXT reply starts from empty instead of
-        // inheriting this one's text (root cause of the message-spam loop).
-        buf.target = "";
-        buf.shown = 0;
-        buf.done = false;
+        return;
       }
-    };
-    const ensureTick = () => {
-      if (rafId === null) rafId = requestAnimationFrame(tick);
+      // Fully revealed — commit it to the conversation.
+      useAiStore.getState().setStreamingContent(() => buf.target);
+      useAiStore.getState().finalizeStreaming();
+      // Hard-reset the buffer so the NEXT reply starts from empty instead of
+      // inheriting this one's text (root cause of the message-spam loop).
+      buf.target = "";
+      buf.shown = 0;
+      buf.done = false;
     };
     void (async () => {
+      // Accumulate silently. Nothing is painted until the reply is complete.
       const uc = await listen<string>("ai_chunk", (e) => {
         buf.target += e.payload;
-        ensureTick();
       });
       const ud = await listen("ai_done", () => {
         buf.done = true;
-        ensureTick(); // let the reveal finish catching up, then finalize
+        if (buf.target.length === 0) {
+          // Nothing came back — don't animate an empty bubble.
+          useAiStore.getState().finalizeStreaming();
+          return;
+        }
+        // Scale with length so a one-liner doesn't crawl and an essay doesn't
+        // take all day, then clamp so it always feels responsive.
+        revealMs = Math.min(1400, Math.max(350, buf.target.length * 4));
+        revealStart = performance.now();
+        buf.shown = 0;
+        if (rafId === null) rafId = requestAnimationFrame(tick);
       });
       if (!active) {
         uc();
