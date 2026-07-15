@@ -1,18 +1,3 @@
-## Beta 4 — Background Apps
-
-The one feature that missed Beta 3 by a few hours. **Background Apps** is a new tab that closes the programs sitting behind your game eating RAM.
-
-- Lists only apps Mujify can **name and explain** — launchers, chat, browsers, cloud sync, RGB software. No wall of `svchost.exe` to shoot at.
-- Real measured memory per app, summed across all its processes (Chrome alone is usually ~20 of them, and usually the biggest number on the page).
-- The RAM freed afterwards is a **measured before/after delta**, not an estimate. If Windows gives nothing back, it says so.
-- **Windows system processes, your anti-cheat, and the game you're playing are never listed and can never be closed** — enforced on the backend, not just hidden in the UI. Tampering with the app can't get around it.
-- Warnings only where it costs you something: closing a browser loses your tabs, closing MSI Afterburner drops your overclock, closing Discord drops you out of voice.
-- Closing an app isn't a settings change, so there's nothing to undo — you reopen it when you want it back. Mujify says that plainly instead of pretending it's reversible.
-
-Everything from Beta 3 below.
-
----
-
 ## Beta 3 — Optimizing actually works again
 
 The big one: **Apply was broken for a lot of you, and it wasn't your fault.**
@@ -51,9 +36,20 @@ A new **Services** tab. Windows runs background services you almost certainly do
 - Everything is reversible from the Change Log, restoring the exact start type each service had before Mujify touched it.
 - Mujify will **not** offer to disable audio, networking, Windows Update or Defender. Those aren't optimizations, they're breakage.
 
+### New: Background Apps
+
+A new **Background Apps** tab that closes the programs sitting behind your game eating RAM.
+
+- Lists only apps Mujify can **name and explain** — launchers, chat, browsers, cloud sync, RGB software. No wall of `svchost.exe` to shoot at.
+- Real measured memory per app, summed across all its processes (Chrome alone is usually ~20 of them, and usually the biggest number on the page).
+- The RAM freed afterwards is a **measured before/after delta**, not an estimate. If Windows gives nothing back, it says so.
+- **Windows system processes, your anti-cheat, and the game you're playing are never listed and can never be closed** — enforced on the backend, not just hidden in the UI. Tampering with the app can't get around it.
+- Warnings only where it costs you something: closing a browser loses your tabs, closing MSI Afterburner drops your overclock, closing Discord drops you out of voice.
+- Closing an app isn't a settings change, so there's nothing to undo — you reopen it when you want it back. Mujify says that plainly instead of pretending it's reversible.
+
 ### Honest notes
 
-- **What this won't do:** no service tweak turns weak hardware into strong hardware. Expect steadier frame times rather than a big average-FPS jump. Anyone promising otherwise is selling something.
+- **What this won't do:** none of this turns weak hardware into strong hardware. Expect steadier frame times, and real RAM back if something was hogging it — not doubled FPS. Anyone promising otherwise is selling something.
 - Disabling services needs admin rights. Without them the change is **refused and reported** — never silently skipped while claiming success.
 
 170 automated tests pass against this build, all proving the apply/undo logic without touching a real machine.
