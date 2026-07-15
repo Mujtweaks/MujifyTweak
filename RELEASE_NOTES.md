@@ -1,66 +1,33 @@
 # Beta 3
 
-The big one: **Optimizing works again.** If Apply did nothing for you before, that was our bug, not you.
+This update fixes a major bug that stopped optimizations from applying, repairs game detection and logos, and adds two new tools.
 
-## Apply is fixed
+## Fixed
 
-Do you have VALORANT installed? Then Mujify was refusing to apply almost every optimization — always, even with no game open.
+- **Optimizations now apply.** If VALORANT or Fortnite was installed, their anti-cheat runs in the background at all times, and Mujify mistook that for being in a game — so it held tweaks back permanently. It now only holds them back while you are actually playing.
+- **Game logos now load.** Logos were only ever read from a game's `.exe`. Mujify now also reads Xbox and Game Pass logo files, Steam's own game icons, and falls back to Windows itself. On our test PC this went from 0 of 6 games to 6 of 6.
+- **Cover art is no longer stretched or cropped.** Wide Steam banners now fit the tile correctly.
+- **Minecraft no longer appears twice.** "Minecraft Launcher" was listed as a separate game.
+- **Roblox only appears if Roblox is installed.** Having Roblox Studio no longer counts as having the game.
+- **Start with Windows works again.** Reinstalling silently disabled it. It now repairs itself, and stays off if you turned it off deliberately.
+- **AI responses no longer stutter.** The full answer is now shown in one smooth pass.
+- **Update notes now display correctly.** The last release showed raw formatting symbols.
 
-Here's why. VALORANT's anti-cheat, Vanguard, starts with Windows and never stops. Mujify saw it running and thought "a protected game is on right now", so it held back every tweak to keep you safe. But no game was on. It was just Vanguard sitting there. So the block never lifted, and Apply quietly did nothing. Fortnite's anti-cheat did the same thing.
+## Added
 
-Now Mujify only holds tweaks back when an anti-cheat is running **and** you are actually in a game. That is what it was always meant to do.
+- **Services** — turn off Windows background services you don't need. Every service is read live from your PC and explained in plain English, including what you lose. Everything is undone from the Change Log, exactly as it was. Sound, internet, Windows Update and Defender are never offered.
+- **Background Apps** — close programs eating memory behind your game. Shows real memory use per app, and measures how much actually comes back. Windows processes, your anti-cheat and your running game can never be closed here.
 
-You are still protected. While you really are in a game, risky tweaks are still held back automatically.
+## Improved
 
-## Your games look right now
+- **Xbox, Game Pass, VALORANT and League of Legends** are now detected once installed, not only while running.
+- **Hone, WeMod and Razer Cortex** no longer appear in your games list.
+- Warnings now appear only where there is a real cost, instead of on everything.
 
-**Game logos actually show up.** Before, a lot of games showed a plain letter in a coloured box. We found the real reason: Mujify was only looking for logos inside the game's `.exe` file. That works for some games and not others. Xbox and Game Pass games keep their logo in a separate picture file. Steam saves each game's icon as its own file. Some games lock their folder so nothing can read it at all.
+## Notes
 
-Mujify now checks all of those places, and asks Windows itself for the icon if everything else fails. On our test PC this took logos from 0 out of 6 games to 6 out of 6.
+- Optimizing does not turn a low-end PC into a high-end one. Expect smoother, steadier gameplay and real memory back — not double the FPS.
+- Turning off services requires administrator rights. Without them, Mujify reports that it could not make the change rather than claiming success.
+- Anti-cheat protection is unchanged. Risky tweaks are still held back automatically while a protected game is running.
 
-**No more squashed art.** Wide Steam banners were being cut off to fit the tall tile. Fixed.
-
-**Minecraft shows once, not twice.** "Minecraft Launcher" was showing as a separate game next to Minecraft. It is the same game. Our mistake, now fixed.
-
-**Roblox only shows if you have Roblox.** Having Roblox Studio (the game maker) is not the same as having the game. Mujify was treating them as one.
-
-## Your games are found now
-
-- **Xbox and Game Pass games** show up as soon as they are installed — not only while you are playing them.
-- **VALORANT and League of Legends** do the same.
-- **Hone and other "optimizers" are gone from your games list.** So are WeMod and Razer Cortex. They are tools, not games.
-
-## New: Services
-
-Windows runs background services you almost certainly don't need. Fax. Remote Registry. Xbox services, if you never touch Game Pass. Turning them off frees memory and stops background work on your disk.
-
-- Read live from **your** PC. Nothing is guessed.
-- Written in plain English, including **what you lose**. Turn off the print service and you can't print. We say so up front instead of letting you find out later.
-- Warnings only where there's a real cost. Not on every single row.
-- Undo anything from the Change Log. It puts each service back exactly how it was.
-- Mujify will **never** offer to turn off your sound, your internet, Windows Update or Defender. That's breaking your PC, not speeding it up.
-
-## New: Background Apps
-
-Closes the programs sitting behind your game eating memory.
-
-- Only shows apps we can actually name and explain. No giant list of confusing Windows processes to shoot at.
-- Shows the real memory each app is using. Chrome runs about 20 processes at once — they're added up into one line, and it's usually the biggest number on the page.
-- The memory you get back is **measured for real**, before and after. If Windows gives nothing back, we say nothing came back.
-- **Windows itself, your anti-cheat, and the game you're playing can never be closed here.** That's locked in the app's core, not just hidden from the screen.
-- Warnings where it matters: closing a browser loses your tabs, closing MSI Afterburner drops your overclock, closing Discord drops you out of voice chat.
-- This one has no undo, because there's nothing to undo — just open the app again when you want it back. We'd rather say that than pretend.
-
-## Smaller fixes
-
-- **The AI reads properly now.** Its answers used to jump and stutter as they arrived. It now waits for the full answer, then shows it smoothly.
-- **This window looks right.** Last update showed you raw `##` and `**` symbols. Sorry about that.
-- **Mujify starts with Windows again.** It was meant to already, but reinstalling quietly broke it. It now fixes itself. If you turned it off on purpose, it stays off.
-
-## Being straight with you
-
-None of this turns a weak PC into a strong one. Nothing can. What you get is smoother, steadier gameplay, and real memory back when something was hogging it. Anyone promising you double the FPS is selling something.
-
-Turning services off needs admin rights. Without them, Mujify tells you it couldn't do it. It will never claim something worked when it didn't.
-
-177 automated tests pass on this build. All of them prove the undo works without touching a real PC.
+177 automated tests pass on this build.
