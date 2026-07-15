@@ -1,7 +1,7 @@
 {
   "name": "mujify-tweaks",
   "private": true,
-  "version": "0.9.0-beta.13",
+  "version": "0.9.0-beta.14",
   "type": "module",
   "scripts": {
     "dev": "node scripts/free-port.cjs 1420 && vite",
