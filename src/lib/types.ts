@@ -165,6 +165,29 @@ export interface GameInfo {
   appId: string | null;
 }
 
+/** A background app, grouped across all its processes, with REAL measured RAM. */
+export interface BackgroundApp {
+  stem: string;
+  display: string;
+  category: string;
+  description: string;
+  /** The real cost of closing it. null when there isn't one worth warning about. */
+  warning: string | null;
+  recommended: boolean;
+  /** Summed working set across every process of this app, in MB. Measured. */
+  memoryMb: number;
+  instances: number;
+}
+
+/** Outcome of closing background apps. Every figure is measured, not estimated. */
+export interface CloseResult {
+  closed: string[];
+  /** Real reasons things didn't close — never silently swallowed. */
+  failed: string[];
+  processesClosed: number;
+  freedMb: number;
+}
+
 /** One curated Windows service joined with this machine's REAL current state. */
 export interface ServiceStatus {
   /** The tweak id it applies under (`service:<Name>`) — same pipeline as any

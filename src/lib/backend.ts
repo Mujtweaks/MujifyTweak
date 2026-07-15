@@ -27,6 +27,8 @@ import type {
   NetworkInfo,
   PingResponse,
   Profile,
+  BackgroundApp,
+  CloseResult,
   ScanResult,
   ServiceStatus,
   SettingsAdvice,
@@ -465,6 +467,43 @@ export async function applyFix(id: string): Promise<boolean> {
     console.error("apply_fix failed:", err);
     toast.errorHelp("Fix failed", String(err));
     return false;
+  }
+}
+
+/** Background Apps — read-only. Lists catalogued background apps with their real
+ *  measured memory. Closes nothing. */
+export async function fetchBackgroundApps(): Promise<BackgroundApp[]> {
+  if (!isTauri) return [];
+  try {
+    return await invoke<BackgroundApp[]>("list_background_apps");
+  } catch (err) {
+    console.error("list_background_apps failed:", err);
+    return [];
+  }
+}
+
+/** Close background apps. `confirm` is set by the user's explicit click in the
+ *  confirmation modal — the backend refuses without it, and re-validates every
+ *  target against its own catalog. */
+export async function closeBackgroundApps(stems: string[]): Promise<CloseResult | null> {
+  if (!isTauri) return null;
+  try {
+    const r = await invoke<CloseResult>("close_background_apps", { stems, confirm: true });
+    // Report what actually happened — including a partial success.
+    if (r.closed.length > 0) {
+      toast.success(
+        `Closed ${r.closed.length} app${r.closed.length === 1 ? "" : "s"}`,
+        r.freedMb > 0 ? `${r.freedMb} MB of RAM freed.` : "Windows didn't report any RAM back yet.",
+      );
+    }
+    if (r.failed.length > 0) {
+      toast.errorHelp("Some apps didn't close", r.failed.join(" · "));
+    }
+    return r;
+  } catch (err) {
+    console.error("close_background_apps failed:", err);
+    toast.errorHelp("Couldn't close apps", String(err));
+    return null;
   }
 }
 

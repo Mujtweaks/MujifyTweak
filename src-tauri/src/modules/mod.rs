@@ -31,6 +31,7 @@ pub mod health_scan;
 pub mod logger;
 pub mod network_monitor;
 pub mod power_util;
+pub mod process_manager;
 pub mod profile_store;
 pub mod ram_optimizer;
 pub mod ready_check;

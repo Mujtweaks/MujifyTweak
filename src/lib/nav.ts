@@ -4,6 +4,7 @@ import {
   Gamepad2,
   Globe,
   LayoutDashboard,
+  MemoryStick,
   Rocket,
   Server,
   Settings,
@@ -24,6 +25,7 @@ export type PageId =
   | "network"
   | "tweaks"
   | "services"
+  | "processes"
   | "fixes"
   | "cleaner"
   | "tools"
@@ -54,6 +56,7 @@ export const PAGE_TITLES: Record<PageId, string> = {
   network: "Network",
   tweaks: "Tweaks",
   services: "Services",
+  processes: "Background Apps",
   fixes: "Fixes",
   cleaner: "Cleaner",
   tools: "Tools",
@@ -76,6 +79,7 @@ export const NAV_ITEMS: NavItem[] = [
   { id: "network", label: "Network", icon: Globe },
   { id: "tweaks", label: "Tweaks", icon: SlidersHorizontal },
   { id: "services", label: "Services", icon: Server },
+  { id: "processes", label: "Background Apps", icon: MemoryStick },
   { id: "fixes", label: "Fixes", icon: Wrench },
   { id: "cleaner", label: "Cleaner", icon: Trash2 },
   { id: "ai", label: "AI Assistant", icon: Bot },
