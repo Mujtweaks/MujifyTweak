@@ -18,13 +18,12 @@ import { invoke } from "@tauri-apps/api/core";
 import { useSystemStore } from "../store/systemStore";
 import { useSettingsStore } from "../store/settingsStore";
 import { useAiStore } from "../store/aiStore";
-import { getUpdateInfo, openLogsFolder } from "../lib/backend";
+import { fetchReleaseNotes, getAppVersion, getUpdateInfo, openLogsFolder } from "../lib/backend";
 import { toast } from "../store/toastStore";
 import Toggle from "../components/Toggle";
 import UpdateModal from "../components/UpdateModal";
 import WhatsNewModal from "../components/WhatsNewModal";
 import OverlayControl from "../components/OverlayControl";
-import { WHATS_NEW } from "../lib/whatsNew";
 import type { UpdateInfo } from "../lib/types";
 
 function Section({ icon: Icon, title, children }: { icon: typeof Info; title: string; children: React.ReactNode }) {
@@ -69,6 +68,23 @@ export default function Settings() {
   const [updateInfo, setUpdateInfo] = useState<UpdateInfo | null>(null);
   const [showUpdate, setShowUpdate] = useState(false);
   const [showWhatsNew, setShowWhatsNew] = useState(false);
+  // What's New reads the SAME source as the post-update popup: the GitHub
+  // release body for the version actually running. It used to render a
+  // hand-written local copy that was last updated for 0.9.0-beta.12, so this
+  // button showed three-versions-old notes under a wrong version number forever.
+  const [appVersion, setAppVersion] = useState<string | null>(null);
+  const [notes, setNotes] = useState<string | null>(null);
+  const [notesLoading, setNotesLoading] = useState(false);
+  useEffect(() => {
+    void getAppVersion().then(setAppVersion);
+  }, []);
+  const openWhatsNew = async () => {
+    setShowWhatsNew(true);
+    if (notes || !appVersion) return;
+    setNotesLoading(true);
+    setNotes(await fetchReleaseNotes(appVersion));
+    setNotesLoading(false);
+  };
 
   // Start-on-startup — backed by the OS autostart entry (defaults ON at first run).
   const [autostartOn, setAutostartOn] = useState(true);
@@ -154,11 +170,13 @@ export default function Settings() {
       {/* What's New */}
       <Section icon={Sparkles} title="What's New">
         <p className="text-[12.5px] leading-relaxed text-txt2">
-          <span className="font-semibold text-txt">v{WHATS_NEW.version} — {WHATS_NEW.headline}</span> See everything that
-          changed in this build. You can reopen this any time.
+          <span className="font-semibold text-txt">
+            {appVersion ? `v${appVersion}` : "This build"}
+          </span>{" "}
+          — see everything that changed in the version you're running. You can reopen this any time.
         </p>
         <button
-          onClick={() => setShowWhatsNew(true)}
+          onClick={() => void openWhatsNew()}
           className="mt-3 flex items-center gap-2 rounded-btn border border-edge bg-bg px-4 py-2 text-[12.5px] font-medium text-txt hover:border-edge2"
         >
           <Sparkles size={14} className="text-accent" /> See what's new
@@ -166,7 +184,12 @@ export default function Settings() {
       </Section>
 
       {showWhatsNew && (
-        <WhatsNewModal version={WHATS_NEW.version} notes={WHATS_NEW.notes.join("\n")} onClose={() => setShowWhatsNew(false)} />
+        <WhatsNewModal
+          version={appVersion ?? "?"}
+          notes={notes}
+          loading={notesLoading}
+          onClose={() => setShowWhatsNew(false)}
+        />
       )}
 
       {/* In-Game Overlay */}

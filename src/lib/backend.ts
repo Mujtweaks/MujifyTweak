@@ -96,13 +96,31 @@ export async function getAppVersion(): Promise<string | null> {
 
 /** GitHub release notes for a version tag, or null (graceful — none yet = no-op). */
 export async function fetchReleaseNotes(version: string): Promise<string | null> {
+  // Cache per version, so What's New still works offline after the first
+  // successful fetch. This replaces the old hand-written local copy of the
+  // notes, which was kept "so it works offline" but was last updated for
+  // 0.9.0-beta.12 — it went stale immediately and then showed every user the
+  // wrong version's changelog. Cached REAL notes can't drift from the release.
+  const cacheKey = `mujify.notes.${version}`;
+  try {
+    const cached = localStorage.getItem(cacheKey);
+    if (cached) return cached;
+  } catch {
+    /* storage unavailable — just fetch */
+  }
   try {
     const tag = version.startsWith("v") ? version : `v${version}`;
     const r = await fetch(`https://api.github.com/repos/Mujtweaks/MujifyTweak/releases/tags/${tag}`);
     if (!r.ok) return null;
     const j = (await r.json()) as { body?: string };
     const body = (j.body ?? "").trim();
-    return body || null;
+    if (!body) return null;
+    try {
+      localStorage.setItem(cacheKey, body);
+    } catch {
+      /* quota/private mode — the notes still show, just not offline next time */
+    }
+    return body;
   } catch {
     return null;
   }
