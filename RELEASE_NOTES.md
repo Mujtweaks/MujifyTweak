@@ -12,6 +12,8 @@ This update fixes a major bug that stopped optimizations from applying, repairs 
 - **Start with Windows works again.** Reinstalling silently disabled it. It now repairs itself, and stays off if you turned it off deliberately.
 - **AI responses no longer stutter.** The full answer is now shown in one smooth pass.
 - **Update notes now display correctly.** The last release showed raw formatting symbols.
+- **Settings → What's New shows the right notes.** It was showing the Beta 2 changelog regardless of the version installed.
+- **"Last checked" no longer resets to Never.** The update check time is now remembered between sessions.
 
 ## Added
 
@@ -29,5 +31,8 @@ This update fixes a major bug that stopped optimizations from applying, repairs 
 - Optimizing does not turn a low-end PC into a high-end one. Expect smoother, steadier gameplay and real memory back — not double the FPS.
 - Turning off services requires administrator rights. Without them, Mujify reports that it could not make the change rather than claiming success.
 - Anti-cheat protection is unchanged. Risky tweaks are still held back automatically while a protected game is running.
+
+Full changelog and downloads: https://github.com/Mujtweaks/MujifyTweak/releases
+Website: https://mujifytweaks.site.je · Discord: https://discord.gg/zg4WXbJ9uw
 
 177 automated tests pass on this build.

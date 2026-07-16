@@ -18,7 +18,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { useSystemStore } from "../store/systemStore";
 import { useSettingsStore } from "../store/settingsStore";
 import { useAiStore } from "../store/aiStore";
-import { fetchReleaseNotes, getAppVersion, getUpdateInfo, openLogsFolder } from "../lib/backend";
+import { fetchReleaseNotes, getAppVersion, getLastUpdateCheck, getUpdateInfo, openLogsFolder } from "../lib/backend";
 import { toast } from "../store/toastStore";
 import Toggle from "../components/Toggle";
 import UpdateModal from "../components/UpdateModal";
@@ -63,7 +63,9 @@ export default function Settings() {
   const clearMessages = useAiStore((s) => s.clearMessages);
 
   const [updateStatus, setUpdateStatus] = useState<string | null>(null);
-  const [lastChecked, setLastChecked] = useState<number | null>(null);
+  // Seeded from storage: this is a real record of the last completed check,
+  // including the automatic one on launch — not just this page's lifetime.
+  const [lastChecked, setLastChecked] = useState<number | null>(() => getLastUpdateCheck());
   const [checking, setChecking] = useState(false);
   const [updateInfo, setUpdateInfo] = useState<UpdateInfo | null>(null);
   const [showUpdate, setShowUpdate] = useState(false);
@@ -109,7 +111,7 @@ export default function Settings() {
     setUpdateStatus(null);
     const info = await getUpdateInfo();
     setChecking(false);
-    setLastChecked(Date.now());
+    setLastChecked(getLastUpdateCheck());
     setUpdateInfo(info);
     if (info?.available) {
       setUpdateStatus(`Update available: v${info.version}`);

@@ -68,11 +68,35 @@ export async function checkForUpdates(): Promise<{ ok: boolean; message: string 
 }
 
 /** Non-throwing update check for the in-app banner (never a browser page). */
+const LAST_UPDATE_CHECK_KEY = "mujify.lastUpdateCheck";
+
+/** When the last update check actually completed, or null if it never has. */
+export function getLastUpdateCheck(): number | null {
+  try {
+    const raw = localStorage.getItem(LAST_UPDATE_CHECK_KEY);
+    const n = raw ? Number(raw) : NaN;
+    return Number.isFinite(n) ? n : null;
+  } catch {
+    return null;
+  }
+}
+
 export async function getUpdateInfo(): Promise<UpdateInfo | null> {
   if (!isTauri) return null;
   try {
-    return await invoke<UpdateInfo>("get_update_info");
+    const info = await invoke<UpdateInfo>("get_update_info");
+    // Recorded HERE, not in the Settings page, so it survives leaving the page
+    // and restarting the app — it was React state, so it reset to "Never" the
+    // moment you navigated away. Recording it at the source also means the
+    // automatic check on launch counts, which is the honest thing to report.
+    try {
+      localStorage.setItem(LAST_UPDATE_CHECK_KEY, String(Date.now()));
+    } catch {
+      /* storage unavailable — the check still worked, we just can't remember when */
+    }
+    return info;
   } catch {
+    // A failed check is NOT a check — don't stamp the time for it.
     return null;
   }
 }

@@ -1,6 +1,6 @@
 import { Sparkles, X } from "lucide-react";
 import Markdown from "./Markdown";
-import { DISCORD_INVITE, GITHUB_RELEASES, openExternal } from "../lib/links";
+import { DISCORD_INVITE, GITHUB_RELEASES, UPDATES_PAGE, openExternal } from "../lib/links";
 
 /**
  * "What's new" popup — shown once after the first launch on a new version, from
@@ -52,7 +52,14 @@ export default function WhatsNewModal({
             </div>
           )}
         </div>
-        <div className="border-t border-edge px-5 py-3.5 text-center">
+        <div className="flex items-center justify-center gap-4 border-t border-edge px-5 py-3.5 text-center">
+          <button
+            onClick={() => void openExternal(UPDATES_PAGE)}
+            className="text-[12px] font-medium text-txt2 hover:text-txt"
+          >
+            All updates
+          </button>
+          <span className="h-3 w-px bg-edge" />
           <button
             onClick={() => void openExternal(DISCORD_INVITE)}
             className="text-[12px] font-semibold text-accent hover:text-accent-hi"
