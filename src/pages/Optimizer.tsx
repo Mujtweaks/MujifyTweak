@@ -65,6 +65,12 @@ export default function Optimizer({ onNavigate: _onNavigate }: { onNavigate: (pa
   const [openGroup, setOpenGroup] = useState<HwGroup | null>(null);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [confirm, setConfirm] = useState<TweakInfo[] | null>(null);
+  // How hard to push. "balanced" = safe + moderate (the sensible default);
+  // "ultimate" also includes advanced-risk tweaks for maximum effect. Every
+  // tweak is still confirmed, warned, and reversible — this only changes which
+  // risk tiers the one-click actions are ALLOWED to include. The old Optimizer
+  // was hardcoded to balanced, so advanced tweaks could never be applied here.
+  const [level, setLevel] = useState<"balanced" | "ultimate">("balanced");
 
   const runScan = async () => {
     const r = await scanTweaks(hardware?.isLaptop ?? null);
@@ -99,12 +105,22 @@ export default function Optimizer({ onNavigate: _onNavigate }: { onNavigate: (pa
   // members and opens the confirm modal. Never applies directly.
   const optimizeGroup = (g: HwGroup) => optimizeIds(groupRows(g).map((t) => t.id));
   const optimizeIds = (ids: string[]) => {
-    const allowed = PRESET_RISK["balanced"];
+    const allowed = PRESET_RISK[level];
     const picks = ids
       .map((id) => byId.get(id))
       .filter((t): t is TweakInfo => !!t)
       .filter((t) => t.appliable && t.available && !t.applied && allowed.includes(t.risk));
     if (picks.length) setConfirm(picks);
+  };
+
+  // Everything actionable at the current level, across the WHOLE catalog — the
+  // single "make my PC as fast as it safely can be" button.
+  const everythingActionable = useMemo(() => {
+    const allowed = PRESET_RISK[level];
+    return tweaks.filter((t) => t.appliable && t.available && !t.applied && allowed.includes(t.risk));
+  }, [tweaks, level]);
+  const optimizeEverything = () => {
+    if (everythingActionable.length) setConfirm(everythingActionable);
   };
 
   // Live counts across the whole catalog (real, from the scan).
@@ -175,6 +191,59 @@ export default function Optimizer({ onNavigate: _onNavigate }: { onNavigate: (pa
       <div>
         <h1 className="text-[42px] font-black uppercase leading-none tracking-tight text-txt">Optimizer</h1>
         <p className="mt-1.5 text-[14px] text-txt2">Tune each part of your PC — every tweak free, confirmed, and reversible.</p>
+      </div>
+
+      {/* Aggressiveness + Optimize Everything — the big one-click. */}
+      <div className="rounded-2xl border border-accent/25 bg-gradient-to-br from-accent/[0.08] to-transparent p-5">
+        <div className="flex flex-wrap items-center justify-between gap-4">
+          <div>
+            <p className="text-[11px] font-bold uppercase tracking-widest text-accent">One click · everything</p>
+            <h2 className="mt-1 text-[22px] font-black leading-tight text-txt">Optimize your whole PC</h2>
+            <p className="mt-1 max-w-[52ch] text-[12.5px] leading-snug text-txt2">
+              Applies every recommended tweak for your hardware at once — all listed before they run,
+              all logged, all reversible from the Change Log.
+            </p>
+          </div>
+
+          {/* Level selector */}
+          <div className="flex flex-col gap-1.5">
+            <span className="text-[10px] font-bold uppercase tracking-widest text-txt3">How hard</span>
+            <div className="flex rounded-btn border border-edge bg-bg p-1">
+              <button
+                onClick={() => setLevel("balanced")}
+                className={`rounded-[6px] px-3.5 py-1.5 text-[12px] font-semibold transition-colors ${level === "balanced" ? "bg-card text-txt shadow" : "text-txt3 hover:text-txt2"}`}
+              >
+                Balanced
+              </button>
+              <button
+                onClick={() => setLevel("ultimate")}
+                className={`rounded-[6px] px-3.5 py-1.5 text-[12px] font-semibold transition-colors ${level === "ultimate" ? "bg-accent text-white shadow" : "text-txt3 hover:text-txt2"}`}
+              >
+                Maximum
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {level === "ultimate" && (
+          <p className="mt-3 flex items-start gap-2 rounded-chip border border-warning/30 bg-warning/10 px-3 py-2 text-[11.5px] leading-snug text-warning">
+            <Shield size={13} className="mt-0.5 shrink-0" />
+            Maximum includes advanced tweaks with the biggest impact — and the most caution. Each one
+            still shows its warning in the confirmation, and everything stays reversible. Recommended
+            for a plugged-in desktop; on a laptop, watch your temperatures.
+          </p>
+        )}
+
+        <button
+          onClick={optimizeEverything}
+          disabled={everythingActionable.length === 0}
+          className="glint mt-4 flex w-full items-center justify-center gap-2 rounded-btn bg-accent px-4 py-3 text-[14px] font-bold text-white shadow-[0_4px_24px_rgba(227,0,14,0.35)] hover:bg-accent-hi disabled:opacity-50"
+        >
+          <Zap size={16} strokeWidth={2.5} fill="currentColor" />
+          {everythingActionable.length === 0
+            ? "Everything's already optimized"
+            : `Optimize Everything (${everythingActionable.length})`}
+        </button>
       </div>
 
       {/* Live optimization summary (real counts from the scan) */}
