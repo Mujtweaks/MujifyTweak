@@ -76,7 +76,7 @@ pub fn diff_snapshots(prev: &SystemSnapshot, new: &SystemSnapshot, now: i64) -> 
     }
     if let (Some(a), Some(b)) = (&prev.power_plan, &new.power_plan) {
         if a != b {
-            out.push(entry(now, "power_plan", format!("Power plan changed: {a} → {b}"), Some("power_high_perf")));
+            out.push(entry(now, "power_plan", format!("Power plan changed: {a} → {b}"), Some("power_ultimate")));
         }
     }
     if let (Some(a), Some(b)) = (prev.refresh_hz, new.refresh_hz) {
@@ -317,7 +317,7 @@ mod tests {
         new.power_plan = Some("Balanced".into());
         new.refresh_hz = Some(60);
         let d = diff_snapshots(&snap(), &new, 100);
-        assert!(d.iter().any(|e| e.kind == "power_plan" && e.action.as_deref() == Some("power_high_perf")));
+        assert!(d.iter().any(|e| e.kind == "power_plan" && e.action.as_deref() == Some("power_ultimate")));
         // Refresh dropped 144→60 → offer the max-refresh fix.
         assert!(d.iter().any(|e| e.kind == "refresh" && e.action.as_deref() == Some("max_refresh_rate")));
     }

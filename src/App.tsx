@@ -29,8 +29,7 @@ import SplashIntro from "./components/SplashIntro";
 import WelcomeModal from "./components/WelcomeModal";
 import WhatsNewModal from "./components/WhatsNewModal";
 import ReadyCheck from "./components/ReadyCheck";
-import UpdateBanner from "./components/UpdateBanner";
-import UpdateModal from "./components/UpdateModal";
+import MandatoryUpdateModal from "./components/MandatoryUpdateModal";
 import { checkResetTweaks, connectBackend, fetchHardware, fetchReleaseNotes, getAppVersion, getUpdateInfo } from "./lib/backend";
 import { toast } from "./store/toastStore";
 import { startHeartbeat } from "./lib/heartbeat";
@@ -69,11 +68,10 @@ export default function App() {
   };
   // "What's new" — shown once after the first launch on a new version.
   const [whatsNew, setWhatsNew] = useState<{ version: string; notes: string } | null>(null);
-  // Auto-update: checked on EVERY startup (not only via the Settings button). If a
-  // higher version is published, a dismissible banner offers a one-click in-app update.
+  // Auto-update: checked on EVERY startup. If a higher signed version exists, a
+  // REQUIRED, non-skippable update gate takes over the whole window — the old
+  // dismissible top banner let people ignore critical fixes indefinitely.
   const [update, setUpdate] = useState<UpdateInfo | null>(null);
-  const [updateDismissed, setUpdateDismissed] = useState(false);
-  const [showUpdate, setShowUpdate] = useState(false);
 
   useEffect(() => {
     void connectBackend();
@@ -205,15 +203,6 @@ export default function App() {
       <Sidebar page={page} onNavigate={navigate} />
       <div className="flex min-w-0 flex-1 flex-col">
         <TopBar page={page} onNavigate={navigate} />
-        {update?.available && !updateDismissed && (
-          <div className="px-6 pt-3">
-            <UpdateBanner
-              version={update.version}
-              onUpdate={() => setShowUpdate(true)}
-              onDismiss={() => setUpdateDismissed(true)}
-            />
-          </div>
-        )}
         <main className="min-h-0 flex-1 overflow-y-auto px-6 py-5">
           <div key={page} className="page-enter">
             {renderPage()}
@@ -225,11 +214,14 @@ export default function App() {
       <ReadyCheck onNavigate={navigate} />
       {splash && <SplashIntro onDone={() => setSplash(false)} />}
       {!splash && showWelcome && <WelcomeModal onClose={dismissWelcome} />}
-      {whatsNew && (
-        <WhatsNewModal version={whatsNew.version} notes={whatsNew.notes} onClose={() => setWhatsNew(null)} />
-      )}
-      {showUpdate && update && (
-        <UpdateModal version={update.version} onClose={() => setShowUpdate(false)} />
+      {/* The required-update gate outranks What's New: if you're out of date you
+          update first, then see what changed on the new version's first launch. */}
+      {update?.available ? (
+        <MandatoryUpdateModal version={update.version} />
+      ) : (
+        whatsNew && (
+          <WhatsNewModal version={whatsNew.version} notes={whatsNew.notes} onClose={() => setWhatsNew(null)} />
+        )
       )}
     </div>
   );

@@ -37,7 +37,7 @@ function hardwareGroups(gpuVendor: string | undefined): HwGroup[] {
       subtitle: "Keep every core awake and prioritise your game.",
       icon: Cpu,
       color: "#f97316",
-      ids: ["disable_core_parking", "disable_power_throttling", "win32_priority", "power_high_perf", "power_ultimate", "mmcss_gaming", "large_system_cache"],
+      ids: ["disable_core_parking", "disable_power_throttling", "win32_priority", "power_ultimate", "mmcss_gaming", "large_system_cache"],
     },
     {
       id: "gpu",
@@ -116,7 +116,7 @@ export default function Optimizer({ onNavigate: _onNavigate }: { onNavigate: (pa
   // "howMany" counts how many are still actionable so the card can show progress.
   const GOALS: { id: string; label: string; desc: string; icon: LucideIcon; color: string; ids: string[] }[] = [
     { id: "fps", label: "Competitive FPS", desc: "Max frames & steady pacing for shooters.", icon: Zap, color: "#e3000e",
-      ids: ["disable_fso", "disable_gamedvr", "disable_game_bar", "hags", "gpu_priority", "mmcss_gaming", "win32_priority", "disable_core_parking", "disable_power_throttling", "power_high_perf", "network_throttling_index", "disable_nagle"] },
+      ids: ["disable_fso", "disable_gamedvr", "disable_game_bar", "hags", "gpu_priority", "mmcss_gaming", "win32_priority", "disable_core_parking", "disable_power_throttling", "power_ultimate", "network_throttling_index", "disable_nagle"] },
     { id: "latency", label: "Lowest Latency", desc: "Cut input lag & network delay.", icon: Activity, color: "#f59e0b",
       ids: ["disable_nagle", "tcp_ack_frequency", "network_qos", "tcp_optimize", "disable_mpo", "mouse_accel_off", "usb_selective_suspend_off"] },
     { id: "privacy", label: "Privacy Lockdown", desc: "Kill telemetry, ads & tracking.", icon: Shield, color: "#22c55e",

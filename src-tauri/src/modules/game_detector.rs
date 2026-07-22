@@ -146,6 +146,12 @@ fn canonical_name(name: &str) -> String {
     if n.contains("counter-strike") || n.contains("counter strike") || n == "cs2" {
         return "Counter-Strike 2".to_string();
     }
+    // Fortnite ships several content packs as their own folders/manifests
+    // ("Fortnite_JunoContent" = the LEGO/Juno content), which showed as extra
+    // tiles beside Fortnite. They are all one game.
+    if n.contains("fortnite") {
+        return "Fortnite".to_string();
+    }
     // "Minecraft Launcher" IS Minecraft — it's how you launch and play it, and
     // it's what Xbox/Game Pass installs the game as. Excluding "launcher" here
     // meant a user with Game Pass Minecraft got TWO tiles: a "Minecraft" one
@@ -904,18 +910,28 @@ fn scan_riot(games: &mut Vec<GameInfo>) {
         let Some(name) = riot_product_display_name(&dir) else {
             continue;
         };
-        // The default install root; used for the icon + engine scan when present.
-        let install = ["PROGRAMFILES", "ProgramFiles(x86)", "SystemDrive"]
+        // REQUIRE the real game folder to exist. A metadata folder alone is NOT
+        // proof of an install: the Riot Client leaves metadata behind after an
+        // uninstall, and lists products the user never fully installed — which is
+        // exactly why users saw League of Legends / Legends of Runeterra as ghost
+        // tiles for games they'd never downloaded. If the actual folder isn't
+        // there, skip it; a game installed to a non-default drive is still caught
+        // the moment it's launched (running-detection), which is a far better
+        // failure than inventing a game that isn't on the PC.
+        let Some(install) = ["SystemDrive", "PROGRAMFILES", "ProgramFiles(x86)"]
             .iter()
             .filter_map(|v| std::env::var(v).ok())
             .map(|base| PathBuf::from(base).join("Riot Games").join(name))
-            .find(|p| p.exists())
-            .map(|p| p.to_string_lossy().to_string());
+            .find(|p| p.is_dir())
+            .map(|p| p.to_string_lossy().to_string())
+        else {
+            continue;
+        };
         push_unique(games, GameInfo {
             name: name.to_string(),
             exe: String::new(),
             launcher: Some("Riot".into()),
-            install_path: install,
+            install_path: Some(install),
             app_id: None,
             icon_path: None,
         });
@@ -1333,6 +1349,24 @@ mod tests {
         assert!(big > small, "the 256px asset must win ({big} vs {small})");
         // And a proper LargeLogo outranks a StoreLogo.
         assert!(s("LargeLogo.scale-400.png").unwrap() > s("StoreLogo.png").unwrap());
+    }
+
+    #[test]
+    fn fortnite_content_packs_collapse_into_one_fortnite() {
+        // "Fortnite_JunoContent" (the LEGO/Juno content) was showing as a second
+        // tile beside Fortnite. Everything Fortnite is one game.
+        assert_eq!(canonical_name("Fortnite_JunoContent"), "Fortnite");
+        assert_eq!(canonical_name("Fortnite"), "Fortnite");
+        assert_eq!(canonical_name("Fortnite Festival"), "Fortnite");
+        let mut games = Vec::new();
+        let mk = |n: &str| GameInfo {
+            name: n.to_string(), exe: String::new(), launcher: None,
+            install_path: None, app_id: None, icon_path: None,
+        };
+        push_unique(&mut games, mk("Fortnite"));
+        push_unique(&mut games, mk("Fortnite_JunoContent"));
+        assert_eq!(games.len(), 1, "content packs collapse into Fortnite");
+        assert_eq!(games[0].name, "Fortnite");
     }
 
     #[test]

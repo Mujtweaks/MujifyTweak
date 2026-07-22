@@ -51,7 +51,7 @@ pub struct TweakInfo {
 /// apply-confirm dialog surface the exact same caution.
 pub fn warning_for(id: &str) -> Option<&'static str> {
     match id {
-        "power_ultimate" | "power_high_perf" =>
+        "power_ultimate" =>
             Some("On a laptop this runs the CPU/GPU hot and drains the battery — only use it plugged in, and watch your temperatures."),
         "disable_bitlocker" =>
             Some("Only disable BitLocker if you understand the security tradeoff — your drive will no longer be encrypted."),
@@ -123,8 +123,11 @@ use Risk::*;
 /// The full catalog. Source of truth for the Optimizer + Tweaks tabs.
 const CATALOG: &[TweakDef] = &[
     // ---------- System ----------
-    TweakDef { id: "power_high_perf", title: "High Performance Power Plan", description: "Switches Windows to the High Performance plan to prevent CPU/GPU frequency dips.", category: System, risk: Safe, impact: 4 },
-    TweakDef { id: "power_ultimate", title: "Ultimate Performance Power Plan", description: "Enables the hidden Ultimate Performance plan — disables CPU idle states for max responsiveness.", category: System, risk: Moderate, impact: 5 },
+    // NOTE: "power_high_perf" was removed from the catalog — Ultimate Performance
+    // supersedes it (it's High Performance plus disabled CPU idle states). The
+    // apply/undo path for it still lives in tweak_ops so any change already made
+    // in an older build can still be reverted from the Change Log.
+    TweakDef { id: "power_ultimate", title: "Ultimate Performance Power Plan", description: "Enables the hidden Ultimate Performance plan — the highest-performance Windows plan (High Performance plus disabled CPU idle states) for maximum responsiveness.", category: System, risk: Moderate, impact: 5 },
     TweakDef { id: "disable_startup_apps", title: "Trim Startup Programs", description: "Disables non-essential apps that launch at boot to free RAM and speed up startup.", category: System, risk: Safe, impact: 3 },
     TweakDef { id: "disable_sysmain", title: "Disable SysMain (Superfetch)", description: "Stops background prefetching that competes for disk I/O during gameplay.", category: System, risk: Moderate, impact: 3 },
     TweakDef { id: "disable_search_index", title: "Disable Search Indexing", description: "Halts Windows Search indexing to free CPU and disk while gaming.", category: System, risk: Moderate, impact: 3 },

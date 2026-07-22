@@ -159,7 +159,7 @@ const GENERIC: EngineProfile = EngineProfile {
     tendency: "mixed",
     focus: "a safe, conservative gaming baseline",
     recommended: &[
-        ("power_high_perf", "High Performance stops the CPU/GPU down-clocking."),
+        ("power_ultimate", "Ultimate Performance keeps the CPU/GPU from down-clocking mid-match."),
         ("disable_game_bar", "Removes the Xbox overlay capture overhead."),
         ("disable_gamedvr", "Stops background capture that costs FPS."),
         ("disable_power_throttling", "Stops the game being throttled to save power."),

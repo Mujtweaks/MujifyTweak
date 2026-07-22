@@ -22,7 +22,7 @@ const SEV_ORDER: Record<string, number> = { critical: 0, warning: 1, info: 2 };
 // listed here get a one-click "Fix" button; BIOS/advisory findings stay
 // advice-only (never a fake button for something we can't actually change).
 const FIX_MAP: Record<string, { tweakId: string; notice?: string }> = {
-  power_plan: { tweakId: "power_high_perf" },
+  power_plan: { tweakId: "power_ultimate" },
   refresh_rate: { tweakId: "max_refresh_rate" },
   hvci: {
     tweakId: "disable_hvci",

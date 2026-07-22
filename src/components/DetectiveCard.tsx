@@ -10,7 +10,7 @@ import type { PageId } from "../lib/nav";
 const ACTION: Record<string, { label: string; page: PageId }> = {
   driver_rollback: { label: "Driver options", page: "drivers" },
   health_scan: { label: "Run health scan", page: "diagnostics" },
-  power_high_perf: { label: "Fix power plan", page: "tweaks" },
+  power_ultimate: { label: "Fix power plan", page: "tweaks" },
   max_refresh_rate: { label: "Fix refresh rate", page: "tweaks" },
 };
 

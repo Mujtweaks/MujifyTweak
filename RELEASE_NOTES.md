@@ -1,38 +1,24 @@
-# Beta 3
+# Beta 2
 
-This update fixes a major bug that stopped optimizations from applying, repairs game detection and logos, and adds two new tools.
+This update fixes game detection, simplifies the power tweaks, and makes updates mandatory so everyone stays on the latest, safest build.
 
 ## Fixed
 
-- **Optimizations now apply.** If VALORANT or Fortnite was installed, their anti-cheat runs in the background at all times, and Mujify mistook that for being in a game — so it held tweaks back permanently. It now only holds them back while you are actually playing.
-- **Game logos now load.** Logos were only ever read from a game's `.exe`. Mujify now also reads Xbox and Game Pass logo files, Steam's own game icons, and falls back to Windows itself. On our test PC this went from 0 of 6 games to 6 of 6.
-- **Cover art is no longer stretched or cropped.** Wide Steam banners now fit the tile correctly.
-- **Minecraft no longer appears twice.** "Minecraft Launcher" was listed as a separate game.
-- **Roblox only appears if Roblox is installed.** Having Roblox Studio no longer counts as having the game.
-- **Start with Windows works again.** Reinstalling silently disabled it. It now repairs itself, and stays off if you turned it off deliberately.
-- **AI responses no longer stutter.** The full answer is now shown in one smooth pass.
-- **Update notes now display correctly.** The last release showed raw formatting symbols.
-- **Settings → What's New shows the right notes.** It was showing the Beta 2 changelog regardless of the version installed.
-- **"Last checked" no longer resets to Never.** The update check time is now remembered between sessions.
+- **Games you never installed no longer appear.** Riot titles like League of Legends and Legends of Runeterra were showing up for people who had never downloaded them — the app was reading leftover Riot data instead of checking for a real install. It now only lists a Riot game when the game is genuinely installed.
+- **Fortnite shows once.** Its extra content packs (like the LEGO/Juno content) were appearing as separate games. They now collapse into a single Fortnite tile.
 
-## Added
+## Changed
 
-- **Services** — turn off Windows background services you don't need. Every service is read live from your PC and explained in plain English, including what you lose. Everything is undone from the Change Log, exactly as it was. Sound, internet, Windows Update and Defender are never offered.
-- **Background Apps** — close programs eating memory behind your game. Shows real memory use per app, and measures how much actually comes back. Windows processes, your anti-cheat and your running game can never be closed here.
-
-## Improved
-
-- **Xbox, Game Pass, VALORANT and League of Legends** are now detected once installed, not only while running.
-- **Hone, WeMod and Razer Cortex** no longer appear in your games list.
-- Warnings now appear only where there is a real cost, instead of on everything.
+- **One power plan instead of two.** High Performance has been removed. Ultimate Performance replaces it — it does everything High Performance did and more, so there's no reason to offer both. Any change you made in an older build can still be undone from the Change Log.
+- **Updates are now required.** When a new version is available, Mujify shows it as a full pop-up on launch with the changelog and a single Update Now button — no more banner you can ignore. This keeps everyone on the build with the important fixes. If an update ever fails to install, your current version keeps working and you can retry or download it manually.
 
 ## Notes
 
+- Ultimate Performance runs the CPU and GPU harder. On a laptop, use it plugged in and keep an eye on temperatures — Mujify warns you before applying it.
 - Optimizing does not turn a low-end PC into a high-end one. Expect smoother, steadier gameplay and real memory back — not double the FPS.
-- Turning off services requires administrator rights. Without them, Mujify reports that it could not make the change rather than claiming success.
 - Anti-cheat protection is unchanged. Risky tweaks are still held back automatically while a protected game is running.
 
-Full changelog and downloads: https://github.com/Mujtweaks/MujifyTweak/releases
 Website: https://mujifytweaks.site.je · Discord: https://discord.gg/zg4WXbJ9uw
+Full changelog and downloads: https://github.com/Mujtweaks/MujifyTweak/releases
 
-177 automated tests pass on this build.
+178 automated tests pass on this build.
